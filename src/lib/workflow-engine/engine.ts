@@ -1,7 +1,7 @@
 import { store, uid } from "./storage";
 import type {
   WorkflowInstance, WorkflowHistory, WorkflowTransition, StageAssignment,
-  FieldRule, FieldDefinition, FieldGroup, StageGroup, StageGroupAudience, WfUser, WorkflowStage, WorkflowVersion,
+  FieldRule, FieldDefinition, FieldGroup, StageGroup, StageGroupAudience, StageRoutingRule, WfUser, WorkflowStage, WorkflowVersion,
   WorkflowDefinition, WorkflowAction,
 } from "./types";
 
@@ -121,6 +121,10 @@ export function getStageGroups(versionId: string): StageGroup[] {
     .sort((a, b) => a.order - b.order);
 }
 
+export function getStageRoutingRules(versionId: string): StageRoutingRule[] {
+  return getEffectiveStageRoutingRules(versionId);
+}
+
 /**
  * Whether `user` matches a single audience rule. Each set field must match
  * (org/role ids are aliased to engine ids); unset fields mean "any".
@@ -130,6 +134,94 @@ function audienceRuleMatches(rule: StageGroupAudience, user: WfUser): boolean {
   if (rule.teamId && !user.teamIds.includes(rule.teamId)) return false;
   if (rule.roleId && !user.roleIds.includes(ROLE_ID_ALIASES[rule.roleId] ?? rule.roleId)) return false;
   return true;
+}
+
+export function stageRoutingRuleMatches(rule: Pick<StageRoutingRule, "organizationId" | "teamId" | "roleId">, user: WfUser): boolean {
+  if (rule.organizationId && user.organizationId !== (ORG_ID_ALIASES[rule.organizationId] ?? rule.organizationId)) return false;
+  if (rule.teamId && !user.teamIds.includes(rule.teamId)) return false;
+  if (rule.roleId && !user.roleIds.includes(ROLE_ID_ALIASES[rule.roleId] ?? rule.roleId)) return false;
+  return true;
+}
+
+export function getStageRoutingForUser(stage: WorkflowStage, user: WfUser | null): StageRoutingRule | undefined {
+  const rules = getEffectiveStageRoutingRules(stage.workflowVersionId).filter((r) => r.stageId === stage.id);
+  if (rules.length === 0 || !user) return undefined;
+  return rules.find((r) => stageRoutingRuleMatches(r, user));
+}
+
+export function canViewByStageRouting(stageId: string, user: WfUser | null): boolean {
+  if (!user) return false;
+  if (user.roleIds.includes("role_admin")) return true;
+  const stage = store.stages.get().find((s) => s.id === stageId);
+  const rules = stage
+    ? getEffectiveStageRoutingRules(stage.workflowVersionId).filter((r) => r.stageId === stageId)
+    : store.stageRoutingRules.get().filter((r) => r.stageId === stageId);
+  if (rules.length === 0) return canView(stageId, user);
+  return rules.some((r) => stageRoutingRuleMatches(r, user));
+}
+
+export function processLabelForStage(stage: WorkflowStage, user: WfUser | null): string {
+  return getStageRoutingForUser(stage, user)?.processLabel ?? stage.processLabel ?? stage.name;
+}
+
+export function isAssignmentBackedStageRoutingRule(ruleId: string): boolean {
+  return ruleId.startsWith("sr_assignment_");
+}
+
+export function getAssignmentBackedStageRoutingRules(versionId: string): StageRoutingRule[] {
+  const stages = store.stages.get().filter((s) => s.workflowVersionId === versionId);
+  const stageById = new Map(stages.map((s) => [s.id, s]));
+  const manualRules = store.stageRoutingRules.get().filter((r) => r.workflowVersionId === versionId);
+  const manualByScope = new Map(manualRules.map((r) => [stageRoutingScopeKey(r), r]));
+  const seen = new Set<string>();
+  const rules: StageRoutingRule[] = [];
+
+  for (const assignment of store.assignments.get()) {
+    const stage = stageById.get(assignment.stageId);
+    if (!stage) continue;
+
+    const rule: StageRoutingRule = {
+      id: `sr_assignment_${assignment.id}`,
+      workflowVersionId: versionId,
+      stageId: assignment.stageId,
+      organizationId: assignment.organizationId,
+      teamId: assignment.teamId,
+      roleId: assignment.roleId,
+      processLabel: stage.name,
+    };
+
+    if (!rule.organizationId && !rule.teamId && !rule.roleId) continue;
+
+    const key = stageRoutingScopeKey(rule);
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    rules.push({
+      ...rule,
+      processLabel: manualByScope.get(key)?.processLabel ?? rule.processLabel,
+    });
+  }
+
+  return rules;
+}
+
+export function getEffectiveStageRoutingRules(versionId: string): StageRoutingRule[] {
+  const mandatoryRules = getAssignmentBackedStageRoutingRules(versionId);
+  const mandatoryScopes = new Set(mandatoryRules.map(stageRoutingScopeKey));
+  const manualRules = store.stageRoutingRules
+    .get()
+    .filter((r) => r.workflowVersionId === versionId && !mandatoryScopes.has(stageRoutingScopeKey(r)));
+
+  return [...mandatoryRules, ...manualRules];
+}
+
+function stageRoutingScopeKey(rule: Pick<StageRoutingRule, "stageId" | "organizationId" | "teamId" | "roleId">): string {
+  return [
+    rule.stageId,
+    rule.organizationId ? ORG_ID_ALIASES[rule.organizationId] ?? rule.organizationId : "",
+    rule.teamId ?? "",
+    rule.roleId ? ROLE_ID_ALIASES[rule.roleId] ?? rule.roleId : "",
+  ].join("|");
 }
 
 /**

@@ -3,7 +3,7 @@ import {
   LayoutDashboard, FileText, Users, BarChart3,
   Settings, Bell, Search, Sun, Moon, LogOut, Languages,
   Building2, ScrollText, AlertTriangle, ChevronLeft, UserCog, Network,
-  FileCheck2, KeyRound, ShieldCheck, Menu, X,
+  FileCheck2, KeyRound, ShieldCheck, Menu, X, Database,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth, auth, ROLE_LABELS, type Role } from "@/lib/mock";
@@ -40,6 +40,7 @@ const NAV: NavItem[] = [
   { to: "/audit", label: "التدقيق والامتثال", icon: ScrollText, screen: "audit" },
   { to: "/notifications", label: "الإشعارات", icon: Bell },
   { to: "/admin/workflows", label: "مصمم سير العمل", icon: FileCheck2, roles: ["platform_admin"] },
+  { to: "/admin/reference-data", label: "البيانات الأساسية", icon: Database, roles: ["platform_admin"] },
   { to: "/admin/screen-permissions", label: "صلاحيات الشاشات", icon: ShieldCheck, roles: ["platform_admin"] },
   { to: "/admin/entities", label: "إدارة البنوك", icon: Network, roles: ["platform_admin"] },
   { to: "/admin/orgs", label: "إدارة الجهات", icon: Building2, roles: ["platform_admin"] },

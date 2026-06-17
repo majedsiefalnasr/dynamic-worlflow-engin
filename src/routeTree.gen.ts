@@ -28,6 +28,7 @@ import { Route as AdminWorkflowDocsRouteImport } from './routes/admin.workflow-d
 import { Route as AdminTeamsRouteImport } from './routes/admin.teams'
 import { Route as AdminScreenPermissionsRouteImport } from './routes/admin.screen-permissions'
 import { Route as AdminRolesRouteImport } from './routes/admin.roles'
+import { Route as AdminReferenceDataRouteImport } from './routes/admin.reference-data'
 import { Route as AdminOrgsRouteImport } from './routes/admin.orgs'
 import { Route as AdminEntitiesRouteImport } from './routes/admin.entities'
 import { Route as AdminCbyStaffRouteImport } from './routes/admin.cby-staff'
@@ -130,6 +131,11 @@ const AdminRolesRoute = AdminRolesRouteImport.update({
   path: '/admin/roles',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminReferenceDataRoute = AdminReferenceDataRouteImport.update({
+  id: '/admin/reference-data',
+  path: '/admin/reference-data',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminOrgsRoute = AdminOrgsRouteImport.update({
   id: '/admin/orgs',
   path: '/admin/orgs',
@@ -174,6 +180,7 @@ export interface FileRoutesByFullPath {
   '/admin/cby-staff': typeof AdminCbyStaffRoute
   '/admin/entities': typeof AdminEntitiesRoute
   '/admin/orgs': typeof AdminOrgsRoute
+  '/admin/reference-data': typeof AdminReferenceDataRoute
   '/admin/roles': typeof AdminRolesRoute
   '/admin/screen-permissions': typeof AdminScreenPermissionsRoute
   '/admin/teams': typeof AdminTeamsRoute
@@ -201,6 +208,7 @@ export interface FileRoutesByTo {
   '/admin/cby-staff': typeof AdminCbyStaffRoute
   '/admin/entities': typeof AdminEntitiesRoute
   '/admin/orgs': typeof AdminOrgsRoute
+  '/admin/reference-data': typeof AdminReferenceDataRoute
   '/admin/roles': typeof AdminRolesRoute
   '/admin/screen-permissions': typeof AdminScreenPermissionsRoute
   '/admin/teams': typeof AdminTeamsRoute
@@ -229,6 +237,7 @@ export interface FileRoutesById {
   '/admin/cby-staff': typeof AdminCbyStaffRoute
   '/admin/entities': typeof AdminEntitiesRoute
   '/admin/orgs': typeof AdminOrgsRoute
+  '/admin/reference-data': typeof AdminReferenceDataRoute
   '/admin/roles': typeof AdminRolesRoute
   '/admin/screen-permissions': typeof AdminScreenPermissionsRoute
   '/admin/teams': typeof AdminTeamsRoute
@@ -258,6 +267,7 @@ export interface FileRouteTypes {
     | '/admin/cby-staff'
     | '/admin/entities'
     | '/admin/orgs'
+    | '/admin/reference-data'
     | '/admin/roles'
     | '/admin/screen-permissions'
     | '/admin/teams'
@@ -285,6 +295,7 @@ export interface FileRouteTypes {
     | '/admin/cby-staff'
     | '/admin/entities'
     | '/admin/orgs'
+    | '/admin/reference-data'
     | '/admin/roles'
     | '/admin/screen-permissions'
     | '/admin/teams'
@@ -312,6 +323,7 @@ export interface FileRouteTypes {
     | '/admin/cby-staff'
     | '/admin/entities'
     | '/admin/orgs'
+    | '/admin/reference-data'
     | '/admin/roles'
     | '/admin/screen-permissions'
     | '/admin/teams'
@@ -340,6 +352,7 @@ export interface RootRouteChildren {
   AdminCbyStaffRoute: typeof AdminCbyStaffRoute
   AdminEntitiesRoute: typeof AdminEntitiesRoute
   AdminOrgsRoute: typeof AdminOrgsRoute
+  AdminReferenceDataRoute: typeof AdminReferenceDataRoute
   AdminRolesRoute: typeof AdminRolesRoute
   AdminScreenPermissionsRoute: typeof AdminScreenPermissionsRoute
   AdminTeamsRoute: typeof AdminTeamsRoute
@@ -488,6 +501,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRolesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/reference-data': {
+      id: '/admin/reference-data'
+      path: '/admin/reference-data'
+      fullPath: '/admin/reference-data'
+      preLoaderRoute: typeof AdminReferenceDataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/orgs': {
       id: '/admin/orgs'
       path: '/admin/orgs'
@@ -569,6 +589,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminCbyStaffRoute: AdminCbyStaffRoute,
   AdminEntitiesRoute: AdminEntitiesRoute,
   AdminOrgsRoute: AdminOrgsRoute,
+  AdminReferenceDataRoute: AdminReferenceDataRoute,
   AdminRolesRoute: AdminRolesRoute,
   AdminScreenPermissionsRoute: AdminScreenPermissionsRoute,
   AdminTeamsRoute: AdminTeamsRoute,

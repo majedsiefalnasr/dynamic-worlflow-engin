@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import type {
   WorkflowDefinition, WorkflowVersion, WorkflowStage, WorkflowTransition,
   WorkflowAction, StageAssignment, FieldDefinition, FieldGroup, FieldRule,
-  StageGroup, WorkflowInstance, WorkflowHistory,
+  StageGroup, StageRoutingRule, WorkflowInstance, WorkflowHistory,
   WfOrganization, WfTeam, WfRole, WfUser,
 } from "./types";
 
@@ -24,6 +24,7 @@ type Tables = {
   versions: WorkflowVersion[];
   stages: WorkflowStage[];
   stageGroups: StageGroup[];
+  stageRoutingRules: StageRoutingRule[];
   transitions: WorkflowTransition[];
   actions: WorkflowAction[];
   assignments: StageAssignment[];
@@ -102,6 +103,7 @@ export const store = {
   versions: makeCell("versions"),
   stages: makeCell("stages"),
   stageGroups: makeCell("stageGroups"),
+  stageRoutingRules: makeCell("stageRoutingRules"),
   transitions: makeCell("transitions"),
   actions: makeCell("actions"),
   assignments: makeCell("assignments"),

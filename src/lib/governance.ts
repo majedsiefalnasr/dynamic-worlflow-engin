@@ -98,6 +98,78 @@ export function clearAllNotifs() {
 export const merchantsCell = cell("merchants", SEED_MERCHANTS);
 export const entitiesCell = cell("entities", ENTITIES);
 
+// ============================================================
+// Internal reference tables
+// ============================================================
+
+export type ReferenceValue = {
+  id: string;
+  key: string;
+  label: string;
+};
+
+export type ReferenceTable = {
+  id: string;
+  key: string;
+  label: string;
+  system?: boolean;
+  values: ReferenceValue[];
+};
+
+const DEFAULT_REFERENCE_TABLES: ReferenceTable[] = [
+  {
+    id: "rt_sector_activity",
+    key: "sector_activity",
+    label: "القطاع/النشاط",
+    system: true,
+    values: [
+      { id: "rv_food", key: "food", label: "مواد غذائية" },
+      { id: "rv_medical", key: "medical_supplies", label: "أدوية ومستلزمات طبية" },
+      { id: "rv_petroleum", key: "petroleum_derivatives", label: "مشتقات نفطية" },
+      { id: "rv_spare_parts", key: "spare_parts", label: "قطع غيار" },
+      { id: "rv_construction", key: "construction_materials", label: "مواد بناء" },
+      { id: "rv_electronics", key: "electronics", label: "إلكترونيات" },
+    ],
+  },
+  {
+    id: "rt_arrival_port",
+    key: "arrival_port",
+    label: "ميناء الوصول",
+    system: true,
+    values: [
+      { id: "rv_aden_port", key: "aden_port", label: "ميناء عدن" },
+      { id: "rv_hodeidah_port", key: "hodeidah_port", label: "ميناء الحديدة" },
+      { id: "rv_mukalla_port", key: "mukalla_port", label: "ميناء المكلا" },
+      { id: "rv_wadea_crossing", key: "wadea_crossing", label: "منفذ الوديعة" },
+    ],
+  },
+  {
+    id: "rt_origin_country",
+    key: "origin_country",
+    label: "بلد المنشأ",
+    system: true,
+    values: [
+      { id: "rv_usa", key: "usa", label: "الولايات المتحدة" },
+      { id: "rv_germany", key: "germany", label: "ألمانيا" },
+      { id: "rv_china", key: "china", label: "الصين" },
+      { id: "rv_saudi_arabia", key: "saudi_arabia", label: "السعودية" },
+      { id: "rv_uae", key: "uae", label: "الإمارات" },
+      { id: "rv_india", key: "india", label: "الهند" },
+      { id: "rv_egypt", key: "egypt", label: "مصر" },
+    ],
+  },
+];
+
+export const referenceTablesCell = cell<ReferenceTable[]>("referenceTables", DEFAULT_REFERENCE_TABLES);
+
+export function referenceValues(tableKey: string): ReferenceValue[] {
+  return referenceTablesCell.get().find((t) => t.key === tableKey)?.values ?? [];
+}
+
+export function referenceLabels(tableKey: string): string[] {
+  return referenceValues(tableKey).map((v) => v.label);
+}
+
 export type OrgRecord = {
   id: string;
   label: string;

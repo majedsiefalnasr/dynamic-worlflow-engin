@@ -1,7 +1,9 @@
 import {
   canExecute,
   canView,
+  canViewByStageRouting,
   getInitialStage,
+  processLabelForStage,
   getPublishedVersion,
   getStagesForVersion,
   isAssigned,
@@ -104,7 +106,7 @@ export function visibleInstancesFor(user: User | null | undefined, instances = w
   if (user.role === "platform_admin") return instances;
 
   const wfUser = getLegacyWorkflowUser(user);
-  return instances.filter((inst) => canView(inst.currentStageId, wfUser));
+  return instances.filter((inst) => canViewByStageRouting(inst.currentStageId, wfUser));
 }
 
 export function stageFor(instance: WorkflowInstance): WorkflowStage | undefined {
@@ -112,7 +114,8 @@ export function stageFor(instance: WorkflowInstance): WorkflowStage | undefined 
 }
 
 export function stageLabel(instance: WorkflowInstance): string {
-  return stageFor(instance)?.name ?? "—";
+  const stage = stageFor(instance);
+  return stage ? processLabelForStage(stage, wfAuth.get()) : "—";
 }
 
 export function instanceRef(instance: WorkflowInstance): string {

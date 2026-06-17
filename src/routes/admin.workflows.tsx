@@ -22,11 +22,12 @@ import {
 } from "@/components/ui/dialog";
 import {
   wfStore, uid, cloneVersion, publishVersion, reseed,
+  getEffectiveStageRoutingRules, isAssignmentBackedStageRoutingRule,
   type FieldDefinition, type WorkflowStage, type WorkflowTransition,
   type StageAssignment, type FieldRule, type WorkflowAction,
-  type StageGroup, type StageGroupAudience, type DynamicSource,
+  type StageGroup, type StageGroupAudience, type StageRoutingRule, type DynamicSource,
 } from "@/lib/workflow-engine";
-import { orgsCell, teamsCell, roleCatalogCell } from "@/lib/governance";
+import { orgsCell, teamsCell, roleCatalogCell, referenceTablesCell } from "@/lib/governance";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
 import { toast } from "sonner";
 
@@ -72,10 +73,15 @@ const FIELD_TYPES: { value: FieldDefinition["type"]; label: string }[] = [
 
 const DYNAMIC_SOURCES: { value: DynamicSource; label: string }[] = [
   { value: "merchants", label: "التجار" },
+  { value: "merchant_companies", label: "شركات التاجر المرتبطة" },
 ];
 
 const fieldTypeLabel = (t: FieldDefinition["type"]) => FIELD_TYPES.find((x) => x.value === t)?.label ?? t;
 const sourceLabel = (s: DynamicSource | undefined) => DYNAMIC_SOURCES.find((x) => x.value === s)?.label ?? "—";
+type DynamicSourceOption = DynamicSource | `reference:${string}`;
+const referenceSourceValue = (key: string): DynamicSourceOption => `reference:${key}`;
+const isReferenceSourceValue = (value: DynamicSourceOption): value is `reference:${string}` => value.startsWith("reference:");
+const referenceKeyFromSourceValue = (value: DynamicSourceOption) => value.slice("reference:".length);
 
 function DesignerPage() {
   const defs = wfStore.definitions.use();
@@ -162,6 +168,7 @@ function DesignerPage() {
         <Tabs defaultValue="stages">
           <TabsList className="mb-4">
             <TabsTrigger value="stages"><Layers className="ms-1 h-4 w-4" /> المراحل</TabsTrigger>
+            <TabsTrigger value="stageRouting"><Users2 className="ms-1 h-4 w-4" /> سير العملية التنظيمية</TabsTrigger>
             <TabsTrigger value="transitions"><GitBranch className="ms-1 h-4 w-4" /> الانتقالات</TabsTrigger>
             <TabsTrigger value="assignments"><Users2 className="ms-1 h-4 w-4" /> الصلاحيات</TabsTrigger>
             <TabsTrigger value="fields"><FileCog className="ms-1 h-4 w-4" /> الحقول</TabsTrigger>
@@ -170,6 +177,7 @@ function DesignerPage() {
           </TabsList>
 
           <TabsContent value="stages"><StagesTab versionId={verId} /></TabsContent>
+          <TabsContent value="stageRouting"><StageRoutingTab versionId={verId} /></TabsContent>
           <TabsContent value="transitions"><TransitionsTab versionId={verId} /></TabsContent>
           <TabsContent value="assignments"><AssignmentsTab versionId={verId} /></TabsContent>
           <TabsContent value="fields"><FieldsTab versionId={verId} /></TabsContent>
@@ -186,55 +194,34 @@ function DesignerPage() {
 // ============================================================
 function StagesTab({ versionId }: { versionId: string }) {
   const stages = wfStore.stages.use().filter((s) => s.workflowVersionId === versionId).sort((a, b) => a.order - b.order);
-  const stageGroups = wfStore.stageGroups.use().filter((g) => g.workflowVersionId === versionId).sort((a, b) => a.order - b.order);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
-  const [processLabel, setProcessLabel] = useState("");
-  const [groupId, setGroupId] = useState<string>(NO_GROUP);
 
   const add = () => {
     if (!name || !code) return toast.error("الاسم والرمز مطلوبان");
     const max = stages.reduce((m, s) => Math.max(m, s.order), 0);
     const s: WorkflowStage = {
       id: uid("s"), workflowVersionId: versionId, code, name, order: max + 1,
-      processLabel: processLabel.trim() || undefined,
-      groupId: groupId === NO_GROUP ? undefined : groupId,
     };
     wfStore.stages.update((arr) => [...arr, s]);
-    setName(""); setCode(""); setProcessLabel("");
+    setName(""); setCode("");
   };
   const remove = (id: string) => {
     wfStore.stages.update((arr) => arr.filter((s) => s.id !== id));
     wfStore.transitions.update((arr) => arr.filter((t) => t.fromStageId !== id && t.toStageId !== id));
     wfStore.assignments.update((arr) => arr.filter((a) => a.stageId !== id));
+    wfStore.stageRoutingRules.update((arr) => arr.filter((r) => r.stageId !== id));
     wfStore.fieldRules.update((arr) => arr.filter((r) => r.stageId !== id));
   };
   const toggleFlag = (id: string, key: "isInitial" | "isFinal") => {
     wfStore.stages.update((arr) => arr.map((s) => s.id === id ? { ...s, [key]: !s[key] } : s));
   };
-  const setStageProcessLabel = (id: string, val: string) => {
-    wfStore.stages.update((arr) => arr.map((s) => s.id === id ? { ...s, processLabel: val || undefined } : s));
-  };
-  const setStageGroup = (id: string, gid: string) => {
-    wfStore.stages.update((arr) => arr.map((s) => s.id === id ? { ...s, groupId: gid === NO_GROUP ? undefined : gid } : s));
-  };
-
   return (
     <div className="space-y-6">
-      <StageGroupsManager versionId={versionId} />
-
       <Card className="p-5">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
           <Input placeholder="رمز المرحلة (مثال: REVIEW)" value={code} onChange={(e) => setCode(e.target.value)} />
           <Input placeholder="اسم المرحلة" value={name} onChange={(e) => setName(e.target.value)} />
-          <Input placeholder="مسمى المرحلة في سير العملية" value={processLabel} onChange={(e) => setProcessLabel(e.target.value)} />
-          <Select value={groupId} onValueChange={setGroupId}>
-            <SelectTrigger><SelectValue placeholder="المجموعة" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_GROUP}>بدون مجموعة</SelectItem>
-              {stageGroups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
           <Button onClick={add}><Plus className="ms-1 h-4 w-4" /> إضافة مرحلة</Button>
         </div>
         <Table>
@@ -243,8 +230,6 @@ function StagesTab({ versionId }: { versionId: string }) {
               <TableHead>الترتيب</TableHead>
               <TableHead>الرمز</TableHead>
               <TableHead>الاسم</TableHead>
-              <TableHead>مسمى المرحلة في سير العملية</TableHead>
-              <TableHead>المجموعة</TableHead>
               <TableHead>بداية</TableHead>
               <TableHead>نهاية</TableHead>
               <TableHead></TableHead>
@@ -256,23 +241,6 @@ function StagesTab({ versionId }: { versionId: string }) {
                 <TableCell className="font-mono text-xs">{s.order}</TableCell>
                 <TableCell className="font-mono text-xs">{s.code}</TableCell>
                 <TableCell>{s.name}</TableCell>
-                <TableCell>
-                  <Input
-                    className="h-8 w-48 text-xs"
-                    value={s.processLabel ?? ""}
-                    placeholder={s.name}
-                    onChange={(e) => setStageProcessLabel(s.id, e.target.value)}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Select value={s.groupId ?? NO_GROUP} onValueChange={(v) => setStageGroup(s.id, v)}>
-                    <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NO_GROUP}>بدون مجموعة</SelectItem>
-                      {stageGroups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
                 <TableCell><Switch checked={!!s.isInitial} onCheckedChange={() => toggleFlag(s.id, "isInitial")} /></TableCell>
                 <TableCell><Switch checked={!!s.isFinal} onCheckedChange={() => toggleFlag(s.id, "isFinal")} /></TableCell>
                 <TableCell><Button size="icon" variant="ghost" onClick={() => remove(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
@@ -286,7 +254,167 @@ function StagesTab({ versionId }: { versionId: string }) {
 }
 
 // ============================================================
-// Stage Groups (organizational-process sections + audience)
+// Stage routing (organizational process + request visibility)
+// ============================================================
+function StageRoutingTab({ versionId }: { versionId: string }) {
+  const stages = wfStore.stages.use().filter((s) => s.workflowVersionId === versionId).sort((a, b) => a.order - b.order);
+  const manualRules = wfStore.stageRoutingRules.use();
+  const assignments = wfStore.assignments.use();
+  const rules = useMemo(
+    () => getEffectiveStageRoutingRules(versionId),
+    [versionId, manualRules, assignments, stages],
+  );
+  const orgs = orgsCell.use().filter((o) => o.active);
+  const teamsAll = teamsCell.use().filter((t) => t.active);
+  const rolesAll = roleCatalogCell.use().filter((r) => r.active);
+  const wfOrgs = wfStore.orgs.use();
+  const wfRoles = wfStore.roles.use();
+
+  const orgLabel = (id?: string) => orgs.find((x) => x.id === id)?.label ?? wfOrgs.find((x) => x.id === id)?.name ?? id ?? "—";
+  const teamLabel = (id?: string) => teamsAll.find((x) => x.id === id)?.label ?? id ?? "—";
+  const roleLabel = (id?: string) => rolesAll.find((x) => x.id === id)?.name ?? wfRoles.find((x) => x.id === id)?.name ?? id ?? "—";
+  const remove = (id: string) => {
+    if (isAssignmentBackedStageRoutingRule(id)) {
+      return toast.error("هذه القاعدة إلزامية لأنها مشتقة من صلاحيات المرحلة");
+    }
+    wfStore.stageRoutingRules.update((arr) => arr.filter((r) => r.id !== id));
+  };
+
+  return (
+    <Card className="p-5">
+      <div className="mb-4">
+        <h3 className="font-semibold">سير العملية التنظيمية</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          قواعد الصلاحيات تظهر تلقائيا هنا ولا يمكن حذفها من هذا التبويب. يمكنك إضافة قواعد تنظيمية إضافية وحذفها عند الحاجة.
+        </p>
+      </div>
+      <div className="space-y-5">
+        {stages.map((stage) => (
+          <StageRoutingSection
+            key={stage.id}
+            stage={stage}
+            rules={rules.filter((r) => r.stageId === stage.id)}
+            orgs={orgs}
+            teamsAll={teamsAll}
+            rolesAll={rolesAll}
+            labels={{ orgLabel, teamLabel, roleLabel }}
+            onRemove={remove}
+          />
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function StageRoutingSection({
+  stage, rules, orgs, teamsAll, rolesAll, labels, onRemove,
+}: {
+  stage: WorkflowStage;
+  rules: StageRoutingRule[];
+  orgs: ReturnType<typeof orgsCell.get>;
+  teamsAll: ReturnType<typeof teamsCell.get>;
+  rolesAll: ReturnType<typeof roleCatalogCell.get>;
+  labels: { orgLabel: (id?: string) => string; teamLabel: (id?: string) => string; roleLabel: (id?: string) => string };
+  onRemove: (id: string) => void;
+}) {
+  const [orgId, setOrgId] = useState("");
+  const [teamId, setTeamId] = useState("");
+  const [roleId, setRoleId] = useState("");
+  const [processLabel, setProcessLabel] = useState(stage.name);
+  const NONE = "__none__";
+  const teams = orgId && orgId !== NONE ? teamsAll.filter((t) => t.orgKind === orgId) : teamsAll;
+  const roles = orgId && orgId !== NONE ? rolesAll.filter((r) => r.orgId === orgId) : rolesAll;
+
+  const add = () => {
+    if (!processLabel.trim()) return toast.error("المسمى مطلوب");
+    const rule: StageRoutingRule = {
+      id: uid("sr"),
+      workflowVersionId: stage.workflowVersionId,
+      stageId: stage.id,
+      organizationId: orgId && orgId !== NONE ? orgId : undefined,
+      teamId: teamId && teamId !== NONE ? teamId : undefined,
+      roleId: roleId && roleId !== NONE ? roleId : undefined,
+      processLabel: processLabel.trim(),
+    };
+    if (!rule.organizationId && !rule.teamId && !rule.roleId) {
+      return toast.error("حدّد على الأقل جهة أو فريق أو دور");
+    }
+    wfStore.stageRoutingRules.update((arr) => [...arr, rule]);
+    setOrgId(""); setTeamId(""); setRoleId(""); setProcessLabel(stage.name);
+  };
+
+  return (
+    <div className="rounded-xl border p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <div className="font-semibold">{stage.name}</div>
+          <div className="text-[11px] font-mono text-muted-foreground">{stage.code}</div>
+        </div>
+        <Badge variant="secondary">{rules.length} قاعدة</Badge>
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+        <Select value={orgId} onValueChange={(v) => { setOrgId(v); setTeamId(""); setRoleId(""); }}>
+          <SelectTrigger><SelectValue placeholder="الجهة" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>— أي —</SelectItem>
+            {orgs.map((o) => <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={teamId} onValueChange={setTeamId}>
+          <SelectTrigger><SelectValue placeholder="الفريق" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>— أي —</SelectItem>
+            {teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={roleId} onValueChange={setRoleId}>
+          <SelectTrigger><SelectValue placeholder="الدور" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>— أي —</SelectItem>
+            {roles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Input value={processLabel} onChange={(e) => setProcessLabel(e.target.value)} placeholder="المسمى المعروض" />
+        <Button onClick={add}><Plus className="ms-1 h-4 w-4" /> إضافة</Button>
+      </div>
+      <Table className="mt-3">
+        <TableHeader>
+          <TableRow>
+            <TableHead>الجهة</TableHead><TableHead>الفريق</TableHead><TableHead>الدور</TableHead><TableHead>المسمى</TableHead><TableHead></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rules.map((r) => (
+            <TableRow key={r.id}>
+              <TableCell>{labels.orgLabel(r.organizationId)}</TableCell>
+              <TableCell>{labels.teamLabel(r.teamId)}</TableCell>
+              <TableCell>{labels.roleLabel(r.roleId)}</TableCell>
+              <TableCell>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>{r.processLabel}</span>
+                  {isAssignmentBackedStageRoutingRule(r.id) && <Badge variant="outline">من الصلاحيات</Badge>}
+                </div>
+              </TableCell>
+              <TableCell>
+                {!isAssignmentBackedStageRoutingRule(r.id) && (
+                  <Button size="icon" variant="ghost" onClick={() => onRemove(r.id)} title="حذف">
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+          {rules.length === 0 && (
+            <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground">لا توجد قواعد لهذه المرحلة.</TableCell></TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+// ============================================================
+// Stage Groups (legacy, no longer shown in the designer)
 // ============================================================
 function StageGroupsManager({ versionId }: { versionId: string }) {
   const groups = wfStore.stageGroups.use().filter((g) => g.workflowVersionId === versionId).sort((a, b) => a.order - b.order);
@@ -680,28 +808,47 @@ function FieldsTab({ versionId }: { versionId: string }) {
   const groups = wfStore.fieldGroups.use()
     .filter((g) => g.workflowVersionId === versionId)
     .sort((a, b) => a.order - b.order);
+  const referenceTables = referenceTablesCell.use();
   const [key, setKey] = useState("");
   const [label, setLabel] = useState("");
   const [type, setType] = useState<FieldDefinition["type"]>("text");
   const [options, setOptions] = useState("");
-  const [sourceTable, setSourceTable] = useState<DynamicSource>("merchants");
+  const [sourceValue, setSourceValue] = useState<DynamicSourceOption>("merchants");
   const [groupId, setGroupId] = useState<string>(NO_GROUP);
   const [groupName, setGroupName] = useState("");
+  const dynamicSourceOptions = useMemo(
+    () => [
+      ...DYNAMIC_SOURCES,
+      ...referenceTables.map((t) => ({
+        value: referenceSourceValue(t.key),
+        label: t.label,
+      })),
+    ],
+    [referenceTables],
+  );
 
   const add = () => {
     if (!key || !label) return toast.error("الرمز والوصف مطلوبان");
+    const dynamicSource = type === "dynamic_select"
+      ? isReferenceSourceValue(sourceValue) ? "reference_data" : sourceValue
+      : undefined;
+    const dynamicReferenceKey = type === "dynamic_select" && isReferenceSourceValue(sourceValue)
+      ? referenceKeyFromSourceValue(sourceValue)
+      : undefined;
     const f: FieldDefinition = {
       id: uid("fd"), workflowVersionId: versionId, key, label, type,
       options: type === "select" ? options.split(",").map((o) => o.trim()).filter(Boolean) : undefined,
-      sourceTable: type === "dynamic_select" ? sourceTable : undefined,
+      referenceTableKey: dynamicReferenceKey,
+      sourceTable: dynamicSource,
       groupId: groupId === NO_GROUP ? undefined : groupId,
     };
     wfStore.fieldDefs.update((arr) => [...arr, f]);
-    setKey(""); setLabel(""); setOptions("");
+    setKey(""); setLabel(""); setOptions(""); setSourceValue("merchants");
   };
   const remove = (id: string) => {
     const f = fields.find((x) => x.id === id);
     if (!f) return;
+    if (f.system) return toast.error("لا يمكن حذف حقل افتراضي من النظام");
     wfStore.fieldDefs.update((arr) => arr.filter((x) => x.id !== id));
     wfStore.fieldRules.update((arr) => arr.filter((r) => r.fieldKey !== f.key));
   };
@@ -721,6 +868,8 @@ function FieldsTab({ versionId }: { versionId: string }) {
     toast.success("تمت إضافة المجموعة");
   };
   const removeGroup = (id: string) => {
+    const group = groups.find((g) => g.id === id);
+    if (group?.system) return toast.error("لا يمكن حذف مجموعة حقول افتراضية من النظام");
     wfStore.fieldGroups.update((arr) => arr.filter((g) => g.id !== id));
     wfStore.fieldDefs.update((arr) => arr.map((f) => (f.groupId === id ? { ...f, groupId: undefined } : f)));
     toast.success("تم حذف المجموعة (نُقلت حقولها إلى \"عام\")");
@@ -759,12 +908,15 @@ function FieldsTab({ versionId }: { versionId: string }) {
               <div key={g.id} className="flex items-center gap-2 rounded-lg border px-3 py-2">
                 <Badge variant="secondary" className="font-mono text-[10px]">{i + 1}</Badge>
                 <span className="font-medium text-sm flex-1">{g.name}</span>
+                {g.system && <Badge variant="outline">افتراضي</Badge>}
                 <span className="text-xs text-muted-foreground">
                   {fields.filter((f) => f.groupId === g.id).length} حقل
                 </span>
                 <Button size="icon" variant="ghost" onClick={() => moveGroup(g.id, -1)} disabled={i === 0}><ChevronUp className="h-4 w-4" /></Button>
                 <Button size="icon" variant="ghost" onClick={() => moveGroup(g.id, 1)} disabled={i === groups.length - 1}><ChevronDown className="h-4 w-4" /></Button>
-                <Button size="icon" variant="ghost" onClick={() => removeGroup(g.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                {!g.system && (
+                  <Button size="icon" variant="ghost" onClick={() => removeGroup(g.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                )}
               </div>
             ))}
           </div>
@@ -773,7 +925,7 @@ function FieldsTab({ versionId }: { versionId: string }) {
 
       {/* Fields */}
       <Card className="p-5">
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-3 mb-4">
           <Input placeholder="مفتاح الحقل (مثال: amount)" value={key} onChange={(e) => setKey(e.target.value)} />
           <Input placeholder="اسم العرض" value={label} onChange={(e) => setLabel(e.target.value)} />
           <Select value={type} onValueChange={(v) => setType(v as FieldDefinition["type"])}>
@@ -790,20 +942,23 @@ function FieldsTab({ versionId }: { versionId: string }) {
             </SelectContent>
           </Select>
           {type === "dynamic_select" ? (
-            <Select value={sourceTable} onValueChange={(v) => setSourceTable(v as DynamicSource)}>
-              <SelectTrigger><SelectValue placeholder="المصدر" /></SelectTrigger>
-              <SelectContent>
-                {DYNAMIC_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          ) : (
+            <div className="md:col-span-2">
+              <Select value={sourceValue} onValueChange={(v) => setSourceValue(v as DynamicSourceOption)}>
+                <SelectTrigger><SelectValue placeholder="المصدر" /></SelectTrigger>
+                <SelectContent>
+                  {dynamicSourceOptions.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : type === "select" ? (
             <Input
+              key="manual-options"
               placeholder="خيارات (لـ القائمة، مفصولة بفواصل)"
               value={options}
               onChange={(e) => setOptions(e.target.value)}
-              disabled={type !== "select"}
+              className="md:col-span-2"
             />
-          )}
+          ) : null}
           <Button onClick={add}><Plus className="ms-1 h-4 w-4" /> إضافة حقل</Button>
         </div>
         <Table>
@@ -817,7 +972,12 @@ function FieldsTab({ versionId }: { versionId: string }) {
             {fields.map((f) => (
               <TableRow key={f.id}>
                 <TableCell className="font-mono text-xs">{f.key}</TableCell>
-                <TableCell>{f.label}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <span>{f.label}</span>
+                    {f.system && <Badge variant="outline">افتراضي</Badge>}
+                  </div>
+                </TableCell>
                 <TableCell><Badge variant="outline">{fieldTypeLabel(f.type)}</Badge></TableCell>
                 <TableCell>
                   <Select value={f.groupId ?? NO_GROUP} onValueChange={(v) => setFieldGroup(f.id, v)}>
@@ -829,9 +989,17 @@ function FieldsTab({ versionId }: { versionId: string }) {
                   </Select>
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
-                  {f.type === "dynamic_select" ? `مصدر: ${sourceLabel(f.sourceTable)}` : (f.options?.join("، ") ?? "—")}
+                  {f.type === "dynamic_select"
+                    ? f.sourceTable === "reference_data" && f.referenceTableKey
+                      ? `مصدر: ${referenceTables.find((t) => t.key === f.referenceTableKey)?.label ?? f.referenceTableKey}`
+                      : `مصدر: ${sourceLabel(f.sourceTable)}`
+                    : (f.options?.join("، ") ?? "—")}
                 </TableCell>
-                <TableCell><Button size="icon" variant="ghost" onClick={() => remove(f.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                <TableCell>
+                  {!f.system && (
+                    <Button size="icon" variant="ghost" onClick={() => remove(f.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

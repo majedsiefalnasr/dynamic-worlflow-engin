@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,14 +10,49 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import type { DynamicSource, FieldDefinition, FieldGroup } from "@/lib/workflow-engine";
+import type { FieldDefinition, FieldGroup } from "@/lib/workflow-engine";
 import { MERCHANTS } from "@/lib/mock";
+import { referenceLabels, referenceTablesCell } from "@/lib/governance";
+import { toast } from "sonner";
 
 /** Options for a `dynamic_select` field sourced from a reference table. */
-function dynamicOptions(source: DynamicSource | undefined): string[] {
-  switch (source) {
+function merchantByTax(tax: unknown) {
+  const value = typeof tax === "string" ? tax.trim() : "";
+  if (!value) return undefined;
+  return MERCHANTS.find((m) => m.tax === value);
+}
+
+function merchantByName(name: unknown) {
+  const value = typeof name === "string" ? name.trim() : "";
+  if (!value) return undefined;
+  return MERCHANTS.find((m) => m.name === value);
+}
+
+function merchantCompanies(merchant: ReturnType<typeof merchantByName> | ReturnType<typeof merchantByTax>): string[] {
+  if (!merchant) return [];
+  return (merchant.linkedCompanies?.length ? merchant.linkedCompanies : [{
+    id: `${merchant.id}_main`,
+    name: merchant.name,
+    category: merchant.category,
+    cr: merchant.cr,
+    crExpiry: merchant.commercialRegistrationExpiry ?? "",
+  }]).map((c) => c.name);
+}
+
+function companyFor(merchant: ReturnType<typeof merchantByName> | ReturnType<typeof merchantByTax>, name: unknown) {
+  if (!merchant || typeof name !== "string") return undefined;
+  return (merchant.linkedCompanies ?? []).find((c) => c.name === name);
+}
+
+/** Options for a `dynamic_select` field sourced from runtime data. */
+function dynamicOptions(def: FieldDefinition, value: Record<string, unknown>): string[] {
+  switch (def.sourceTable) {
     case "merchants":
       return MERCHANTS.map((m) => m.name);
+    case "merchant_companies":
+      return merchantCompanies(merchantByName(value.importerName) ?? merchantByTax(value.taxNumber));
+    case "reference_data":
+      return def.referenceTableKey ? referenceLabels(def.referenceTableKey) : [];
     default:
       return [];
   }
@@ -41,6 +76,7 @@ interface Props {
 }
 
 const UNGROUPED_ID = "__ungrouped";
+const LOCKED_MERCHANT_FIELDS = new Set(["taxCardExpiry", "commercialRegistration", "commercialRegistrationExpiry"]);
 
 /**
  * Metadata-driven form renderer. Reads field defs + per-stage rules and
@@ -48,8 +84,45 @@ const UNGROUPED_ID = "__ungrouped";
  * When field groups are defined, visible fields are split into tabs.
  */
 export function DynamicForm({ fields, value, onChange, groups, readOnly = false }: Props) {
+  referenceTablesCell.use();
   const [activeTab, setActiveTab] = useState<string>("");
-  const set = (key: string, v: unknown) => onChange({ ...value, [key]: v });
+  const set = (key: string, v: unknown) => {
+    const next = { ...value, [key]: v };
+    if (key === "taxNumber") {
+      const merchant = merchantByTax(v);
+      if (merchant) {
+        const companies = merchant.linkedCompanies ?? [];
+        const firstCompany = companies[0];
+        next.importerName = merchant.name;
+        next.taxCardExpiry = merchant.taxCardExpiry ?? "";
+        next.linkedCompany = firstCompany?.name ?? merchant.name;
+        next.commercialRegistration = firstCompany?.cr ?? merchant.cr;
+        next.commercialRegistrationExpiry = firstCompany?.crExpiry ?? merchant.commercialRegistrationExpiry ?? "";
+        next.owners = (merchant.owners ?? []).map((o) => `${o.name} - ${o.share}%`).join("\n");
+      }
+    }
+    if (key === "importerName") {
+      const merchant = merchantByName(v);
+      if (merchant) {
+        const firstCompany = merchant.linkedCompanies?.[0];
+        next.taxNumber = merchant.tax;
+        next.taxCardExpiry = merchant.taxCardExpiry ?? "";
+        next.linkedCompany = firstCompany?.name ?? merchant.name;
+        next.commercialRegistration = firstCompany?.cr ?? merchant.cr;
+        next.commercialRegistrationExpiry = firstCompany?.crExpiry ?? merchant.commercialRegistrationExpiry ?? "";
+        next.owners = (merchant.owners ?? []).map((o) => `${o.name} - ${o.share}%`).join("\n");
+      }
+    }
+    if (key === "linkedCompany") {
+      const merchant = merchantByName(next.importerName) ?? merchantByTax(next.taxNumber);
+      const company = companyFor(merchant, v);
+      if (company) {
+        next.commercialRegistration = company.cr;
+        next.commercialRegistrationExpiry = company.crExpiry;
+      }
+    }
+    onChange(next);
+  };
   // When the user can't act on the request, every field is view-only even if
   // the stage rules mark it editable (e.g. admin viewing a draft).
   const effFields = readOnly ? fields.map((f) => ({ ...f, editable: false })) : fields;
@@ -72,32 +145,63 @@ export function DynamicForm({ fields, value, onChange, groups, readOnly = false 
     tabs.push({ id: UNGROUPED_ID, name: "عام", items: ungrouped });
   }
 
-  // No meaningful grouping → flat grid (backward compatible).
-  if (tabs.length <= 1) {
-    return <FieldsGrid items={visible} value={value} onSet={set} />;
-  }
-
   const tabIds = tabs.map((t) => t.id);
+  const wizardSteps = [...tabs, { id: "__review", name: "المراجعة والإرسال", items: [] }];
+  const wizardIds = wizardSteps.map((t) => t.id);
   const current = tabIds.includes(activeTab) ? activeTab : tabs[0].id;
-  const idx = tabIds.indexOf(current);
+  const currentWizard = wizardIds.includes(activeTab) ? activeTab : current;
+  const idx = wizardIds.indexOf(currentWizard);
   const isFirst = idx === 0;
-  const isLast = idx === tabs.length - 1;
+  const isLast = idx === wizardIds.length - 1;
+  const currentStep = wizardSteps[idx];
+  const currentItems = currentStep.id === "__review" ? [] : currentStep.items;
+  const missingCurrent = requiredMissing(currentItems, value);
+
+  useEffect(() => {
+    if (!activeTab && tabs[0]) setActiveTab(tabs[0].id);
+  }, [activeTab, tabs]);
+
+  const goNext = () => {
+    if (missingCurrent.length > 0) {
+      toast.error(`أكمل الحقول الإلزامية: ${missingCurrent.join("، ")}`);
+      return;
+    }
+    setActiveTab(wizardIds[Math.min(wizardIds.length - 1, idx + 1)]);
+  };
+
+  const changeStep = (target: string) => {
+    const targetIdx = wizardIds.indexOf(target);
+    if (targetIdx > idx && missingCurrent.length > 0) {
+      toast.error(`أكمل الحقول الإلزامية: ${missingCurrent.join("، ")}`);
+      return;
+    }
+    setActiveTab(target);
+  };
 
   return (
-    <Tabs value={current} onValueChange={setActiveTab}>
-      <TabsList className="mb-4 flex-wrap h-auto">
-        {tabs.map((t) => (
-          <TabsTrigger key={t.id} value={t.id} className="gap-1.5">
-            {t.name}
-            <Badge variant="secondary" className="text-[10px] px-1.5">{t.items.length}</Badge>
-          </TabsTrigger>
-        ))}
+    <Tabs value={currentWizard} onValueChange={changeStep}>
+      <TabsList className="mb-6 flex h-auto w-full flex-wrap justify-between gap-2 rounded-2xl bg-muted/40 p-3">
+        {wizardSteps.map((t, stepIdx) => {
+          const done = stepIdx < idx;
+          const active = stepIdx === idx;
+          return (
+            <TabsTrigger key={t.id} value={t.id} className="min-w-32 flex-1 gap-2 rounded-xl py-3 data-[state=active]:bg-background">
+              <span className={`grid h-8 w-8 place-items-center rounded-full text-xs font-bold ${done ? "bg-success text-white" : active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                {done ? <Check className="h-4 w-4" /> : stepIdx + 1}
+              </span>
+              <span>{t.name}</span>
+            </TabsTrigger>
+          );
+        })}
       </TabsList>
       {tabs.map((t) => (
         <TabsContent key={t.id} value={t.id}>
           <FieldsGrid items={t.items} value={value} onSet={set} />
         </TabsContent>
       ))}
+      <TabsContent value="__review">
+        <ReviewStep fields={visible} groups={tabs} value={value} />
+      </TabsContent>
 
       {/* Wizard-style navigation between groups (RTL: "السابق" points right, "التالي" points left). */}
       <div className="mt-6 flex items-center justify-between border-t pt-4">
@@ -106,19 +210,19 @@ export function DynamicForm({ fields, value, onChange, groups, readOnly = false 
           variant="outline"
           size="sm"
           disabled={isFirst}
-          onClick={() => setActiveTab(tabIds[Math.max(0, idx - 1)])}
+          onClick={() => setActiveTab(wizardIds[Math.max(0, idx - 1)])}
         >
           <ChevronRight className="h-4 w-4 ms-1" /> السابق
         </Button>
         <span className="text-xs text-muted-foreground tabular-nums">
-          {tabs[idx].name} — خطوة {idx + 1} من {tabs.length}
+          {wizardSteps[idx].name} — خطوة {idx + 1} من {wizardSteps.length}
         </span>
         <Button
           type="button"
           variant={isLast ? "outline" : "default"}
           size="sm"
           disabled={isLast}
-          onClick={() => setActiveTab(tabIds[Math.min(tabIds.length - 1, idx + 1)])}
+          onClick={goNext}
         >
           التالي <ChevronLeft className="h-4 w-4 me-1" />
         </Button>
@@ -133,17 +237,17 @@ function FieldsGrid({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {items.map((f) => (
-        <FieldControl key={f.def.id} field={f} value={value[f.def.key]} onSet={(v) => onSet(f.def.key, v)} />
+        <FieldControl key={f.def.id} field={f} formValue={value} value={value[f.def.key]} onSet={(v) => onSet(f.def.key, v)} />
       ))}
     </div>
   );
 }
 
 function FieldControl({
-  field, value, onSet,
-}: { field: DynamicField; value: unknown; onSet: (v: unknown) => void }) {
+  field, formValue, value, onSet,
+}: { field: DynamicField; formValue: Record<string, unknown>; value: unknown; onSet: (v: unknown) => void }) {
   const { def, editable, required } = field;
-  const disabled = !editable;
+  const disabled = !editable || LOCKED_MERCHANT_FIELDS.has(def.key);
   const id = `field-${def.key}`;
   const label = (
     <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">
@@ -160,20 +264,22 @@ function FieldControl({
             onChange={(e) => onSet(e.target.value)} rows={3} />
         </div>
       );
-    case "select":
+    case "select": {
+      const selectOptions = def.referenceTableKey ? referenceLabels(def.referenceTableKey) : (def.options ?? []);
       return (
         <div className="space-y-1.5">
           {label}
           <Select value={(value as string) ?? ""} disabled={disabled} onValueChange={(v) => onSet(v)}>
             <SelectTrigger id={id}><SelectValue placeholder="اختر..." /></SelectTrigger>
             <SelectContent>
-              {(def.options ?? []).map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              {selectOptions.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
       );
+    }
     case "dynamic_select": {
-      const opts = dynamicOptions(def.sourceTable);
+      const opts = dynamicOptions(def, formValue);
       return (
         <div className="space-y-1.5">
           {label}
@@ -228,16 +334,58 @@ function FieldControl({
       return (
         <div className="space-y-1.5">
           {label}
-          <Input id={id} value={(value as string) ?? ""} disabled={disabled}
-            onChange={(e) => onSet(e.target.value)} />
+          <div className={def.key === "taxNumber" ? "relative" : undefined}>
+            {def.key === "taxNumber" && <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />}
+            <Input id={id} value={(value as string) ?? ""} disabled={disabled}
+              className={def.key === "taxNumber" ? "pr-10" : undefined}
+              placeholder={def.key === "taxNumber" ? "أدخل الرقم الضريبي ثم اضغط بحث" : undefined}
+              onChange={(e) => onSet(e.target.value)} />
+          </div>
         </div>
       );
   }
 }
 
+function ReviewStep({
+  fields, groups, value,
+}: { fields: DynamicField[]; groups: { id: string; name: string; items: DynamicField[] }[]; value: Record<string, unknown> }) {
+  return (
+    <div className="rounded-2xl border bg-muted/10 p-5">
+      <h3 className="mb-4 text-lg font-semibold">مراجعة الطلب قبل الإرسال</h3>
+      <div className="space-y-5">
+        {groups.map((g) => (
+          <section key={g.id} className="border-b pb-4 last:border-b-0">
+            <h4 className="mb-3 font-semibold">{g.name}</h4>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {g.items.map((f) => (
+                <div key={f.def.id} className="grid grid-cols-2 gap-3 text-sm">
+                  <span className="text-muted-foreground">{f.def.label}</span>
+                  <span className="font-medium">{formatReviewValue(value[f.def.key])}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+        {fields.length === 0 && <p className="text-sm text-muted-foreground">لا توجد بيانات للعرض.</p>}
+      </div>
+    </div>
+  );
+}
+
+function formatReviewValue(v: unknown): string {
+  if (v === undefined || v === null || v === "") return "—";
+  if (typeof v === "number") return v.toLocaleString("en-US");
+  if (typeof v === "boolean") return v ? "نعم" : "لا";
+  return String(v);
+}
+
 export function validateRequired(fields: DynamicField[], value: Record<string, unknown>): string[] {
+  return requiredMissing(fields, value);
+}
+
+function requiredMissing(fields: DynamicField[], value: Record<string, unknown>): string[] {
   return fields
-    .filter((f) => f.visible && f.editable && f.required)
+    .filter((f) => f.visible && f.required)
     .filter((f) => {
       const v = value[f.def.key];
       return v === undefined || v === null || v === "";

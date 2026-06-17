@@ -60,9 +60,9 @@ export interface WorkflowStage {
   order: number;
   isInitial?: boolean;
   isFinal?: boolean;
-  /** Display name shown in the request screen's organizational-process view. */
+  /** Deprecated: kept only to read old stored workflow versions safely. */
   processLabel?: string;
-  /** Optional stage group this stage belongs to (drives org-process visibility). */
+  /** Deprecated: old organizational-process grouping. */
   groupId?: ID;
 }
 
@@ -88,6 +88,21 @@ export interface StageGroup {
   name: string;
   order: number;
   audiences?: StageGroupAudience[];
+}
+
+/**
+ * Per-stage visibility rule for request lists and organizational-process text.
+ * The stage itself comes from the Stages tab; each rule scopes who sees that
+ * stage's requests and which label appears in tables/request details.
+ */
+export interface StageRoutingRule {
+  id: ID;
+  workflowVersionId: ID;
+  stageId: ID;
+  organizationId?: ID;
+  teamId?: ID;
+  roleId?: ID;
+  processLabel: string;
 }
 
 export interface WorkflowAction {
@@ -133,8 +148,8 @@ export type FieldType =
   | "currency"
   | "checkbox";
 
-/** Reference data tables that a `dynamic_select` field can source options from. */
-export type DynamicSource = "merchants";
+/** Data sources that a `dynamic_select` field can use to resolve options. */
+export type DynamicSource = "merchants" | "merchant_companies" | "reference_data";
 
 /** A tab/section that groups related fields on the request screen. */
 export interface FieldGroup {
@@ -142,6 +157,8 @@ export interface FieldGroup {
   workflowVersionId: ID;
   name: string;
   order: number;
+  /** System groups are seeded defaults and cannot be deleted. */
+  system?: boolean;
 }
 
 export interface FieldDefinition {
@@ -151,11 +168,15 @@ export interface FieldDefinition {
   label: string;
   type: FieldType;
   options?: string[];
-  /** For `dynamic_select`: which reference table supplies the options. */
+  /** Internal reference table key that supplies options for select/reference_data fields. */
+  referenceTableKey?: string;
+  /** For `dynamic_select`: which data source supplies the options. */
   sourceTable?: DynamicSource;
   helpText?: string;
   /** Optional group/tab this field belongs to; ungrouped → "عام" tab. */
   groupId?: ID;
+  /** System fields are seeded defaults and cannot be deleted. */
+  system?: boolean;
 }
 
 export interface FieldRule {

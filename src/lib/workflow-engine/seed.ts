@@ -2,7 +2,7 @@ import { store, uid } from "./storage";
 import type {
   WfOrganization, WfTeam, WfRole, WfUser,
   WorkflowDefinition, WorkflowVersion, WorkflowStage, WorkflowTransition,
-  WorkflowAction, StageAssignment, FieldDefinition, FieldGroup, StageGroup, FieldRule,
+  WorkflowAction, StageAssignment, FieldDefinition, FieldGroup, StageRoutingRule, FieldRule,
   WorkflowInstance, WorkflowHistory,
 } from "./types";
 
@@ -11,7 +11,7 @@ import type {
 // Runs once on first load (if no workflow definitions exist).
 // ------------------------------------------------------------
 
-const SEED_VERSION = "2026-06-16-stage-audience-rules";
+const SEED_VERSION = "2026-06-17-reference-data-dynamic-selects";
 const SEED_VERSION_KEY = "wfe:seedVersion";
 
 export function seedIfEmpty() {
@@ -26,7 +26,7 @@ export function seedIfEmpty() {
 
 export function reseed() {
   // wipe engine tables
-  (["orgs", "teams", "roles", "users", "definitions", "versions", "stages", "stageGroups",
+  (["orgs", "teams", "roles", "users", "definitions", "versions", "stages", "stageGroups", "stageRoutingRules",
     "transitions", "actions", "assignments", "fieldDefs", "fieldGroups", "fieldRules",
     "instances", "history"] as const).forEach((k) => store[k].set([] as never));
   seed();
@@ -119,28 +119,33 @@ function seed() {
   store.definitions.set([def]);
   store.versions.set([version]);
 
-  // ---------- Stage Groups (organizational-process sections) ----------
-  // Audience rules use governance ids (bank/committee/team_*/rc_*) — the same
-  // ids the designer's audience picker uses; `stageGroupVisibleTo` aliases them
-  // to engine ids when matching a user.
-  const stageGroups: StageGroup[] = [
-    { id: "sg_bank", workflowVersionId: version.id, name: "إجراءات البنك التجاري", order: 1, audiences: [{ organizationId: "bank" }] },
-    { id: "sg_committee", workflowVersionId: version.id, name: "إجراءات اللجنة الوطنية", order: 2, audiences: [{ organizationId: "committee" }] },
-  ];
-  store.stageGroups.set(stageGroups);
+  store.stageGroups.set([]);
 
   // ---------- Stages ----------
   const stages: WorkflowStage[] = [
-    { id: "stg_create", workflowVersionId: version.id, code: "CREATE", name: "إنشاء الطلب", order: 1, isInitial: true, processLabel: "تقديم الطلب", groupId: "sg_bank" },
-    { id: "stg_internal", workflowVersionId: version.id, code: "INTERNAL", name: "المراجعة الداخلية", order: 2, processLabel: "المراجعة الداخلية بالبنك", groupId: "sg_bank" },
-    { id: "stg_support", workflowVersionId: version.id, code: "SUPPORT", name: "المراجعة المساندة", order: 3, processLabel: "مراجعة اللجنة المساندة", groupId: "sg_committee" },
-    { id: "stg_exec", workflowVersionId: version.id, code: "EXEC", name: "القرار التنفيذي", order: 4, processLabel: "قرار اللجنة التنفيذية", groupId: "sg_committee" },
-    { id: "stg_fx", workflowVersionId: version.id, code: "FX", name: "عمليات الصرف", order: 5, processLabel: "تنفيذ عملية الصرف", groupId: "sg_bank" },
-    { id: "stg_fx_confirm", workflowVersionId: version.id, code: "FX_CONFIRM", name: "تأكيد الصرف", order: 6, processLabel: "تأكيد عملية الصرف", groupId: "sg_committee" },
-    { id: "stg_final", workflowVersionId: version.id, code: "FINAL", name: "الاعتماد النهائي", order: 7, processLabel: "الاعتماد النهائي", groupId: "sg_committee" },
-    { id: "stg_closed", workflowVersionId: version.id, code: "CLOSED", name: "مغلق", order: 99, isFinal: true, processLabel: "إغلاق الطلب", groupId: "sg_committee" },
+    { id: "stg_create", workflowVersionId: version.id, code: "CREATE", name: "إنشاء الطلب", order: 1, isInitial: true },
+    { id: "stg_internal", workflowVersionId: version.id, code: "INTERNAL", name: "المراجعة الداخلية", order: 2 },
+    { id: "stg_support", workflowVersionId: version.id, code: "SUPPORT", name: "المراجعة المساندة", order: 3 },
+    { id: "stg_exec", workflowVersionId: version.id, code: "EXEC", name: "القرار التنفيذي", order: 4 },
+    { id: "stg_fx", workflowVersionId: version.id, code: "FX", name: "عمليات الصرف", order: 5 },
+    { id: "stg_fx_confirm", workflowVersionId: version.id, code: "FX_CONFIRM", name: "تأكيد الصرف", order: 6 },
+    { id: "stg_final", workflowVersionId: version.id, code: "FINAL", name: "الاعتماد النهائي", order: 7 },
+    { id: "stg_closed", workflowVersionId: version.id, code: "CLOSED", name: "مغلق", order: 99, isFinal: true },
   ];
   store.stages.set(stages);
+
+  const routingRules: StageRoutingRule[] = [
+    sr(version.id, "stg_create", "bank", "team_entry", "rc_bank_intake", "تقديم الطلب"),
+    sr(version.id, "stg_internal", "bank", "team_internal", "rc_bank_reviewer", "المراجعة الداخلية بالبنك"),
+    sr(version.id, "stg_support", "committee", "team_support", "rc_support_member", "مراجعة اللجنة المساندة"),
+    sr(version.id, "stg_exec", "committee", "team_exec", "rc_committee_manager", "قرار اللجنة التنفيذية"),
+    sr(version.id, "stg_exec", "committee", "team_exec", "rc_executive_member", "اطلاع أعضاء اللجنة التنفيذية"),
+    sr(version.id, "stg_fx", "bank", "team_fx", "rc_bank_swift", "تنفيذ عملية الصرف"),
+    sr(version.id, "stg_fx_confirm", "committee", "team_fx_confirm", "rc_committee_manager", "تأكيد عملية الصرف"),
+    sr(version.id, "stg_final", "committee", "team_exec", "rc_committee_manager", "الاعتماد النهائي"),
+    sr(version.id, "stg_closed", "committee", "team_exec", "rc_committee_manager", "إغلاق الطلب"),
+  ];
+  store.stageRoutingRules.set(routingRules);
 
   // ---------- Transitions ----------
   const trans: WorkflowTransition[] = [
@@ -174,110 +179,101 @@ function seed() {
 
   // ---------- Field Groups (tabs on the request screen) ----------
   const groups: FieldGroup[] = [
-    { id: "fg_basic", workflowVersionId: version.id, name: "معلومات الطلب الأساسية", order: 1 },
-    { id: "fg_shipment", workflowVersionId: version.id, name: "بيانات المورد والشحنة", order: 2 },
-    { id: "fg_docs", workflowVersionId: version.id, name: "رفع الوثائق المطلوبة", order: 3 },
-    { id: "fg_review", workflowVersionId: version.id, name: "المراجعة والقرار", order: 4 },
-    { id: "fg_fx", workflowVersionId: version.id, name: "عمليات الصرف", order: 5 },
+    { id: "fg_basic", workflowVersionId: version.id, name: "المعلومات الأساسية", order: 1, system: true },
+    { id: "fg_invoice", workflowVersionId: version.id, name: "بيانات الفاتورة", order: 2, system: true },
+    { id: "fg_shipping", workflowVersionId: version.id, name: "بيانات الشحن", order: 3, system: true },
+    { id: "fg_docs", workflowVersionId: version.id, name: "الوثائق المطلوبة", order: 4, system: true },
   ];
   store.fieldGroups.set(groups);
 
   // ---------- Field Definitions ----------
   const fields: FieldDefinition[] = [
-    // معلومات الطلب الأساسية
-    fd(version.id, "importType", "نوع الواردات", "select", ["مواد غذائية", "أدوية ومستلزمات طبية", "مشتقات نفطية", "قطع غيار", "مواد بناء", "إلكترونيات"], "fg_basic"),
-    fd(version.id, "importerName", "المستورد (التاجر)", "dynamic_select", undefined, "fg_basic", "merchants"),
-    fd(version.id, "financeAmount", "مبلغ التمويل", "currency", undefined, "fg_basic"),
-    fd(version.id, "currency", "العملة", "select", ["USD", "EUR", "SAR"], "fg_basic"),
-    fd(version.id, "paymentTerms", "شروط الدفع", "select", ["L/C اعتماد مستندي", "تحويل مباشر", "دفعة مقدمة", "حساب مفتوح"], "fg_basic"),
-    fd(version.id, "expectedDueDate", "تاريخ الاستحقاق المتوقع", "date", undefined, "fg_basic"),
-    fd(version.id, "additionalNotes", "ملاحظات إضافية", "textarea", undefined, "fg_basic"),
-    // بيانات المورد والشحنة
-    fd(version.id, "supplierName", "اسم المورد", "text", undefined, "fg_shipment"),
-    fd(version.id, "originCountry", "بلد المنشأ", "select", ["الولايات المتحدة", "ألمانيا", "الصين", "السعودية", "الإمارات", "الهند", "مصر"], "fg_shipment"),
-    fd(version.id, "invoiceNumber", "رقم الفاتورة", "text", undefined, "fg_shipment"),
-    fd(version.id, "invoiceDate", "تاريخ الفاتورة", "date", undefined, "fg_shipment"),
-    fd(version.id, "shippingPort", "ميناء الشحن", "text", undefined, "fg_shipment"),
-    fd(version.id, "arrivalPort", "ميناء الوصول", "select", ["ميناء عدن", "ميناء الحديدة", "ميناء المكلا", "منفذ الوديعة"], "fg_shipment"),
-    fd(version.id, "billOfLading", "رقم بوليصة الشحن", "text", undefined, "fg_shipment"),
-    fd(version.id, "customsOffice", "الجمارك المختصة", "select", ["جمارك عدن", "جمارك الحديدة", "جمارك المكلا"], "fg_shipment"),
-    // رفع الوثائق المطلوبة
-    fd(version.id, "docProforma", "الفاتورة المبدئية (Proforma)", "file", undefined, "fg_docs"),
-    fd(version.id, "docCommercialInvoice", "الفاتورة التجارية", "file", undefined, "fg_docs"),
-    fd(version.id, "docBillOfLading", "بوليصة الشحن", "file", undefined, "fg_docs"),
-    fd(version.id, "docPackingList", "قائمة التعبئة", "file", undefined, "fg_docs"),
-    fd(version.id, "docImportLicense", "إذن الاستيراد", "file", undefined, "fg_docs"),
-    // المراجعة والقرار
-    fd(version.id, "internalNotes", "ملاحظات المراجعة الداخلية", "textarea", undefined, "fg_review"),
-    fd(version.id, "committeeNotes", "ملاحظات اللجنة المساندة", "textarea", undefined, "fg_review"),
-    fd(version.id, "execDecisionNotes", "مبررات القرار التنفيذي", "textarea", undefined, "fg_review"),
-    // عمليات الصرف
-    fd(version.id, "swiftReference", "رقم رسالة السويفت", "text", undefined, "fg_fx"),
-    fd(version.id, "fxRate", "سعر الصرف المطبَّق", "number", undefined, "fg_fx"),
-    fd(version.id, "fxConfirmRef", "مرجع تأكيد العملات", "text", undefined, "fg_fx"),
+    fd(version.id, "taxNumber", "الرقم الضريبي", "text", undefined, "fg_basic", undefined, true),
+    fd(version.id, "importerName", "اسم التاجر", "dynamic_select", undefined, "fg_basic", "merchants", true),
+    fd(version.id, "linkedCompany", "الشركة المرتبطة", "dynamic_select", undefined, "fg_basic", "merchant_companies", true),
+    fd(version.id, "taxCardExpiry", "تاريخ انتهاء البطاقة الضريبية", "date", undefined, "fg_basic", undefined, true),
+    fd(version.id, "commercialRegistration", "رقم السجل التجاري", "text", undefined, "fg_basic", undefined, true),
+    fd(version.id, "commercialRegistrationExpiry", "تاريخ انتهاء السجل التجاري", "date", undefined, "fg_basic", undefined, true),
+    fd(version.id, "owners", "الملاك والمساهمون (25% فأكثر)", "textarea", undefined, "fg_basic", undefined, true),
+
+    fd(version.id, "requestType", "نوع الطلب", "select", ["طلب مصارفة وتحويل خارجي", "طلب تمويل واردات", "طلب اعتماد مستندي"], "fg_invoice", undefined, true),
+    fd(version.id, "coverageType", "نوع التغطية", "select", ["كلي", "جزئي"], "fg_invoice", undefined, true),
+    fd(version.id, "foreignCurrencySource", "مصادر العملة الأجنبية", "select", ["حساب العميل", "موارد البنك", "مصدر خارجي"], "fg_invoice", undefined, true),
+    fd(version.id, "paymentTerms", "شروط الدفع", "select", ["كلي", "جزئي", "دفعة مقدمة"], "fg_invoice", undefined, true),
+    fd(version.id, "requestCurrency", "عملة الطلب", "select", ["دولار أمريكي", "يورو", "ريال سعودي"], "fg_invoice", undefined, true),
+    fd(version.id, "requestPercentage", "نسبة الطلب %", "number", undefined, "fg_invoice", undefined, true),
+    fd(version.id, "invoiceType", "نوع الفاتورة", "select", ["فاتورة تجارية", "فاتورة أولية"], "fg_invoice", undefined, true),
+    fd(version.id, "financeAmount", "إجمالي الطلب", "currency", undefined, "fg_invoice", undefined, true),
+    fd(version.id, "currency", "عملة الفاتورة", "select", ["دولار أمريكي", "يورو", "ريال سعودي"], "fg_invoice", undefined, true),
+    fd(version.id, "invoiceNumber", "رقم الفاتورة", "text", undefined, "fg_invoice", undefined, true),
+    fd(version.id, "invoiceDate", "تاريخ الفاتورة", "date", undefined, "fg_invoice", undefined, true),
+    fd(version.id, "quantity", "الكمية", "number", undefined, "fg_invoice", undefined, true),
+    fd(version.id, "unit", "وحدة القياس", "text", undefined, "fg_invoice", undefined, true),
+    fd(version.id, "invoiceTotal", "إجمالي الفاتورة", "currency", undefined, "fg_invoice", undefined, true),
+    fd(version.id, "importType", "السلعة", "dynamic_select", undefined, "fg_invoice", "reference_data", true, "sector_activity"),
+    fd(version.id, "supplierName", "اسم الشركة المصدرة", "text", undefined, "fg_invoice", undefined, true),
+    fd(version.id, "supplierLocation", "موقع الشركة المصدرة", "text", undefined, "fg_invoice", undefined, true),
+    fd(version.id, "originCountry", "بلد المنشأ", "dynamic_select", undefined, "fg_invoice", "reference_data", true, "origin_country"),
+
+    fd(version.id, "shippingDate", "تاريخ الشحن", "date", undefined, "fg_shipping", undefined, true),
+    fd(version.id, "arrivalDate", "تاريخ الوصول", "date", undefined, "fg_shipping", undefined, true),
+    fd(version.id, "shippingPort", "ميناء الشحن", "text", undefined, "fg_shipping", undefined, true),
+    fd(version.id, "arrivalPort", "ميناء الوصول", "dynamic_select", undefined, "fg_shipping", "reference_data", true, "arrival_port"),
+    fd(version.id, "deliveryTerms", "شروط التسليم", "select", ["FOB", "CIF", "CFR"], "fg_shipping", undefined, true),
+    fd(version.id, "finalDestination", "الوجهة النهائية", "text", undefined, "fg_shipping", undefined, true),
+
+    fd(version.id, "docYemeniRialSharia", "كشف حساب بالريال اليمني (مناطق الشرعية)", "file", undefined, "fg_docs", undefined, true),
+    fd(version.id, "docSaudiRialSharia", "كشف حساب بالريال السعودي (مناطق الشرعية)", "file", undefined, "fg_docs", undefined, true),
+    fd(version.id, "docUsdSharia", "كشف حساب بالدولار الأمريكي (مناطق الشرعية)", "file", undefined, "fg_docs", undefined, true),
+    fd(version.id, "docTaxAndCr", "البطاقة الضريبية والسجل التجاري", "file", undefined, "fg_docs", undefined, true),
+    fd(version.id, "docCommercialInvoice", "الفاتورة", "file", undefined, "fg_docs", undefined, true),
+    fd(version.id, "docLicenses", "التراخيص المطلوبة لبعض السلع", "file", undefined, "fg_docs", undefined, true),
+    fd(version.id, "docExtra", "مستندات إضافية", "file", undefined, "fg_docs", undefined, true),
   ];
   store.fieldDefs.set(fields);
 
   // ---------- Field Rules per stage ----------
   // Field key buckets used to compose per-stage visibility/edit rules.
-  const requestKeys = [
-    "importType", "importerName", "financeAmount", "currency", "paymentTerms", "expectedDueDate", "additionalNotes",
-    "supplierName", "originCountry", "invoiceNumber", "invoiceDate", "shippingPort", "arrivalPort", "billOfLading", "customsOffice",
-    "docProforma", "docCommercialInvoice", "docBillOfLading", "docPackingList", "docImportLicense",
+  const requestKeys = fields.map((f) => f.key);
+  const requiredOnCreate = [
+    "taxNumber", "importerName", "linkedCompany", "taxCardExpiry", "commercialRegistration", "commercialRegistrationExpiry",
+    "requestType", "coverageType", "foreignCurrencySource", "paymentTerms", "requestCurrency", "requestPercentage",
+    "invoiceType", "financeAmount", "currency", "invoiceNumber", "invoiceDate", "quantity", "unit", "invoiceTotal",
+    "importType", "supplierName", "supplierLocation", "originCountry",
+    "shippingDate", "arrivalDate", "shippingPort", "arrivalPort", "deliveryTerms", "finalDestination",
+    "docYemeniRialSharia", "docSaudiRialSharia", "docUsdSharia", "docTaxAndCr", "docCommercialInvoice",
   ];
-  const requiredOnCreate = ["importType", "importerName", "financeAmount", "currency", "paymentTerms", "supplierName", "invoiceNumber", "arrivalPort"];
-  const reviewKeys = ["internalNotes", "committeeNotes", "execDecisionNotes"];
-  const fxKeys = ["swiftReference", "fxRate", "fxConfirmRef"];
 
   const rules: FieldRule[] = [];
   const allFields = fields.map((f) => f.key);
 
-  // Stage: CREATE — request + shipment + documents editable; review/fx hidden.
+  // Stage: CREATE — default request design fields editable.
   requestKeys.forEach((k) =>
     rules.push(fr("stg_create", k, { visible: true, editable: true, required: requiredOnCreate.includes(k) })),
   );
-  [...reviewKeys, ...fxKeys].forEach((k) =>
-    rules.push(fr("stg_create", k, { visible: false, editable: false, required: false })),
-  );
-
-  // Stage: INTERNAL — request readonly, internalNotes editable.
+  // Stage: INTERNAL and beyond — submitted request data is visible read-only.
   allFields.forEach((k) => {
-    if (k === "internalNotes") rules.push(fr("stg_internal", k, { visible: true, editable: true, required: true }));
-    else if (["committeeNotes", "execDecisionNotes", ...fxKeys].includes(k))
-      rules.push(fr("stg_internal", k, { visible: false, editable: false, required: false }));
-    else rules.push(fr("stg_internal", k, { visible: true, editable: false, required: false }));
+    rules.push(fr("stg_internal", k, { visible: true, editable: false, required: false }));
   });
 
   // Stage: SUPPORT — request + internal readonly, committeeNotes editable.
   allFields.forEach((k) => {
-    if (k === "committeeNotes") rules.push(fr("stg_support", k, { visible: true, editable: true, required: false }));
-    else if (["execDecisionNotes", ...fxKeys].includes(k))
-      rules.push(fr("stg_support", k, { visible: false, editable: false, required: false }));
-    else rules.push(fr("stg_support", k, { visible: true, editable: false, required: false }));
+    rules.push(fr("stg_support", k, { visible: true, editable: false, required: false }));
   });
 
   // Stage: EXEC — execDecisionNotes editable.
   allFields.forEach((k) => {
-    if (k === "execDecisionNotes") rules.push(fr("stg_exec", k, { visible: true, editable: true, required: true }));
-    else if (fxKeys.includes(k))
-      rules.push(fr("stg_exec", k, { visible: false, editable: false, required: false }));
-    else rules.push(fr("stg_exec", k, { visible: true, editable: false, required: false }));
+    rules.push(fr("stg_exec", k, { visible: true, editable: false, required: false }));
   });
 
   // Stage: FX — swift + fxRate editable.
   allFields.forEach((k) => {
-    if (k === "swiftReference" || k === "fxRate")
-      rules.push(fr("stg_fx", k, { visible: true, editable: true, required: true }));
-    else if (k === "fxConfirmRef")
-      rules.push(fr("stg_fx", k, { visible: false, editable: false, required: false }));
-    else rules.push(fr("stg_fx", k, { visible: true, editable: false, required: false }));
+    rules.push(fr("stg_fx", k, { visible: true, editable: false, required: false }));
   });
 
   // Stage: FX_CONFIRM — fxConfirmRef editable.
   allFields.forEach((k) => {
-    if (k === "fxConfirmRef")
-      rules.push(fr("stg_fx_confirm", k, { visible: true, editable: true, required: true }));
-    else rules.push(fr("stg_fx_confirm", k, { visible: true, editable: false, required: false }));
+    rules.push(fr("stg_fx_confirm", k, { visible: true, editable: false, required: false }));
   });
 
   // Stage: FINAL + CLOSED — all readonly.
@@ -438,7 +434,7 @@ function buildHistory(seed: InstanceSeed, instanceId: string, created: Date) {
 // ---------- instance helpers ----------
 
 function inst(stage: string, status: WorkflowInstance["status"], data: Record<string, unknown>): InstanceSeed {
-  return { stage, status, data };
+  return { stage, status, data: enrichRequestData(data) };
 }
 
 function hop(
@@ -471,10 +467,80 @@ function a(stageId: string, opts: Omit<StageAssignment, "id" | "stageId">): Stag
   return { id: uid("a"), stageId, ...opts };
 }
 
-function fd(versionId: string, key: string, label: string, type: FieldDefinition["type"], options?: string[], groupId?: string, sourceTable?: FieldDefinition["sourceTable"]): FieldDefinition {
-  return { id: uid("fd"), workflowVersionId: versionId, key, label, type, options, groupId, sourceTable };
+function sr(
+  workflowVersionId: string,
+  stageId: string,
+  organizationId: string,
+  teamId: string,
+  roleId: string,
+  processLabel: string,
+): StageRoutingRule {
+  return { id: uid("sr"), workflowVersionId, stageId, organizationId, teamId, roleId, processLabel };
+}
+
+function fd(
+  versionId: string,
+  key: string,
+  label: string,
+  type: FieldDefinition["type"],
+  options?: string[],
+  groupId?: string,
+  sourceTable?: FieldDefinition["sourceTable"],
+  system = false,
+  referenceTableKey?: string,
+): FieldDefinition {
+  return { id: uid("fd"), workflowVersionId: versionId, key, label, type, options, groupId, sourceTable, system, referenceTableKey };
 }
 
 function fr(stageId: string, fieldKey: string, opts: { visible: boolean; editable: boolean; required: boolean }): FieldRule {
   return { id: uid("fr"), stageId, fieldKey, ...opts };
+}
+
+function merchantFixture(name: string): {
+  taxNumber: string;
+  linkedCompany: string;
+  taxCardExpiry: string;
+  commercialRegistration: string;
+  commercialRegistrationExpiry: string;
+  owners: string;
+} | undefined {
+  switch (name) {
+    case "شركة هائل سعيد أنعم":
+      return { taxNumber: "4100000", linkedCompany: "شركة هائل سعيد أنعم للتجارة", taxCardExpiry: "2026-06-16", commercialRegistration: "CR-50000", commercialRegistrationExpiry: "2026-06-16", owners: "عبد الجليل هائل سعيد - 25%" };
+    case "مجموعة الشيباني":
+      return { taxNumber: "4107777", linkedCompany: "الشيباني للاستيراد", taxCardExpiry: "2026-06-16", commercialRegistration: "CR-50013", commercialRegistrationExpiry: "2026-06-16", owners: "أحمد الشيباني - 25%" };
+    case "شركة ثابت إخوان":
+      return { taxNumber: "4115554", linkedCompany: "ثابت إخوان للتجارة", taxCardExpiry: "2026-06-16", commercialRegistration: "CR-50026", commercialRegistrationExpiry: "2026-06-16", owners: "محمد ثابت - 25%" };
+    case "شركة الكميم للأدوية":
+      return { taxNumber: "4123331", linkedCompany: "الكميم للأدوية", taxCardExpiry: "2026-06-16", commercialRegistration: "CR-50039", commercialRegistrationExpiry: "2026-06-16", owners: "علي الكميم - 25%" };
+    case "مجموعة الأهدل":
+      return { taxNumber: "4131108", linkedCompany: "الأهدل للتجارة", taxCardExpiry: "2026-06-16", commercialRegistration: "CR-50052", commercialRegistrationExpiry: "2026-06-16", owners: "سالم الأهدل - 25%" };
+    default:
+      return undefined;
+  }
+}
+
+function enrichRequestData(data: Record<string, unknown>): Record<string, unknown> {
+  const importerName = typeof data.importerName === "string" ? data.importerName : "";
+  const merchant = merchantFixture(importerName);
+  return {
+    requestType: "طلب مصارفة وتحويل خارجي",
+    coverageType: "كلي",
+    foreignCurrencySource: "حساب العميل",
+    requestCurrency: data.currency ?? "دولار أمريكي",
+    requestPercentage: 100,
+    invoiceType: "فاتورة تجارية",
+    invoiceDate: "2026-06-16",
+    quantity: 1,
+    unit: "كرتون",
+    invoiceTotal: data.financeAmount ?? 0,
+    supplierLocation: "المدينة / الدولة",
+    shippingDate: "2026-06-16",
+    arrivalDate: "2026-06-16",
+    shippingPort: "ميناء الشحن",
+    deliveryTerms: "CIF",
+    finalDestination: "المدينة / المخزن الوجهة",
+    ...(merchant ?? {}),
+    ...data,
+  };
 }

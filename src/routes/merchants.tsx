@@ -14,11 +14,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useAuth, ENTITIES, type Merchant } from "@/lib/mock";
-import { merchantsCell, logAudit } from "@/lib/governance";
+import { merchantsCell, logAudit, referenceLabels, referenceTablesCell } from "@/lib/governance";
 import { toast } from "sonner";
 import { ScreenGuard } from "@/components/workflow/ScreenGuard";
-
-const CATEGORIES = ["مواد غذائية", "أدوية ومستلزمات طبية", "مشتقات نفطية", "قطع غيار", "مواد بناء", "إلكترونيات"];
 
 export const Route = createFileRoute("/merchants")({
   component: () => (
@@ -30,6 +28,20 @@ export const Route = createFileRoute("/merchants")({
 
 function entityName(id?: string) {
   return ENTITIES.find((e) => e.id === id)?.name ?? "—";
+}
+
+function linkedCompanies(m: Merchant) {
+  return m.linkedCompanies?.length ? m.linkedCompanies : [{
+    id: `${m.id}_main`,
+    name: m.name,
+    category: m.category,
+    cr: m.cr,
+    crExpiry: m.commercialRegistrationExpiry ?? "—",
+  }];
+}
+
+function primaryCompany(m: Merchant) {
+  return linkedCompanies(m)[0];
 }
 
 function Merchants() {
@@ -60,8 +72,8 @@ function Merchants() {
       if (!s) return true;
       return (
         m.name.toLowerCase().includes(s) ||
-        m.cr.toLowerCase().includes(s) ||
         m.tax.toLowerCase().includes(s) ||
+        linkedCompanies(m).some((c) => [c.name, c.cr, c.category].join(" ").toLowerCase().includes(s)) ||
         entityName(m.entityId).toLowerCase().includes(s)
       );
     });
@@ -149,8 +161,8 @@ function Merchants() {
               <thead className="bg-muted/40 text-xs text-muted-foreground">
                 <tr className="text-right">
                   <th className="p-3 font-semibold">التاجر</th>
-                  <th className="p-3 font-semibold">السجل التجاري</th>
                   <th className="p-3 font-semibold">الرقم الضريبي</th>
+                  <th className="p-3 font-semibold">الشركات المرتبطة</th>
                   <th className="p-3 font-semibold">القطاع</th>
                   <th className="p-3 font-semibold">البنك التابع له</th>
                   <th className="p-3 font-semibold">الحالة</th>
@@ -162,9 +174,9 @@ function Merchants() {
                 {filtered.map((m) => (
                   <tr key={m.id} className="hover:bg-muted/30">
                     <td className="p-3 font-medium">{m.name}</td>
-                    <td className="p-3 text-muted-foreground">{m.cr}</td>
                     <td className="p-3 text-muted-foreground tabular-nums">{m.tax}</td>
-                    <td className="p-3 text-muted-foreground">{m.category}</td>
+                    <td className="p-3 text-muted-foreground">{linkedCompanies(m).length}</td>
+                    <td className="p-3 text-muted-foreground">{primaryCompany(m).category || "—"}</td>
                     <td className="p-3">
                       <Badge variant="outline" className="font-normal">
                         <Building2 className="h-3 w-3 ml-1" />
@@ -204,10 +216,11 @@ function Merchants() {
                 </Badge>
               </div>
               <div className="font-semibold text-base">{m.name}</div>
-              <div className="text-xs text-muted-foreground">{m.category}</div>
+              <div className="text-xs text-muted-foreground">{primaryCompany(m).category || "—"}</div>
               <div className="mt-4 space-y-1.5 text-xs">
-                <Row k="السجل التجاري" v={m.cr} />
                 <Row k="الرقم الضريبي" v={m.tax} />
+                <Row k="انتهاء البطاقة الضريبية" v={m.taxCardExpiry ?? "—"} />
+                <Row k="أول سجل تجاري" v={primaryCompany(m).cr} />
                 <Row k="البنك" v={entityName(m.entityId)} />
                 <Row k="العنوان" v={m.address} />
                 <Row k="هاتف" v={m.contact} />
@@ -280,14 +293,22 @@ function Merchants() {
               <DialogDescription>تفاصيل التاجر — عرض فقط</DialogDescription>
             </DialogHeader>
             <div className="grid sm:grid-cols-2 gap-3 py-2 text-sm">
-              <DetailRow k="السجل التجاري" v={viewing.cr} />
               <DetailRow k="الرقم الضريبي" v={viewing.tax} />
-              <DetailRow k="القطاع" v={viewing.category} />
+              <DetailRow k="انتهاء البطاقة الضريبية" v={viewing.taxCardExpiry ?? "—"} />
               <DetailRow k="الحالة" v={viewing.status === "active" ? "نشط" : "موقوف"} />
               <DetailRow k="البنك التابع له" v={entityName(viewing.entityId)} />
               <DetailRow k="عدد المعاملات" v={String(viewing.transactions)} />
               <div className="sm:col-span-2"><DetailRow k="العنوان" v={viewing.address} /></div>
               <div className="sm:col-span-2"><DetailRow k="هاتف التواصل" v={viewing.contact} /></div>
+              <div className="sm:col-span-2 space-y-2">
+                <div className="text-xs font-semibold text-muted-foreground">الشركات المرتبطة</div>
+                {linkedCompanies(viewing).map((c) => (
+                  <div key={c.id} className="rounded-lg border p-2 text-xs">
+                    <div className="font-medium">{c.name}</div>
+                    <div className="text-muted-foreground">السجل: {c.cr} · الانتهاء: {c.crExpiry} · {c.category}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </DialogContent>
         )}
@@ -327,55 +348,63 @@ function DetailRow({ k, v }: { k: string; v: string }) {
 }
 
 function MerchantDialog({ title, initial, defaultEntityId, onSave }: { title: string; initial?: Merchant; defaultEntityId?: string; onSave: (m: Merchant) => void }) {
+  referenceTablesCell.use();
+  const categoryOptions = referenceLabels("sector_activity");
+  const defaultCompanyCategory = initial?.linkedCompanies?.[0]?.category ?? initial?.category ?? categoryOptions[0] ?? "";
   const [name, setName] = useState(initial?.name ?? "");
-  const [cr, setCr] = useState(initial?.cr ?? "");
   const [tax, setTax] = useState(initial?.tax ?? "");
+  const [taxCardExpiry, setTaxCardExpiry] = useState(initial?.taxCardExpiry ?? "2026-06-16");
   const [address, setAddress] = useState(initial?.address === "—" ? "" : initial?.address ?? "");
   const [contact, setContact] = useState(initial?.contact === "—" ? "" : initial?.contact ?? "");
-  const [category, setCategory] = useState(initial?.category ?? CATEGORIES[0]);
   const [status, setStatus] = useState<"active" | "suspended">(initial?.status ?? "active");
   const [entityId, setEntityId] = useState<string>(initial?.entityId ?? defaultEntityId ?? ENTITIES[0].id);
+  const [owners, setOwners] = useState(initial?.owners?.length ? initial.owners : [{ id: `own_${Date.now()}`, name: "", share: 25 }]);
+  const [companies, setCompanies] = useState(
+    initial?.linkedCompanies?.length
+      ? initial.linkedCompanies
+      : [{ id: `co_${Date.now()}`, name: "", category: defaultCompanyCategory, cr: initial?.cr ?? "", crExpiry: initial?.commercialRegistrationExpiry ?? "2026-06-16" }],
+  );
 
-  const valid = name.trim() && cr.trim() && tax.trim() && entityId;
+  const valid = name.trim() && tax.trim() && taxCardExpiry && entityId && companies.some((c) => c.name.trim() && c.cr.trim() && c.crExpiry);
 
   function submit() {
     if (!valid) return;
+    const cleanCompanies = companies
+      .filter((c) => c.name.trim() && c.cr.trim())
+      .map((c) => ({ ...c, name: c.name.trim(), cr: c.cr.trim(), crExpiry: c.crExpiry || "—" }));
+    const firstCompany = cleanCompanies[0];
     onSave({
       id: initial?.id ?? `m_${Date.now()}`,
-      name: name.trim(), cr: cr.trim(), tax: tax.trim(),
+      name: name.trim(), cr: firstCompany?.cr ?? "", tax: tax.trim(),
       address: address.trim() || "—",
       contact: contact.trim() || "—",
-      category, status, entityId,
+      category: firstCompany?.category ?? "", status, entityId,
+      taxCardExpiry,
+      commercialRegistrationExpiry: firstCompany?.crExpiry,
+      owners: owners.filter((o) => o.name.trim()).map((o) => ({ ...o, name: o.name.trim(), share: Number(o.share) || 0 })),
+      linkedCompanies: cleanCompanies,
       transactions: initial?.transactions ?? 0,
     });
   }
 
   return (
-    <DialogContent dir="rtl" className="sm:max-w-lg">
+    <DialogContent dir="rtl" className="sm:max-w-5xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>الحقول المعلّمة بـ * إلزامية.</DialogDescription>
       </DialogHeader>
       <div className="grid sm:grid-cols-2 gap-3 py-2">
-        <Field label="اسم التاجر / الشركة *">
+        <Field label="اسم التاجر *">
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: شركة الكميم للأدوية" />
-        </Field>
-        <Field label="رقم السجل التجاري *">
-          <Input value={cr} onChange={(e) => setCr(e.target.value)} placeholder="CR-12345" />
         </Field>
         <Field label="الرقم الضريبي *">
           <Input value={tax} onChange={(e) => setTax(e.target.value)} placeholder="4123456" />
         </Field>
+        <Field label="تاريخ انتهاء البطاقة الضريبية *">
+          <Input type="date" value={taxCardExpiry} onChange={(e) => setTaxCardExpiry(e.target.value)} />
+        </Field>
         <Field label="هاتف التواصل">
           <Input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="+9677…" />
-        </Field>
-        <Field label="القطاع / النشاط">
-          <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-            </SelectContent>
-          </Select>
         </Field>
         <Field label="الحالة">
           <Select value={status} onValueChange={(v) => setStatus(v as "active" | "suspended")}>
@@ -400,6 +429,85 @@ function MerchantDialog({ title, initial, defaultEntityId, onSave }: { title: st
           <Field label="العنوان">
             <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="المدينة – الشارع" />
           </Field>
+        </div>
+        <div className="sm:col-span-2 rounded-xl border p-3">
+          <div className="mb-3 flex items-center justify-between">
+            <Label className="font-semibold">الملاك والمساهمون (25% فأكثر)</Label>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setOwners((prev) => [...prev, { id: `own_${Date.now()}`, name: "", share: 25 }])}
+            >
+              <Plus className="ms-1 h-4 w-4" /> إضافة مالك
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {owners.map((owner) => (
+              <div key={owner.id} className="grid grid-cols-[1fr_110px_auto] gap-2">
+                <Input
+                  value={owner.name}
+                  onChange={(e) => setOwners((prev) => prev.map((o) => o.id === owner.id ? { ...o, name: e.target.value } : o))}
+                  placeholder="اسم المالك / المساهم"
+                />
+                <Input
+                  type="number"
+                  value={owner.share}
+                  onChange={(e) => setOwners((prev) => prev.map((o) => o.id === owner.id ? { ...o, share: Number(e.target.value) } : o))}
+                  placeholder="%"
+                />
+                <Button type="button" size="icon" variant="ghost" onClick={() => setOwners((prev) => prev.filter((o) => o.id !== owner.id))}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="sm:col-span-2 rounded-xl border p-3">
+          <div className="mb-3 flex items-center justify-between">
+            <Label className="font-semibold">الشركات المرتبطة</Label>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setCompanies((prev) => [...prev, { id: `co_${Date.now()}`, name: "", category: categoryOptions[0] ?? "", cr: "", crExpiry: "2026-06-16" }])}
+            >
+              <Plus className="ms-1 h-4 w-4" /> إضافة شركة
+            </Button>
+          </div>
+          <div className="space-y-3">
+            {companies.map((company) => (
+              <div key={company.id} className="grid gap-2 rounded-lg bg-muted/30 p-2 sm:grid-cols-2">
+                <Input
+                  value={company.name}
+                  onChange={(e) => setCompanies((prev) => prev.map((c) => c.id === company.id ? { ...c, name: e.target.value } : c))}
+                  placeholder="اسم الشركة"
+                />
+                <Select
+                  value={company.category}
+                  onValueChange={(v) => setCompanies((prev) => prev.map((c) => c.id === company.id ? { ...c, category: v } : c))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{categoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
+                <Input
+                  value={company.cr}
+                  onChange={(e) => setCompanies((prev) => prev.map((c) => c.id === company.id ? { ...c, cr: e.target.value } : c))}
+                  placeholder="رقم السجل التجاري"
+                />
+                <div className="grid grid-cols-[1fr_auto] gap-2">
+                  <Input
+                    type="date"
+                    value={company.crExpiry}
+                    onChange={(e) => setCompanies((prev) => prev.map((c) => c.id === company.id ? { ...c, crExpiry: e.target.value } : c))}
+                  />
+                  <Button type="button" size="icon" variant="ghost" onClick={() => setCompanies((prev) => prev.filter((c) => c.id !== company.id))}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
       <DialogFooter>

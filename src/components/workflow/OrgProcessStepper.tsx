@@ -1,7 +1,7 @@
 import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  getStagesForVersion, getStageGroups, isAssigned, stageGroupVisibleTo,
+  canViewByStageRouting, getStagesForVersion, isAssigned, processLabelForStage,
   wfStore, type WorkflowInstance,
 } from "@/lib/workflow-engine";
 import { useWfUser } from "@/lib/workflow-engine/wfAuth";
@@ -15,21 +15,19 @@ import { Badge } from "@/components/ui/badge";
  */
 export function OrgProcessStepper({ instance }: { instance: WorkflowInstance }) {
   wfStore.stages.use();
-  wfStore.stageGroups.use();
+  wfStore.stageRoutingRules.use();
   wfStore.assignments.use();
   const user = useWfUser();
 
   const allStages = getStagesForVersion(instance.workflowVersionId);
-  const groups = getStageGroups(instance.workflowVersionId);
   const currentIdx = allStages.findIndex((s) => s.id === instance.currentStageId);
   const rejected = instance.status === "rejected";
   const isAdmin = Boolean(user?.roleIds.includes("role_admin"));
 
-  // A stage shows if it has no group, or the user is in the group's audience.
+  // A stage shows when its routing rules allow the signed-in user's org/team/role.
   const visibleStages = allStages.filter((s) => {
-    if (isAdmin || !s.groupId) return true;
-    const group = groups.find((g) => g.id === s.groupId);
-    return group ? stageGroupVisibleTo(group, user) : true;
+    if (isAdmin) return true;
+    return canViewByStageRouting(s.id, user);
   });
 
   if (visibleStages.length === 0) {
@@ -78,7 +76,7 @@ export function OrgProcessStepper({ instance }: { instance: WorkflowInstance }) 
             <div className="pb-1 -mt-0.5">
               <div className="flex items-center gap-2">
                 <span className={cn("text-sm font-medium", isCurrent ? "text-foreground" : "text-foreground/80")}>
-                  {s.processLabel ?? s.name}
+                  {processLabelForStage(s, user)}
                 </span>
                 {mine && (
                   <Badge variant="outline" className="h-4 px-1.5 text-[10px] border-primary/40 text-primary">دورك</Badge>

@@ -181,6 +181,10 @@ export type Merchant = {
   id: string; name: string; tax: string; cr: string; address: string;
   contact: string; category: string; status: "active" | "suspended"; transactions: number;
   entityId?: string;
+  taxCardExpiry?: string;
+  commercialRegistrationExpiry?: string;
+  owners?: { id: string; name: string; share: number }[];
+  linkedCompanies?: { id: string; name: string; category: string; cr: string; crExpiry: string }[];
 };
 
 export const MERCHANTS: Merchant[] = importers.map((n, i) => ({
@@ -188,6 +192,16 @@ export const MERCHANTS: Merchant[] = importers.map((n, i) => ({
   name: n,
   tax: `4${String(100000 + i * 7777)}`,
   cr: `CR-${String(50000 + i * 13)}`,
+  taxCardExpiry: "2026-06-16",
+  commercialRegistrationExpiry: "2026-06-16",
+  owners: [{ id: `own${i + 1}`, name: `${n} - المالك الرئيسي`, share: 25 }],
+  linkedCompanies: [{
+    id: `mc${i + 1}`,
+    name: n,
+    category: types[i % types.length],
+    cr: `CR-${String(50000 + i * 13)}`,
+    crExpiry: "2026-06-16",
+  }],
   address: ["صنعاء – شارع الزبيري", "عدن – كريتر", "الحديدة – شارع صنعاء", "المكلا", "تعز"][i % 5],
   contact: `+9677${String(11000000 + i * 9999)}`,
   category: types[i % types.length],
