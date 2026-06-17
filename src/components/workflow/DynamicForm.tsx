@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, ChevronLeft, ChevronRight, Search, Upload } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -112,6 +112,9 @@ export function DynamicForm({ fields, value, onChange, groups, readOnly = false 
         next.commercialRegistrationExpiry = firstCompany?.crExpiry ?? merchant.commercialRegistrationExpiry ?? "";
         next.owners = (merchant.owners ?? []).map((o) => `${o.name} - ${o.share}%`).join("\n");
       }
+    }
+    if (key === "coverageType" && v === "كلي") {
+      next.requestPercentage = 100;
     }
     if (key === "linkedCompany") {
       const merchant = merchantByName(next.importerName) ?? merchantByTax(next.taxNumber);
@@ -247,7 +250,8 @@ function FieldControl({
   field, formValue, value, onSet,
 }: { field: DynamicField; formValue: Record<string, unknown>; value: unknown; onSet: (v: unknown) => void }) {
   const { def, editable, required } = field;
-  const disabled = !editable || LOCKED_MERCHANT_FIELDS.has(def.key);
+  const lockedByFullCoverage = def.key === "requestPercentage" && formValue.coverageType === "كلي";
+  const disabled = !editable || LOCKED_MERCHANT_FIELDS.has(def.key) || lockedByFullCoverage;
   const id = `field-${def.key}`;
   const label = (
     <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">
@@ -303,16 +307,7 @@ function FieldControl({
         </div>
       );
     case "file":
-      return (
-        <div className="space-y-1.5 md:col-span-2">
-          {label}
-          <Input id={id} type="file" disabled={disabled}
-            onChange={(e) => onSet(e.target.files?.[0]?.name ?? "")} />
-          {typeof value === "string" && value && (
-            <p className="text-[11px] text-muted-foreground">الملف الحالي: {value}</p>
-          )}
-        </div>
-      );
+      return <FileUploadCard id={id} label={def.label} required={required} disabled={disabled} value={value} onSet={onSet} />;
     case "number":
     case "currency":
       return (
@@ -344,6 +339,71 @@ function FieldControl({
         </div>
       );
   }
+}
+
+function FileUploadCard({
+  id, label, required, disabled, value, onSet,
+}: {
+  id: string; label: string; required: boolean; disabled: boolean; value: unknown; onSet: (v: unknown) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const fileName = typeof value === "string" ? value : "";
+  return (
+    <div className="space-y-1.5">
+      <div className="rounded-xl border border-dashed border-border p-4 flex flex-col gap-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              {required ? (
+                <Badge variant="destructive" className="text-[10px] shrink-0">إلزامي</Badge>
+              ) : (
+                <Badge variant="secondary" className="text-[10px] shrink-0">اختياري</Badge>
+              )}
+            </div>
+            <div className="font-semibold text-sm mt-2">{label}</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">
+              {required ? "مطلوب" : "اختياري"} · PDF, JPG (حد أقصى 10MB)
+            </div>
+          </div>
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border text-muted-foreground">
+            <Upload className="h-5 w-5" />
+          </div>
+        </div>
+        {fileName ? (
+          <div className="flex items-center justify-between rounded-lg bg-success/10 px-3 py-2 text-xs">
+            <span className="font-medium truncate">{fileName}</span>
+            {!disabled && (
+              <button
+                type="button"
+                className="text-destructive hover:underline shrink-0 ms-2"
+                onClick={() => { onSet(""); if (inputRef.current) inputRef.current.value = ""; }}
+              >
+                إزالة
+              </button>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={disabled}
+            className="w-full rounded-lg border bg-background py-2.5 text-xs font-medium text-muted-foreground hover:bg-muted/40 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+            onClick={() => inputRef.current?.click()}
+          >
+            <Upload className="h-3.5 w-3.5" /> اضغط للرفع
+          </button>
+        )}
+        <input
+          ref={inputRef}
+          id={id}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png"
+          className="hidden"
+          disabled={disabled}
+          onChange={(e) => onSet(e.target.files?.[0]?.name ?? "")}
+        />
+      </div>
+    </div>
+  );
 }
 
 function ReviewStep({

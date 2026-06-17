@@ -23,7 +23,9 @@ function Audit() {
   const AUDIT = auditCell.use();
   const instances = wfStore.instances.use();
   const [q, setQ] = useState("");
-  const filtered = AUDIT.filter(a => !q || a.userName.includes(q) || a.action.includes(q) || a.ref.includes(q));
+  const filtered = AUDIT.filter(
+    (a) => !q || a.userName.includes(q) || a.action.includes(q) || a.ref.includes(q),
+  );
   const duplicates = duplicateInvoices(instances);
 
   return (
@@ -36,14 +38,31 @@ function Audit() {
 
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6">
         {[
-          { l: "نشاطات اليوم", v: AUDIT.length.toString(), icon: Activity, tone: "text-info bg-info/10" },
+          {
+            l: "نشاطات اليوم",
+            v: AUDIT.length.toString(),
+            icon: Activity,
+            tone: "text-info bg-info/10",
+          },
           { l: "تنبيهات مفتوحة", v: "9", icon: AlertTriangle, tone: "text-warning bg-warning/10" },
-          { l: "فواتير مكررة", v: duplicates.length.toString(), icon: FileWarning, tone: "text-destructive bg-destructive/10" },
-          { l: "حالات احتيال محتملة", v: "2", icon: ShieldCheck, tone: "text-destructive bg-destructive/10" },
+          {
+            l: "فواتير مكررة",
+            v: duplicates.length.toString(),
+            icon: FileWarning,
+            tone: "text-destructive bg-destructive/10",
+          },
+          {
+            l: "حالات احتيال محتملة",
+            v: "2",
+            icon: ShieldCheck,
+            tone: "text-destructive bg-destructive/10",
+          },
         ].map((k) => (
           <Card key={k.l} className="p-4 shadow-card border-0 flex items-center gap-3">
-            <div className={`h-11 w-11 rounded-xl grid place-items-center ${k.tone}`}><k.icon className="h-5 w-5" /></div>
-            <div>
+            <div className={`h-11 w-11 rounded-xl grid place-items-center shrink-0 ${k.tone}`}>
+              <k.icon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
               <div className="text-xs text-muted-foreground">{k.l}</div>
               <div className="text-xl font-bold">{k.v}</div>
             </div>
@@ -52,10 +71,16 @@ function Audit() {
       </div>
 
       <Tabs defaultValue="logs">
-        <TabsList>
-          <TabsTrigger value="logs">سجل النشاط</TabsTrigger>
-          <TabsTrigger value="dup">الفواتير المكررة</TabsTrigger>
-          <TabsTrigger value="risk">مؤشرات المخاطر</TabsTrigger>
+        <TabsList className="h-auto w-full flex-wrap justify-start gap-1 p-1 sm:w-auto">
+          <TabsTrigger value="logs" className="min-h-11 flex-1 sm:flex-none">
+            سجل النشاط
+          </TabsTrigger>
+          <TabsTrigger value="dup" className="min-h-11 flex-1 sm:flex-none">
+            الفواتير المكررة
+          </TabsTrigger>
+          <TabsTrigger value="risk" className="min-h-11 flex-1 sm:flex-none">
+            مؤشرات المخاطر
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="logs" className="mt-4">
@@ -63,7 +88,13 @@ function Audit() {
             <div className="p-4 border-b">
               <div className="relative max-w-md">
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input className="pr-10" placeholder="بحث في السجل: مستخدم، إجراء، رقم طلب..." value={q} onChange={(e) => setQ(e.target.value)} />
+                <Input
+                  className="pr-10"
+                  aria-label="بحث في سجل التدقيق"
+                  placeholder="بحث في السجل: مستخدم، إجراء، رقم طلب..."
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -82,11 +113,15 @@ function Audit() {
                   {filtered.map((a) => (
                     <tr key={a.id} className="border-t hover:bg-muted/30">
                       <td className="px-4 py-3 font-medium">{a.userName}</td>
-                      <td className="px-4 py-3"><Badge variant="secondary">{a.action}</Badge></td>
+                      <td className="px-4 py-3">
+                        <Badge variant="secondary">{a.action}</Badge>
+                      </td>
                       <td className="px-4 py-3 font-mono text-xs text-accent">{a.ref}</td>
                       <td className="px-4 py-3 text-xs">{a.device}</td>
                       <td className="px-4 py-3 font-mono text-xs">{a.ip}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{new Date(a.ts).toLocaleString("ar-EG")}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        {new Date(a.ts).toLocaleString("ar-EG")}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -100,7 +135,8 @@ function Audit() {
             <div className="flex items-center gap-2 mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
               <AlertTriangle className="h-5 w-5 text-destructive" />
               <div className="text-sm">
-                <span className="font-semibold">تم اكتشاف {duplicates.length} حالات</span> لفواتير مكررة بحاجة لمراجعة عاجلة.
+                <span className="font-semibold">تم اكتشاف {duplicates.length} حالات</span> لفواتير
+                مكررة بحاجة لمراجعة عاجلة.
               </div>
             </div>
             <div className="space-y-3">
@@ -113,7 +149,9 @@ function Audit() {
                         <span className="font-mono font-semibold">{d.invoice}</span>
                       </div>
                       <div className="text-sm font-medium mt-1">فاتورة مستخدمة في أكثر من طلب</div>
-                      <div className="text-xs text-muted-foreground">الطلبات: <span className="font-mono">{d.refs.join("، ")}</span></div>
+                      <div className="text-xs text-muted-foreground">
+                        الطلبات: <span className="font-mono">{d.refs.join("، ")}</span>
+                      </div>
                     </div>
                     <div className="text-left text-xs text-muted-foreground">
                       {d.refs.length} طلبات
@@ -131,17 +169,34 @@ function Audit() {
             <div className="space-y-3">
               {[
                 { t: "نمط طلبات غير عادي", b: "مستخدم u00432 قدّم 14 طلب في 30 دقيقة", l: "عالية" },
-                { t: "محاولة تسجيل دخول مشبوهة", b: "5 محاولات فاشلة من IP 196.4.112.18", l: "عالية" },
+                {
+                  t: "محاولة تسجيل دخول مشبوهة",
+                  b: "5 محاولات فاشلة من IP 196.4.112.18",
+                  l: "عالية",
+                },
                 { t: "تعديل فاتورة بعد الاعتماد", b: "تعديل على IMP-2025-1011", l: "متوسطة" },
                 { t: "وثيقة بصلاحية منتهية", b: "شهادة منشأ على IMP-2025-1027", l: "منخفضة" },
               ].map((r, i) => (
                 <div key={i} className="flex items-start gap-3 p-3 border rounded-lg">
-                  <ShieldCheck className={`h-5 w-5 mt-0.5 ${r.l === "عالية" ? "text-destructive" : r.l === "متوسطة" ? "text-warning" : "text-info"}`} />
-                  <div className="flex-1">
+                  <ShieldCheck
+                    className={`h-5 w-5 mt-0.5 shrink-0 ${
+                      r.l === "عالية"
+                        ? "text-destructive"
+                        : r.l === "متوسطة"
+                          ? "text-warning"
+                          : "text-info"
+                    }`}
+                  />
+                  <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm">{r.t}</div>
                     <div className="text-xs text-muted-foreground">{r.b}</div>
                   </div>
-                  <Badge variant={r.l === "عالية" ? "destructive" : "secondary"}>{r.l}</Badge>
+                  <Badge
+                    variant={r.l === "عالية" ? "destructive" : "secondary"}
+                    className="shrink-0"
+                  >
+                    {r.l}
+                  </Badge>
                 </div>
               ))}
             </div>
@@ -153,13 +208,16 @@ function Audit() {
 }
 
 function duplicateInvoices(instances: WorkflowInstance[]) {
-  const invoices = new Map<string, string[]>();
+  const groups = new Map<string, string[]>();
   instances.forEach((inst) => {
-    const invoice = stringValue(inst.data.invoiceNumber);
-    if (!invoice) return;
-    invoices.set(invoice, [...(invoices.get(invoice) ?? []), instanceRef(inst)]);
+    const invoice = stringValue(inst.data.invoiceNumber).trim();
+    const tax = stringValue(inst.data.taxNumber).trim();
+    const coverage = stringValue(inst.data.coverageType).trim();
+    if (!invoice || !tax || coverage !== "كلي") return;
+    const key = `${tax}::${invoice}`;
+    groups.set(key, [...(groups.get(key) ?? []), instanceRef(inst)]);
   });
-  return [...invoices.entries()]
+  return [...groups.entries()]
     .filter(([, refs]) => refs.length > 1)
-    .map(([invoice, refs]) => ({ invoice, refs }));
+    .map(([key, refs]) => ({ invoice: key.split("::")[1], refs }));
 }

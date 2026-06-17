@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
-  ArrowLeft, ShieldCheck, Lock, MessageSquare, Download,
+  ArrowLeft, ShieldCheck, Lock, MessageSquare, Download, Eye,
   User as UserIcon, Building2, MapPin, CalendarDays, Activity,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -15,14 +15,15 @@ import {
 } from "@/components/workflow/DynamicForm";
 import { OrgProcessStepper } from "@/components/workflow/OrgProcessStepper";
 import {
-  wfStore, getStageFields, getFieldGroups, getFieldDefs, getAvailableActions,
+  wfStore, getStageFields, getViewerFields, getFieldGroups, getFieldDefs, getAvailableActions,
   applyAction, saveDraftData, getInstanceHistory, canExecute, canView,
 } from "@/lib/workflow-engine";
 import { useWfUser } from "@/lib/workflow-engine/wfAuth";
 import { useAuth } from "@/lib/mock";
 import {
   canScreen, progressForInstance, instanceRef, instanceTitle,
-  instanceGoodsType, instanceAmount, instanceCurrency,
+  instanceGoodsType, instanceAmount, instanceCurrency, isDuplicateInvoice,
+  stageLabel,
 } from "@/lib/workflow-bridge";
 import { ScreenGuard } from "@/components/workflow/ScreenGuard";
 import { toast } from "sonner";
@@ -55,10 +56,13 @@ function InstancePage() {
   const instance = instances.find((i) => i.id === id);
   const stage = instance ? stages.find((s) => s.id === instance.currentStageId) : undefined;
 
+  const isExecutor = user ? canExecute(instance?.currentStageId ?? "", user) : false;
+
   const stageFields: DynamicField[] = useMemo(() => {
     if (!instance) return [];
-    return getStageFields(instance.workflowVersionId, instance.currentStageId);
-  }, [instance, stages]);
+    if (isExecutor || isAdmin) return getStageFields(instance.workflowVersionId, instance.currentStageId);
+    return getViewerFields(instance.workflowVersionId, user);
+  }, [instance, stages, isExecutor, isAdmin, user]);
 
   const fieldGroups = useMemo(() => {
     if (!instance) return [];
@@ -77,7 +81,6 @@ function InstancePage() {
   }
 
   const actions = user ? getAvailableActions(instance, user) : [];
-  const isExecutor = canExecute(instance.currentStageId, user);
   // مسؤول النظام يرى كل الطلبات في كل المراحل بدون قيد على التعيينات.
   const canSeeStage = isAdmin || canView(instance.currentStageId, user);
   // تعديل الحقول مسموح فقط لمن يملك صلاحية التنفيذ على المرحلة + صلاحية شاشة الطلبات.
@@ -93,16 +96,25 @@ function InstancePage() {
     setDraftData(instance.data);
   }
 
+  const checkDuplicate = () => {
+    const { duplicate, refs } = isDuplicateInvoice(draftData, instance.id);
+    if (duplicate) {
+      toast.error(`فاتورة مكررة (كلي) — نفس الرقم الضريبي ورقم الفاتورة موجود في: ${refs.join("، ")}`);
+      return true;
+    }
+    return false;
+  };
+
   const onSaveDraft = () => {
     if (!user) return;
+    if (checkDuplicate()) return;
     saveDraftData(instance.id, draftData, user);
     toast.success("تم حفظ المسودة");
   };
 
   const onAction = (transitionId: string, actionName: string) => {
     if (!user) return toast.error("اختر مستخدمًا");
-    // ملاحظة: لا يوجد فرض لقواعد التحقق (validation) عند تنفيذ الإجراءات —
-    // المُجرِّب يُدخل بيانات صحيحة وفق معايير صارمة.
+    if (checkDuplicate()) return;
     const res = applyAction({ instanceId: instance.id, transitionId, user, comments, data: draftData });
     if (!res.ok) return toast.error(res.error);
     toast.success(`تم تنفيذ: ${actionName}`);
@@ -119,7 +131,7 @@ function InstancePage() {
     const payload = {
       "رقم الطلب": instanceRef(instance),
       "المستورد": instanceTitle(instance),
-      "المرحلة الحالية": stage?.name ?? "—",
+      "المرحلة الحالية": stageLabel(instance),
       "الحالة": instance.status === "active" ? "نشط" : instance.status === "closed" ? "مغلق" : "مرفوض",
       "تاريخ الإنشاء": new Date(instance.createdAt).toLocaleString("ar"),
       "البيانات": fieldsLabeled,
@@ -171,7 +183,7 @@ function InstancePage() {
               <span className="text-lg font-bold text-primary">{progress}%</span>
             </div>
             <Progress value={progress} />
-            <p className="text-xs text-muted-foreground mt-2">المرحلة الحالية: {stage?.name ?? "—"}</p>
+            <p className="text-xs text-muted-foreground mt-2">المرحلة الحالية: {stageLabel(instance)}</p>
           </Card>
 
           {/* Stage banner */}
@@ -183,7 +195,7 @@ function InstancePage() {
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground">المرحلة الحالية</div>
-                  <div className="text-lg font-bold">{stage?.name ?? "—"}</div>
+                  <div className="text-lg font-bold">{stageLabel(instance)}</div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -193,7 +205,7 @@ function InstancePage() {
                 {isAdmin && (
                   <Badge variant="outline" className="gap-1"><ShieldCheck className="h-3 w-3" /> مسؤول النظام</Badge>
                 )}
-                {!isAdmin && !isExecutor && canSeeStage && (
+                {!isAdmin && !isExecutor && (
                   <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> عرض فقط</Badge>
                 )}
               </div>
@@ -201,13 +213,9 @@ function InstancePage() {
           </Card>
 
           {/* Form */}
-          <Card className="p-5">
+          <Card id="request-data" className="p-5">
             <h2 className="font-semibold mb-4">بيانات الطلب</h2>
-            {canSeeStage ? (
-              <DynamicForm fields={stageFields} value={draftData} onChange={setDraftData} groups={fieldGroups} readOnly={!canEditFields} />
-            ) : (
-              <p className="text-sm text-muted-foreground">لا تملك صلاحية عرض بيانات هذه المرحلة.</p>
-            )}
+            <DynamicForm fields={stageFields} value={draftData} onChange={setDraftData} groups={fieldGroups} readOnly={!canEditFields} />
           </Card>
 
           {/* Actions */}
@@ -216,14 +224,14 @@ function InstancePage() {
               <h2 className="font-semibold mb-4">الإجراءات المتاحة</h2>
               {!user && <p className="text-sm text-muted-foreground">اختر مستخدمًا من صفحة سير العمل لتنفيذ الإجراءات.</p>}
               {user && !isExecutor && (
-                <p className="text-sm text-muted-foreground">
-                  لا تملك صلاحية تنفيذ إجراءات على هذه المرحلة (يمكنك العرض فقط).
-                </p>
+                <Button variant="outline" size="sm" onClick={() => document.getElementById("request-data")?.scrollIntoView({ behavior: "smooth" })}>
+                  <Eye className="ms-1 h-4 w-4" /> عرض بيانات الطلب
+                </Button>
               )}
               {isExecutor && !canActOnRequests && (
-                <p className="text-sm text-muted-foreground">
-                  لا تملك صلاحية تنفيذ إجراءات على الطلبات وفق صلاحيات ظهور الشاشات (يمكنك العرض فقط).
-                </p>
+                <Button variant="outline" size="sm" onClick={() => document.getElementById("request-data")?.scrollIntoView({ behavior: "smooth" })}>
+                  <Eye className="ms-1 h-4 w-4" /> عرض بيانات الطلب
+                </Button>
               )}
               {isExecutor && canActOnRequests && (
                 <>

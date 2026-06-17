@@ -172,12 +172,17 @@ function ScreenPermissionsAdmin() {
                               ) : (
                                 <X className="h-4 w-4 text-muted-foreground/40" />
                               )
-                            ) : (
-                              <Switch
-                                checked={manualScreenCan(role.legacyRole, g.key, c.cap)}
-                                onCheckedChange={(v) => toggle(g.key, g.label, role, c.cap, v)}
-                              />
-                            )}
+                            ) : (() => {
+                              const checked = manualScreenCan(role.legacyRole, g.key, c.cap);
+                              const viewLockedByAdd = c.cap === "view" && manualScreenCan(role.legacyRole, g.key, "add");
+                              return (
+                                <Switch
+                                  checked={checked}
+                                  disabled={viewLockedByAdd}
+                                  onCheckedChange={(v) => toggle(g.key, g.label, role, c.cap, v)}
+                                />
+                              );
+                            })()}
                           </div>
                         </td>
                       )),

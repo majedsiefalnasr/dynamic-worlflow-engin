@@ -143,10 +143,16 @@ export function stageRoutingRuleMatches(rule: Pick<StageRoutingRule, "organizati
   return true;
 }
 
+function routingSpecificity(rule: Pick<StageRoutingRule, "organizationId" | "teamId" | "roleId">): number {
+  return (rule.organizationId ? 1 : 0) + (rule.teamId ? 1 : 0) + (rule.roleId ? 1 : 0);
+}
+
 export function getStageRoutingForUser(stage: WorkflowStage, user: WfUser | null): StageRoutingRule | undefined {
   const rules = getEffectiveStageRoutingRules(stage.workflowVersionId).filter((r) => r.stageId === stage.id);
   if (rules.length === 0 || !user) return undefined;
-  return rules.find((r) => stageRoutingRuleMatches(r, user));
+  const matched = rules.filter((r) => stageRoutingRuleMatches(r, user));
+  if (matched.length <= 1) return matched[0];
+  return matched.sort((a, b) => routingSpecificity(b) - routingSpecificity(a))[0];
 }
 
 export function canViewByStageRouting(stageId: string, user: WfUser | null): boolean {
@@ -238,6 +244,24 @@ export function stageGroupVisibleTo(group: StageGroup, user: WfUser | null): boo
 
 export function getFieldRules(stageId: string): FieldRule[] {
   return store.fieldRules.get().filter((r) => r.stageId === stageId);
+}
+
+export function getViewerFields(versionId: string, user: WfUser | null) {
+  const defs = getFieldDefs(versionId);
+  if (!user) return defs.map((def) => ({ def, visible: false, editable: false, required: false, groupId: def.groupId }));
+  const stages = getStagesForVersion(versionId);
+  const userStageIds = stages
+    .filter((s) => canViewByStageRouting(s.id, user) || isAssigned(s.id, user))
+    .map((s) => s.id);
+  const allRules = userStageIds.flatMap((sid) => getFieldRules(sid));
+  const visibleKeys = new Set(allRules.filter((r) => r.visible).map((r) => r.fieldKey));
+  return defs.map((def) => ({
+    def,
+    visible: visibleKeys.has(def.key),
+    editable: false,
+    required: false,
+    groupId: def.groupId,
+  }));
 }
 
 /** Merge field defs with stage rules — fields with no rule default to visible+editable+optional. */

@@ -1,6 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Trash2, GitBranch, Tag, Users2, ListChecks, Layers, RefreshCw, FileCog, FolderTree, ChevronUp, ChevronDown } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  GitBranch,
+  Tag,
+  Users2,
+  ListChecks,
+  Layers,
+  RefreshCw,
+  FileCog,
+  FolderTree,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,24 +21,48 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Tabs, TabsContent, TabsList, TabsTrigger,
-} from "@/components/ui/tabs";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  wfStore, uid, cloneVersion, publishVersion, reseed,
-  getEffectiveStageRoutingRules, isAssignmentBackedStageRoutingRule,
-  type FieldDefinition, type WorkflowStage, type WorkflowTransition,
-  type StageAssignment, type FieldRule, type WorkflowAction,
-  type StageGroup, type StageGroupAudience, type StageRoutingRule, type DynamicSource,
+  wfStore,
+  uid,
+  cloneVersion,
+  publishVersion,
+  reseed,
+  getEffectiveStageRoutingRules,
+  isAssignmentBackedStageRoutingRule,
+  type FieldDefinition,
+  type WorkflowStage,
+  type WorkflowTransition,
+  type StageAssignment,
+  type FieldRule,
+  type WorkflowAction,
+  type StageGroup,
+  type StageGroupAudience,
+  type StageRoutingRule,
+  type DynamicSource,
 } from "@/lib/workflow-engine";
 import { orgsCell, teamsCell, roleCatalogCell, referenceTablesCell } from "@/lib/governance";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
@@ -56,8 +93,8 @@ const ROLE_TO_ENGINE_ID: Record<string, string> = {
   rc_platform_admin: "role_admin",
 };
 
-const toEngineOrgId = (id: string | undefined) => (id ? ORG_TO_ENGINE_ID[id] ?? id : undefined);
-const toEngineRoleId = (id: string | undefined) => (id ? ROLE_TO_ENGINE_ID[id] ?? id : undefined);
+const toEngineOrgId = (id: string | undefined) => (id ? (ORG_TO_ENGINE_ID[id] ?? id) : undefined);
+const toEngineRoleId = (id: string | undefined) => (id ? (ROLE_TO_ENGINE_ID[id] ?? id) : undefined);
 
 const FIELD_TYPES: { value: FieldDefinition["type"]; label: string }[] = [
   { value: "text", label: "نص" },
@@ -76,12 +113,16 @@ const DYNAMIC_SOURCES: { value: DynamicSource; label: string }[] = [
   { value: "merchant_companies", label: "شركات التاجر المرتبطة" },
 ];
 
-const fieldTypeLabel = (t: FieldDefinition["type"]) => FIELD_TYPES.find((x) => x.value === t)?.label ?? t;
-const sourceLabel = (s: DynamicSource | undefined) => DYNAMIC_SOURCES.find((x) => x.value === s)?.label ?? "—";
+const fieldTypeLabel = (t: FieldDefinition["type"]) =>
+  FIELD_TYPES.find((x) => x.value === t)?.label ?? t;
+const sourceLabel = (s: DynamicSource | undefined) =>
+  DYNAMIC_SOURCES.find((x) => x.value === s)?.label ?? "—";
 type DynamicSourceOption = DynamicSource | `reference:${string}`;
 const referenceSourceValue = (key: string): DynamicSourceOption => `reference:${key}`;
-const isReferenceSourceValue = (value: DynamicSourceOption): value is `reference:${string}` => value.startsWith("reference:");
-const referenceKeyFromSourceValue = (value: DynamicSourceOption) => value.slice("reference:".length);
+const isReferenceSourceValue = (value: DynamicSourceOption): value is `reference:${string}` =>
+  value.startsWith("reference:");
+const referenceKeyFromSourceValue = (value: DynamicSourceOption) =>
+  value.slice("reference:".length);
 
 function DesignerPage() {
   const defs = wfStore.definitions.use();
@@ -99,7 +140,10 @@ function DesignerPage() {
 
   const onClone = () => {
     if (!verId) return;
-    const newVer = cloneVersion(verId, `${(defVersions.find((v) => v.id === verId)?.version ?? "1.0")}.${Date.now().toString().slice(-3)}`);
+    const newVer = cloneVersion(
+      verId,
+      `${defVersions.find((v) => v.id === verId)?.version ?? "1.0"}.${Date.now().toString().slice(-3)}`,
+    );
     if (newVer) {
       toast.success(`تم إنشاء نسخة جديدة ${newVer.version}`);
       setVerId(newVer.id);
@@ -117,7 +161,10 @@ function DesignerPage() {
       reseed();
       toast.success("تم إعادة بناء البيانات");
       const first = wfStore.definitions.get()[0];
-      if (first) { setDefId(first.id); setVerId(first.activeVersionId ?? ""); }
+      if (first) {
+        setDefId(first.id);
+        setVerId(first.activeVersionId ?? "");
+      }
     }
   };
 
@@ -127,7 +174,11 @@ function DesignerPage() {
         title="مصمم سير العمل"
         subtitle="إعداد المراحل، الانتقالات، الصلاحيات، الحقول، وقواعد الرؤية — بدون كود."
         breadcrumbs={[{ label: "الرئيسية", to: "/" }, { label: "مصمم سير العمل" }]}
-        actions={<Button variant="outline" onClick={onReseed}><RefreshCw className="ms-1 h-4 w-4" /> إعادة البناء</Button>}
+        actions={
+          <Button variant="outline" onClick={onReseed}>
+            <RefreshCw className="ms-1 h-4 w-4" /> إعادة البناء
+          </Button>
+        }
       />
 
       {/* Workflow + Version picker */}
@@ -136,16 +187,24 @@ function DesignerPage() {
           <div>
             <Label className="text-xs text-muted-foreground">سير العمل</Label>
             <Select value={defId} onValueChange={setDefId}>
-              <SelectTrigger><SelectValue placeholder="اختر..." /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="اختر..." />
+              </SelectTrigger>
               <SelectContent>
-                {defs.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                {defs.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">النسخة</Label>
             <Select value={verId} onValueChange={setVerId}>
-              <SelectTrigger><SelectValue placeholder="اختر نسخة..." /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="اختر نسخة..." />
+              </SelectTrigger>
               <SelectContent>
                 {defVersions.map((v) => (
                   <SelectItem key={v.id} value={v.id}>
@@ -156,8 +215,12 @@ function DesignerPage() {
             </Select>
           </div>
           <div className="flex items-end gap-2">
-            <Button variant="secondary" onClick={onClone}><Plus className="ms-1 h-4 w-4" /> نسخة جديدة</Button>
-            <Button onClick={onPublish}><Tag className="ms-1 h-4 w-4" /> نشر</Button>
+            <Button variant="secondary" onClick={onClone}>
+              <Plus className="ms-1 h-4 w-4" /> نسخة جديدة
+            </Button>
+            <Button onClick={onPublish}>
+              <Tag className="ms-1 h-4 w-4" /> نشر
+            </Button>
           </div>
         </div>
       </Card>
@@ -166,23 +229,51 @@ function DesignerPage() {
         <Card className="p-10 text-center text-muted-foreground">لا توجد نسخة محدّدة.</Card>
       ) : (
         <Tabs defaultValue="stages">
-          <TabsList className="mb-4">
-            <TabsTrigger value="stages"><Layers className="ms-1 h-4 w-4" /> المراحل</TabsTrigger>
-            <TabsTrigger value="stageRouting"><Users2 className="ms-1 h-4 w-4" /> سير العملية التنظيمية</TabsTrigger>
-            <TabsTrigger value="transitions"><GitBranch className="ms-1 h-4 w-4" /> الانتقالات</TabsTrigger>
-            <TabsTrigger value="assignments"><Users2 className="ms-1 h-4 w-4" /> الصلاحيات</TabsTrigger>
-            <TabsTrigger value="fields"><FileCog className="ms-1 h-4 w-4" /> الحقول</TabsTrigger>
-            <TabsTrigger value="rules"><ListChecks className="ms-1 h-4 w-4" /> قواعد الحقول</TabsTrigger>
-            <TabsTrigger value="actions"><Tag className="ms-1 h-4 w-4" /> الإجراءات</TabsTrigger>
+          <TabsList className="mb-4 flex h-auto w-full flex-wrap justify-start gap-1">
+            <TabsTrigger className="min-h-10 flex-1 basis-36 sm:flex-none" value="stages">
+              <Layers className="ms-1 h-4 w-4" /> المراحل
+            </TabsTrigger>
+            <TabsTrigger className="min-h-10 flex-1 basis-44 sm:flex-none" value="stageRouting">
+              <Users2 className="ms-1 h-4 w-4" /> سير العملية التنظيمية
+            </TabsTrigger>
+            <TabsTrigger className="min-h-10 flex-1 basis-36 sm:flex-none" value="transitions">
+              <GitBranch className="ms-1 h-4 w-4" /> الانتقالات
+            </TabsTrigger>
+            <TabsTrigger className="min-h-10 flex-1 basis-36 sm:flex-none" value="assignments">
+              <Users2 className="ms-1 h-4 w-4" /> الصلاحيات
+            </TabsTrigger>
+            <TabsTrigger className="min-h-10 flex-1 basis-36 sm:flex-none" value="fields">
+              <FileCog className="ms-1 h-4 w-4" /> الحقول
+            </TabsTrigger>
+            <TabsTrigger className="min-h-10 flex-1 basis-36 sm:flex-none" value="rules">
+              <ListChecks className="ms-1 h-4 w-4" /> قواعد الحقول
+            </TabsTrigger>
+            <TabsTrigger className="min-h-10 flex-1 basis-36 sm:flex-none" value="actions">
+              <Tag className="ms-1 h-4 w-4" /> الإجراءات
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="stages"><StagesTab versionId={verId} /></TabsContent>
-          <TabsContent value="stageRouting"><StageRoutingTab versionId={verId} /></TabsContent>
-          <TabsContent value="transitions"><TransitionsTab versionId={verId} /></TabsContent>
-          <TabsContent value="assignments"><AssignmentsTab versionId={verId} /></TabsContent>
-          <TabsContent value="fields"><FieldsTab versionId={verId} /></TabsContent>
-          <TabsContent value="rules"><RulesTab versionId={verId} /></TabsContent>
-          <TabsContent value="actions"><ActionsTab /></TabsContent>
+          <TabsContent value="stages">
+            <StagesTab versionId={verId} />
+          </TabsContent>
+          <TabsContent value="stageRouting">
+            <StageRoutingTab versionId={verId} />
+          </TabsContent>
+          <TabsContent value="transitions">
+            <TransitionsTab versionId={verId} />
+          </TabsContent>
+          <TabsContent value="assignments">
+            <AssignmentsTab versionId={verId} />
+          </TabsContent>
+          <TabsContent value="fields">
+            <FieldsTab versionId={verId} />
+          </TabsContent>
+          <TabsContent value="rules">
+            <RulesTab versionId={verId} />
+          </TabsContent>
+          <TabsContent value="actions">
+            <ActionsTab />
+          </TabsContent>
         </Tabs>
       )}
     </div>
@@ -193,7 +284,10 @@ function DesignerPage() {
 // Stages
 // ============================================================
 function StagesTab({ versionId }: { versionId: string }) {
-  const stages = wfStore.stages.use().filter((s) => s.workflowVersionId === versionId).sort((a, b) => a.order - b.order);
+  const stages = wfStore.stages
+    .use()
+    .filter((s) => s.workflowVersionId === versionId)
+    .sort((a, b) => a.order - b.order);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
 
@@ -201,28 +295,41 @@ function StagesTab({ versionId }: { versionId: string }) {
     if (!name || !code) return toast.error("الاسم والرمز مطلوبان");
     const max = stages.reduce((m, s) => Math.max(m, s.order), 0);
     const s: WorkflowStage = {
-      id: uid("s"), workflowVersionId: versionId, code, name, order: max + 1,
+      id: uid("s"),
+      workflowVersionId: versionId,
+      code,
+      name,
+      order: max + 1,
     };
     wfStore.stages.update((arr) => [...arr, s]);
-    setName(""); setCode("");
+    setName("");
+    setCode("");
   };
   const remove = (id: string) => {
     wfStore.stages.update((arr) => arr.filter((s) => s.id !== id));
-    wfStore.transitions.update((arr) => arr.filter((t) => t.fromStageId !== id && t.toStageId !== id));
+    wfStore.transitions.update((arr) =>
+      arr.filter((t) => t.fromStageId !== id && t.toStageId !== id),
+    );
     wfStore.assignments.update((arr) => arr.filter((a) => a.stageId !== id));
     wfStore.stageRoutingRules.update((arr) => arr.filter((r) => r.stageId !== id));
     wfStore.fieldRules.update((arr) => arr.filter((r) => r.stageId !== id));
   };
   const toggleFlag = (id: string, key: "isInitial" | "isFinal") => {
-    wfStore.stages.update((arr) => arr.map((s) => s.id === id ? { ...s, [key]: !s[key] } : s));
+    wfStore.stages.update((arr) => arr.map((s) => (s.id === id ? { ...s, [key]: !s[key] } : s)));
   };
   return (
     <div className="space-y-6">
       <Card className="p-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-          <Input placeholder="رمز المرحلة (مثال: REVIEW)" value={code} onChange={(e) => setCode(e.target.value)} />
+          <Input
+            placeholder="رمز المرحلة (مثال: REVIEW)"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
           <Input placeholder="اسم المرحلة" value={name} onChange={(e) => setName(e.target.value)} />
-          <Button onClick={add}><Plus className="ms-1 h-4 w-4" /> إضافة مرحلة</Button>
+          <Button onClick={add}>
+            <Plus className="ms-1 h-4 w-4" /> إضافة مرحلة
+          </Button>
         </div>
         <Table>
           <TableHeader>
@@ -241,9 +348,23 @@ function StagesTab({ versionId }: { versionId: string }) {
                 <TableCell className="font-mono text-xs">{s.order}</TableCell>
                 <TableCell className="font-mono text-xs">{s.code}</TableCell>
                 <TableCell>{s.name}</TableCell>
-                <TableCell><Switch checked={!!s.isInitial} onCheckedChange={() => toggleFlag(s.id, "isInitial")} /></TableCell>
-                <TableCell><Switch checked={!!s.isFinal} onCheckedChange={() => toggleFlag(s.id, "isFinal")} /></TableCell>
-                <TableCell><Button size="icon" variant="ghost" onClick={() => remove(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                <TableCell>
+                  <Switch
+                    checked={!!s.isInitial}
+                    onCheckedChange={() => toggleFlag(s.id, "isInitial")}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Switch
+                    checked={!!s.isFinal}
+                    onCheckedChange={() => toggleFlag(s.id, "isFinal")}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Button size="icon" variant="ghost" onClick={() => remove(s.id)}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -257,7 +378,10 @@ function StagesTab({ versionId }: { versionId: string }) {
 // Stage routing (organizational process + request visibility)
 // ============================================================
 function StageRoutingTab({ versionId }: { versionId: string }) {
-  const stages = wfStore.stages.use().filter((s) => s.workflowVersionId === versionId).sort((a, b) => a.order - b.order);
+  const stages = wfStore.stages
+    .use()
+    .filter((s) => s.workflowVersionId === versionId)
+    .sort((a, b) => a.order - b.order);
   const manualRules = wfStore.stageRoutingRules.use();
   const assignments = wfStore.assignments.use();
   const rules = useMemo(
@@ -270,9 +394,11 @@ function StageRoutingTab({ versionId }: { versionId: string }) {
   const wfOrgs = wfStore.orgs.use();
   const wfRoles = wfStore.roles.use();
 
-  const orgLabel = (id?: string) => orgs.find((x) => x.id === id)?.label ?? wfOrgs.find((x) => x.id === id)?.name ?? id ?? "—";
+  const orgLabel = (id?: string) =>
+    orgs.find((x) => x.id === id)?.label ?? wfOrgs.find((x) => x.id === id)?.name ?? id ?? "—";
   const teamLabel = (id?: string) => teamsAll.find((x) => x.id === id)?.label ?? id ?? "—";
-  const roleLabel = (id?: string) => rolesAll.find((x) => x.id === id)?.name ?? wfRoles.find((x) => x.id === id)?.name ?? id ?? "—";
+  const roleLabel = (id?: string) =>
+    rolesAll.find((x) => x.id === id)?.name ?? wfRoles.find((x) => x.id === id)?.name ?? id ?? "—";
   const remove = (id: string) => {
     if (isAssignmentBackedStageRoutingRule(id)) {
       return toast.error("هذه القاعدة إلزامية لأنها مشتقة من صلاحيات المرحلة");
@@ -285,7 +411,8 @@ function StageRoutingTab({ versionId }: { versionId: string }) {
       <div className="mb-4">
         <h3 className="font-semibold">سير العملية التنظيمية</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          قواعد الصلاحيات تظهر تلقائيا هنا ولا يمكن حذفها من هذا التبويب. يمكنك إضافة قواعد تنظيمية إضافية وحذفها عند الحاجة.
+          قواعد الصلاحيات تظهر تلقائيا هنا ولا يمكن حذفها من هذا التبويب. يمكنك إضافة قواعد تنظيمية
+          إضافية وحذفها عند الحاجة.
         </p>
       </div>
       <div className="space-y-5">
@@ -307,14 +434,24 @@ function StageRoutingTab({ versionId }: { versionId: string }) {
 }
 
 function StageRoutingSection({
-  stage, rules, orgs, teamsAll, rolesAll, labels, onRemove,
+  stage,
+  rules,
+  orgs,
+  teamsAll,
+  rolesAll,
+  labels,
+  onRemove,
 }: {
   stage: WorkflowStage;
   rules: StageRoutingRule[];
   orgs: ReturnType<typeof orgsCell.get>;
   teamsAll: ReturnType<typeof teamsCell.get>;
   rolesAll: ReturnType<typeof roleCatalogCell.get>;
-  labels: { orgLabel: (id?: string) => string; teamLabel: (id?: string) => string; roleLabel: (id?: string) => string };
+  labels: {
+    orgLabel: (id?: string) => string;
+    teamLabel: (id?: string) => string;
+    roleLabel: (id?: string) => string;
+  };
   onRemove: (id: string) => void;
 }) {
   const [orgId, setOrgId] = useState("");
@@ -340,7 +477,10 @@ function StageRoutingSection({
       return toast.error("حدّد على الأقل جهة أو فريق أو دور");
     }
     wfStore.stageRoutingRules.update((arr) => [...arr, rule]);
-    setOrgId(""); setTeamId(""); setRoleId(""); setProcessLabel(stage.name);
+    setOrgId("");
+    setTeamId("");
+    setRoleId("");
+    setProcessLabel(stage.name);
   };
 
   return (
@@ -353,34 +493,69 @@ function StageRoutingSection({
         <Badge variant="secondary">{rules.length} قاعدة</Badge>
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-        <Select value={orgId} onValueChange={(v) => { setOrgId(v); setTeamId(""); setRoleId(""); }}>
-          <SelectTrigger><SelectValue placeholder="الجهة" /></SelectTrigger>
+        <Select
+          value={orgId}
+          onValueChange={(v) => {
+            setOrgId(v);
+            setTeamId("");
+            setRoleId("");
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="الجهة" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE}>— أي —</SelectItem>
-            {orgs.map((o) => <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>)}
+            {orgs.map((o) => (
+              <SelectItem key={o.id} value={o.id}>
+                {o.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={teamId} onValueChange={setTeamId}>
-          <SelectTrigger><SelectValue placeholder="الفريق" /></SelectTrigger>
+          <SelectTrigger>
+            <SelectValue placeholder="الفريق" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE}>— أي —</SelectItem>
-            {teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}
+            {teams.map((t) => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={roleId} onValueChange={setRoleId}>
-          <SelectTrigger><SelectValue placeholder="الدور" /></SelectTrigger>
+          <SelectTrigger>
+            <SelectValue placeholder="الدور" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE}>— أي —</SelectItem>
-            {roles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+            {roles.map((r) => (
+              <SelectItem key={r.id} value={r.id}>
+                {r.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
-        <Input value={processLabel} onChange={(e) => setProcessLabel(e.target.value)} placeholder="المسمى المعروض" />
-        <Button onClick={add}><Plus className="ms-1 h-4 w-4" /> إضافة</Button>
+        <Input
+          value={processLabel}
+          onChange={(e) => setProcessLabel(e.target.value)}
+          placeholder="المسمى المعروض"
+        />
+        <Button onClick={add}>
+          <Plus className="ms-1 h-4 w-4" /> إضافة
+        </Button>
       </div>
       <Table className="mt-3">
         <TableHeader>
           <TableRow>
-            <TableHead>الجهة</TableHead><TableHead>الفريق</TableHead><TableHead>الدور</TableHead><TableHead>المسمى</TableHead><TableHead></TableHead>
+            <TableHead>الجهة</TableHead>
+            <TableHead>الفريق</TableHead>
+            <TableHead>الدور</TableHead>
+            <TableHead>المسمى</TableHead>
+            <TableHead></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -392,7 +567,9 @@ function StageRoutingSection({
               <TableCell>
                 <div className="flex flex-wrap items-center gap-2">
                   <span>{r.processLabel}</span>
-                  {isAssignmentBackedStageRoutingRule(r.id) && <Badge variant="outline">من الصلاحيات</Badge>}
+                  {isAssignmentBackedStageRoutingRule(r.id) && (
+                    <Badge variant="outline">من الصلاحيات</Badge>
+                  )}
                 </div>
               </TableCell>
               <TableCell>
@@ -405,7 +582,11 @@ function StageRoutingSection({
             </TableRow>
           ))}
           {rules.length === 0 && (
-            <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground">لا توجد قواعد لهذه المرحلة.</TableCell></TableRow>
+            <TableRow>
+              <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                لا توجد قواعد لهذه المرحلة.
+              </TableCell>
+            </TableRow>
           )}
         </TableBody>
       </Table>
@@ -417,7 +598,10 @@ function StageRoutingSection({
 // Stage Groups (legacy, no longer shown in the designer)
 // ============================================================
 function StageGroupsManager({ versionId }: { versionId: string }) {
-  const groups = wfStore.stageGroups.use().filter((g) => g.workflowVersionId === versionId).sort((a, b) => a.order - b.order);
+  const groups = wfStore.stageGroups
+    .use()
+    .filter((g) => g.workflowVersionId === versionId)
+    .sort((a, b) => a.order - b.order);
   const stages = wfStore.stages.use().filter((s) => s.workflowVersionId === versionId);
   const orgs = orgsCell.use();
   const teams = teamsCell.use();
@@ -428,25 +612,36 @@ function StageGroupsManager({ versionId }: { versionId: string }) {
   const addGroup = () => {
     if (!groupName.trim()) return toast.error("اسم المجموعة مطلوب");
     const max = groups.reduce((m, g) => Math.max(m, g.order), 0);
-    wfStore.stageGroups.update((arr) => [...arr, {
-      id: uid("sg"), workflowVersionId: versionId, name: groupName.trim(), order: max + 1,
-    }]);
+    wfStore.stageGroups.update((arr) => [
+      ...arr,
+      {
+        id: uid("sg"),
+        workflowVersionId: versionId,
+        name: groupName.trim(),
+        order: max + 1,
+      },
+    ]);
     setGroupName("");
     toast.success("تمت إضافة المجموعة");
   };
   const removeGroup = (id: string) => {
     wfStore.stageGroups.update((arr) => arr.filter((g) => g.id !== id));
-    wfStore.stages.update((arr) => arr.map((s) => (s.groupId === id ? { ...s, groupId: undefined } : s)));
+    wfStore.stages.update((arr) =>
+      arr.map((s) => (s.groupId === id ? { ...s, groupId: undefined } : s)),
+    );
     toast.success("تم حذف المجموعة");
   };
   const moveGroup = (id: string, dir: -1 | 1) => {
     const idx = groups.findIndex((g) => g.id === id);
     const swap = idx + dir;
     if (swap < 0 || swap >= groups.length) return;
-    const a = groups[idx], b = groups[swap];
-    wfStore.stageGroups.update((arr) => arr.map((g) =>
-      g.id === a.id ? { ...g, order: b.order } : g.id === b.id ? { ...g, order: a.order } : g,
-    ));
+    const a = groups[idx],
+      b = groups[swap];
+    wfStore.stageGroups.update((arr) =>
+      arr.map((g) =>
+        g.id === a.id ? { ...g, order: b.order } : g.id === b.id ? { ...g, order: a.order } : g,
+      ),
+    );
   };
 
   const orgLabel = (id?: string) => orgs.find((x) => x.id === id)?.label ?? id ?? "";
@@ -474,12 +669,19 @@ function StageGroupsManager({ versionId }: { versionId: string }) {
         <h3 className="font-semibold text-sm">مجموعات المراحل (سير العملية التنظيمية)</h3>
       </div>
       <p className="text-xs text-muted-foreground mb-4">
-        تُجمَّع المراحل في مجموعات تظهر في «سير العملية التنظيمية» بشاشة الطلب. حدّد الجهات/الفرق/الأدوار التي تظهر لها كل مجموعة — والمجموعة بدون تحديد تظهر للجميع.
+        تُجمَّع المراحل في مجموعات تظهر في «سير العملية التنظيمية» بشاشة الطلب. حدّد
+        الجهات/الفرق/الأدوار التي تظهر لها كل مجموعة — والمجموعة بدون تحديد تظهر للجميع.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-        <Input placeholder="اسم المجموعة (مثال: إجراءات البنك)" value={groupName}
-          onChange={(e) => setGroupName(e.target.value)} className="md:col-span-3" />
-        <Button onClick={addGroup}><Plus className="ms-1 h-4 w-4" /> إضافة مجموعة</Button>
+        <Input
+          placeholder="اسم المجموعة (مثال: إجراءات البنك)"
+          value={groupName}
+          onChange={(e) => setGroupName(e.target.value)}
+          className="md:col-span-3"
+        />
+        <Button onClick={addGroup}>
+          <Plus className="ms-1 h-4 w-4" /> إضافة مجموعة
+        </Button>
       </div>
       {groups.length === 0 ? (
         <p className="text-sm text-muted-foreground">لا توجد مجموعات بعد.</p>
@@ -487,16 +689,40 @@ function StageGroupsManager({ versionId }: { versionId: string }) {
         <div className="space-y-2">
           {groups.map((g, i) => (
             <div key={g.id} className="flex items-center gap-2 rounded-lg border px-3 py-2">
-              <Badge variant="secondary" className="font-mono text-[10px]">{i + 1}</Badge>
+              <Badge variant="secondary" className="font-mono text-[10px]">
+                {i + 1}
+              </Badge>
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-sm">{g.name}</div>
-                <div className="text-[11px] text-muted-foreground truncate">{audienceSummary(g)}</div>
+                <div className="text-[11px] text-muted-foreground truncate">
+                  {audienceSummary(g)}
+                </div>
               </div>
-              <span className="text-xs text-muted-foreground">{stages.filter((s) => s.groupId === g.id).length} مرحلة</span>
-              <Button size="icon" variant="ghost" onClick={() => moveGroup(g.id, -1)} disabled={i === 0}><ChevronUp className="h-4 w-4" /></Button>
-              <Button size="icon" variant="ghost" onClick={() => moveGroup(g.id, 1)} disabled={i === groups.length - 1}><ChevronDown className="h-4 w-4" /></Button>
-              <Button size="sm" variant="outline" onClick={() => setEditing(g)}><Users2 className="ms-1 h-3.5 w-3.5" /> الجمهور</Button>
-              <Button size="icon" variant="ghost" onClick={() => removeGroup(g.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+              <span className="text-xs text-muted-foreground">
+                {stages.filter((s) => s.groupId === g.id).length} مرحلة
+              </span>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => moveGroup(g.id, -1)}
+                disabled={i === 0}
+              >
+                <ChevronUp className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => moveGroup(g.id, 1)}
+                disabled={i === groups.length - 1}
+              >
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setEditing(g)}>
+                <Users2 className="ms-1 h-3.5 w-3.5" /> الجمهور
+              </Button>
+              <Button size="icon" variant="ghost" onClick={() => removeGroup(g.id)}>
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
             </div>
           ))}
         </div>
@@ -539,14 +765,23 @@ function AudienceDialog({ group, onClose }: { group: StageGroup; onClose: () => 
       roleId: roleId === AUD_ANY ? undefined : roleId,
     };
     setRows((prev) => [...prev, rule]);
-    setOrgId(AUD_ANY); setTeamId(AUD_ANY); setRoleId(AUD_ANY);
+    setOrgId(AUD_ANY);
+    setTeamId(AUD_ANY);
+    setRoleId(AUD_ANY);
   };
   const removeRow = (idx: number) => setRows((prev) => prev.filter((_, i) => i !== idx));
 
   const save = () => {
-    wfStore.stageGroups.update((arr) => arr.map((g) => g.id === group.id ? {
-      ...g, audiences: rows.length ? rows : undefined,
-    } : g));
+    wfStore.stageGroups.update((arr) =>
+      arr.map((g) =>
+        g.id === group.id
+          ? {
+              ...g,
+              audiences: rows.length ? rows : undefined,
+            }
+          : g,
+      ),
+    );
     toast.success("تم حفظ جمهور المجموعة");
     onClose();
   };
@@ -556,42 +791,70 @@ function AudienceDialog({ group, onClose }: { group: StageGroup; onClose: () => 
       <DialogHeader>
         <DialogTitle>جمهور المجموعة: {group.name}</DialogTitle>
         <DialogDescription>
-          أضف صفوف الجمهور بنفس فكرة الصلاحيات: الجهة ← الفريق ← الدور (مع خيار «أي» للكل). يرى المستخدم المجموعة إذا طابق أي صف. بدون صفوف تظهر للجميع.
+          أضف صفوف الجمهور بنفس فكرة الصلاحيات: الجهة ← الفريق ← الدور (مع خيار «أي» للكل). يرى
+          المستخدم المجموعة إذا طابق أي صف. بدون صفوف تظهر للجميع.
         </DialogDescription>
       </DialogHeader>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end py-2">
         <div className="space-y-1">
           <Label className="text-[11px] text-muted-foreground">الجهة</Label>
-          <Select value={orgId} onValueChange={(v) => { setOrgId(v); setTeamId(AUD_ANY); setRoleId(AUD_ANY); }}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+          <Select
+            value={orgId}
+            onValueChange={(v) => {
+              setOrgId(v);
+              setTeamId(AUD_ANY);
+              setRoleId(AUD_ANY);
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value={AUD_ANY}>أي جهة</SelectItem>
-              {orgs.map((o) => <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>)}
+              {orgs.map((o) => (
+                <SelectItem key={o.id} value={o.id}>
+                  {o.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1">
           <Label className="text-[11px] text-muted-foreground">الفريق</Label>
           <Select value={teamId} onValueChange={setTeamId}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value={AUD_ANY}>أي فريق</SelectItem>
-              {teamsForOrg.map((t) => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}
+              {teamsForOrg.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1">
           <Label className="text-[11px] text-muted-foreground">الدور</Label>
           <Select value={roleId} onValueChange={setRoleId}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value={AUD_ANY}>أي دور</SelectItem>
-              {rolesForOrg.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+              {rolesForOrg.map((r) => (
+                <SelectItem key={r.id} value={r.id}>
+                  {r.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={addRow}><Plus className="ms-1 h-4 w-4" /> إضافة صف</Button>
+        <Button onClick={addRow}>
+          <Plus className="ms-1 h-4 w-4" /> إضافة صف
+        </Button>
       </div>
 
       <div className="space-y-2">
@@ -599,19 +862,25 @@ function AudienceDialog({ group, onClose }: { group: StageGroup; onClose: () => 
           <p className="text-sm text-muted-foreground rounded-lg border border-dashed px-3 py-4 text-center">
             لا توجد صفوف — المجموعة ظاهرة للجميع.
           </p>
-        ) : rows.map((r, idx) => (
-          <div key={idx} className="flex items-center gap-2 rounded-lg border px-3 py-2">
-            <Badge variant="secondary" className="font-mono text-[10px]">{idx + 1}</Badge>
-            <span className="flex-1 text-sm">
-              {r.organizationId ? orgLabel(r.organizationId) : "أي جهة"}
-              <span className="text-muted-foreground"> › </span>
-              {r.teamId ? teamLabel(r.teamId) : "أي فريق"}
-              <span className="text-muted-foreground"> › </span>
-              {r.roleId ? roleLabel(r.roleId) : "أي دور"}
-            </span>
-            <Button size="icon" variant="ghost" onClick={() => removeRow(idx)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-          </div>
-        ))}
+        ) : (
+          rows.map((r, idx) => (
+            <div key={idx} className="flex items-center gap-2 rounded-lg border px-3 py-2">
+              <Badge variant="secondary" className="font-mono text-[10px]">
+                {idx + 1}
+              </Badge>
+              <span className="flex-1 text-sm">
+                {r.organizationId ? orgLabel(r.organizationId) : "أي جهة"}
+                <span className="text-muted-foreground"> › </span>
+                {r.teamId ? teamLabel(r.teamId) : "أي فريق"}
+                <span className="text-muted-foreground"> › </span>
+                {r.roleId ? roleLabel(r.roleId) : "أي دور"}
+              </span>
+              <Button size="icon" variant="ghost" onClick={() => removeRow(idx)}>
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </div>
+          ))
+        )}
       </div>
 
       <DialogFooter>
@@ -636,46 +905,87 @@ function TransitionsTab({ versionId }: { versionId: string }) {
     if (!from || !to || !actCode) return toast.error("يجب اختيار: من، إلى، الإجراء");
     const action = actions.find((a) => a.code === actCode);
     const t: WorkflowTransition = {
-      id: uid("t"), workflowVersionId: versionId,
-      fromStageId: from, toStageId: to, actionCode: actCode,
+      id: uid("t"),
+      workflowVersionId: versionId,
+      fromStageId: from,
+      toStageId: to,
+      actionCode: actCode,
       actionName: action?.name ?? actCode,
     };
     wfStore.transitions.update((arr) => [...arr, t]);
-    setFrom(""); setTo(""); setActCode("");
+    setFrom("");
+    setTo("");
+    setActCode("");
   };
-  const remove = (id: string) => wfStore.transitions.update((arr) => arr.filter((t) => t.id !== id));
+  const remove = (id: string) =>
+    wfStore.transitions.update((arr) => arr.filter((t) => t.id !== id));
   const sName = (id: string) => stages.find((s) => s.id === id)?.name ?? id;
 
   return (
     <Card className="p-5">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
         <Select value={from} onValueChange={setFrom}>
-          <SelectTrigger><SelectValue placeholder="من مرحلة..." /></SelectTrigger>
-          <SelectContent>{stages.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+          <SelectTrigger>
+            <SelectValue placeholder="من مرحلة..." />
+          </SelectTrigger>
+          <SelectContent>
+            {stages.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
         <Select value={actCode} onValueChange={setActCode}>
-          <SelectTrigger><SelectValue placeholder="عند الإجراء..." /></SelectTrigger>
-          <SelectContent>{actions.map((a) => <SelectItem key={a.code} value={a.code}>{a.name}</SelectItem>)}</SelectContent>
+          <SelectTrigger>
+            <SelectValue placeholder="عند الإجراء..." />
+          </SelectTrigger>
+          <SelectContent>
+            {actions.map((a) => (
+              <SelectItem key={a.code} value={a.code}>
+                {a.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
         <Select value={to} onValueChange={setTo}>
-          <SelectTrigger><SelectValue placeholder="إلى مرحلة..." /></SelectTrigger>
-          <SelectContent>{stages.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+          <SelectTrigger>
+            <SelectValue placeholder="إلى مرحلة..." />
+          </SelectTrigger>
+          <SelectContent>
+            {stages.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
-        <Button onClick={add}><Plus className="ms-1 h-4 w-4" /> إضافة</Button>
+        <Button onClick={add}>
+          <Plus className="ms-1 h-4 w-4" /> إضافة
+        </Button>
       </div>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>من</TableHead><TableHead>الإجراء</TableHead><TableHead>إلى</TableHead><TableHead></TableHead>
+            <TableHead>من</TableHead>
+            <TableHead>الإجراء</TableHead>
+            <TableHead>إلى</TableHead>
+            <TableHead></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {transitions.map((t) => (
             <TableRow key={t.id}>
               <TableCell>{sName(t.fromStageId)}</TableCell>
-              <TableCell><Badge variant="outline">{t.actionName}</Badge></TableCell>
+              <TableCell>
+                <Badge variant="outline">{t.actionName}</Badge>
+              </TableCell>
               <TableCell>{sName(t.toStageId)}</TableCell>
-              <TableCell><Button size="icon" variant="ghost" onClick={() => remove(t.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+              <TableCell>
+                <Button size="icon" variant="ghost" onClick={() => remove(t.id)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -705,18 +1015,17 @@ function AssignmentsTab({ versionId }: { versionId: string }) {
   const [viewOnly, setViewOnly] = useState(false);
 
   // Cascade: teams/roles filter by selected org
-  const teams = orgId && orgId !== "__none__"
-    ? teamsAll.filter((t) => t.orgKind === orgId)
-    : teamsAll;
-  const roles = orgId && orgId !== "__none__"
-    ? rolesAll.filter((r) => r.orgId === orgId)
-    : rolesAll;
+  const teams =
+    orgId && orgId !== "__none__" ? teamsAll.filter((t) => t.orgKind === orgId) : teamsAll;
+  const roles =
+    orgId && orgId !== "__none__" ? rolesAll.filter((r) => r.orgId === orgId) : rolesAll;
 
   const NONE = "__none__";
   const add = () => {
     if (!stageId) return toast.error("اختر مرحلة");
     const a: StageAssignment = {
-      id: uid("a"), stageId,
+      id: uid("a"),
+      stageId,
       organizationId: orgId && orgId !== NONE ? toEngineOrgId(orgId) : undefined,
       teamId: teamId && teamId !== NONE ? teamId : undefined,
       roleId: roleId && roleId !== NONE ? toEngineRoleId(roleId) : undefined,
@@ -727,57 +1036,113 @@ function AssignmentsTab({ versionId }: { versionId: string }) {
       return toast.error("حدّد على الأقل جهة/فريق/دور/مستخدم");
     }
     wfStore.assignments.update((arr) => [...arr, a]);
-    setOrgId(""); setTeamId(""); setRoleId(""); setUserId(""); setViewOnly(false);
+    setOrgId("");
+    setTeamId("");
+    setRoleId("");
+    setUserId("");
+    setViewOnly(false);
   };
-  const remove = (id: string) => wfStore.assignments.update((arr) => arr.filter((x) => x.id !== id));
+  const remove = (id: string) =>
+    wfStore.assignments.update((arr) => arr.filter((x) => x.id !== id));
 
-  const orgLabel = (id?: string) => orgs.find((o) => o.id === id)?.label ?? wfOrgs.find((o) => o.id === id)?.name ?? "—";
+  const orgLabel = (id?: string) =>
+    orgs.find((o) => o.id === id)?.label ?? wfOrgs.find((o) => o.id === id)?.name ?? "—";
   const teamLabel = (id?: string) => teamsAll.find((t) => t.id === id)?.label ?? "—";
-  const roleLabel = (id?: string) => rolesAll.find((r) => r.id === id)?.name ?? wfRoles.find((r) => r.id === id)?.name ?? "—";
+  const roleLabel = (id?: string) =>
+    rolesAll.find((r) => r.id === id)?.name ?? wfRoles.find((r) => r.id === id)?.name ?? "—";
 
   return (
     <Card className="p-5">
       <div className="grid grid-cols-1 md:grid-cols-7 gap-3 mb-4 items-end">
         <Select value={stageId} onValueChange={setStageId}>
-          <SelectTrigger><SelectValue placeholder="المرحلة..." /></SelectTrigger>
-          <SelectContent>{stages.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+          <SelectTrigger>
+            <SelectValue placeholder="المرحلة..." />
+          </SelectTrigger>
+          <SelectContent>
+            {stages.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
-        <Select value={orgId} onValueChange={(v) => { setOrgId(v); setTeamId(""); setRoleId(""); }}>
-          <SelectTrigger><SelectValue placeholder="الجهة" /></SelectTrigger>
+        <Select
+          value={orgId}
+          onValueChange={(v) => {
+            setOrgId(v);
+            setTeamId("");
+            setRoleId("");
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="الجهة" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE}>— أي —</SelectItem>
-            {orgs.map((o) => <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>)}
+            {orgs.map((o) => (
+              <SelectItem key={o.id} value={o.id}>
+                {o.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={teamId} onValueChange={setTeamId}>
-          <SelectTrigger><SelectValue placeholder="الفريق" /></SelectTrigger>
+          <SelectTrigger>
+            <SelectValue placeholder="الفريق" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE}>— أي —</SelectItem>
-            {teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}
+            {teams.map((t) => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={roleId} onValueChange={setRoleId}>
-          <SelectTrigger><SelectValue placeholder="الدور" /></SelectTrigger>
+          <SelectTrigger>
+            <SelectValue placeholder="الدور" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE}>— أي —</SelectItem>
-            {roles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+            {roles.map((r) => (
+              <SelectItem key={r.id} value={r.id}>
+                {r.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={userId} onValueChange={setUserId}>
-          <SelectTrigger><SelectValue placeholder="مستخدم محدّد" /></SelectTrigger>
+          <SelectTrigger>
+            <SelectValue placeholder="مستخدم محدّد" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE}>— أي —</SelectItem>
-            {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.fullName}</SelectItem>)}
+            {users.map((u) => (
+              <SelectItem key={u.id} value={u.id}>
+                {u.fullName}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
-        <div className="flex items-center gap-2"><Switch checked={viewOnly} onCheckedChange={setViewOnly} /><Label>عرض فقط</Label></div>
-        <Button onClick={add}><Plus className="ms-1 h-4 w-4" /> إضافة</Button>
+        <div className="flex items-center gap-2">
+          <Switch checked={viewOnly} onCheckedChange={setViewOnly} />
+          <Label>عرض فقط</Label>
+        </div>
+        <Button onClick={add}>
+          <Plus className="ms-1 h-4 w-4" /> إضافة
+        </Button>
       </div>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>المرحلة</TableHead><TableHead>الجهة</TableHead><TableHead>الفريق</TableHead>
-            <TableHead>الدور</TableHead><TableHead>المستخدم</TableHead><TableHead>النوع</TableHead><TableHead></TableHead>
+            <TableHead>المرحلة</TableHead>
+            <TableHead>الجهة</TableHead>
+            <TableHead>الفريق</TableHead>
+            <TableHead>الدور</TableHead>
+            <TableHead>المستخدم</TableHead>
+            <TableHead>النوع</TableHead>
+            <TableHead></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -788,8 +1153,14 @@ function AssignmentsTab({ versionId }: { versionId: string }) {
               <TableCell>{teamLabel(a.teamId)}</TableCell>
               <TableCell>{roleLabel(a.roleId)}</TableCell>
               <TableCell>{users.find((u) => u.id === a.userId)?.fullName ?? "—"}</TableCell>
-              <TableCell>{a.viewOnly ? <Badge variant="outline">عرض</Badge> : <Badge>تنفيذ</Badge>}</TableCell>
-              <TableCell><Button size="icon" variant="ghost" onClick={() => remove(a.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+              <TableCell>
+                {a.viewOnly ? <Badge variant="outline">عرض</Badge> : <Badge>تنفيذ</Badge>}
+              </TableCell>
+              <TableCell>
+                <Button size="icon" variant="ghost" onClick={() => remove(a.id)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -805,7 +1176,8 @@ const NO_GROUP = "__none";
 
 function FieldsTab({ versionId }: { versionId: string }) {
   const fields = wfStore.fieldDefs.use().filter((f) => f.workflowVersionId === versionId);
-  const groups = wfStore.fieldGroups.use()
+  const groups = wfStore.fieldGroups
+    .use()
     .filter((g) => g.workflowVersionId === versionId)
     .sort((a, b) => a.order - b.order);
   const referenceTables = referenceTablesCell.use();
@@ -829,21 +1201,38 @@ function FieldsTab({ versionId }: { versionId: string }) {
 
   const add = () => {
     if (!key || !label) return toast.error("الرمز والوصف مطلوبان");
-    const dynamicSource = type === "dynamic_select"
-      ? isReferenceSourceValue(sourceValue) ? "reference_data" : sourceValue
-      : undefined;
-    const dynamicReferenceKey = type === "dynamic_select" && isReferenceSourceValue(sourceValue)
-      ? referenceKeyFromSourceValue(sourceValue)
-      : undefined;
+    const dynamicSource =
+      type === "dynamic_select"
+        ? isReferenceSourceValue(sourceValue)
+          ? "reference_data"
+          : sourceValue
+        : undefined;
+    const dynamicReferenceKey =
+      type === "dynamic_select" && isReferenceSourceValue(sourceValue)
+        ? referenceKeyFromSourceValue(sourceValue)
+        : undefined;
     const f: FieldDefinition = {
-      id: uid("fd"), workflowVersionId: versionId, key, label, type,
-      options: type === "select" ? options.split(",").map((o) => o.trim()).filter(Boolean) : undefined,
+      id: uid("fd"),
+      workflowVersionId: versionId,
+      key,
+      label,
+      type,
+      options:
+        type === "select"
+          ? options
+              .split(",")
+              .map((o) => o.trim())
+              .filter(Boolean)
+          : undefined,
       referenceTableKey: dynamicReferenceKey,
       sourceTable: dynamicSource,
       groupId: groupId === NO_GROUP ? undefined : groupId,
     };
     wfStore.fieldDefs.update((arr) => [...arr, f]);
-    setKey(""); setLabel(""); setOptions(""); setSourceValue("merchants");
+    setKey("");
+    setLabel("");
+    setOptions("");
+    setSourceValue("merchants");
   };
   const remove = (id: string) => {
     const f = fields.find((x) => x.id === id);
@@ -861,9 +1250,15 @@ function FieldsTab({ versionId }: { versionId: string }) {
   const addGroup = () => {
     if (!groupName.trim()) return toast.error("اسم المجموعة مطلوب");
     const max = groups.reduce((m, g) => Math.max(m, g.order), 0);
-    wfStore.fieldGroups.update((arr) => [...arr, {
-      id: uid("fg"), workflowVersionId: versionId, name: groupName.trim(), order: max + 1,
-    }]);
+    wfStore.fieldGroups.update((arr) => [
+      ...arr,
+      {
+        id: uid("fg"),
+        workflowVersionId: versionId,
+        name: groupName.trim(),
+        order: max + 1,
+      },
+    ]);
     setGroupName("");
     toast.success("تمت إضافة المجموعة");
   };
@@ -871,17 +1266,22 @@ function FieldsTab({ versionId }: { versionId: string }) {
     const group = groups.find((g) => g.id === id);
     if (group?.system) return toast.error("لا يمكن حذف مجموعة حقول افتراضية من النظام");
     wfStore.fieldGroups.update((arr) => arr.filter((g) => g.id !== id));
-    wfStore.fieldDefs.update((arr) => arr.map((f) => (f.groupId === id ? { ...f, groupId: undefined } : f)));
-    toast.success("تم حذف المجموعة (نُقلت حقولها إلى \"عام\")");
+    wfStore.fieldDefs.update((arr) =>
+      arr.map((f) => (f.groupId === id ? { ...f, groupId: undefined } : f)),
+    );
+    toast.success('تم حذف المجموعة (نُقلت حقولها إلى "عام")');
   };
   const moveGroup = (id: string, dir: -1 | 1) => {
     const idx = groups.findIndex((g) => g.id === id);
     const swap = idx + dir;
     if (swap < 0 || swap >= groups.length) return;
-    const a = groups[idx], b = groups[swap];
-    wfStore.fieldGroups.update((arr) => arr.map((g) =>
-      g.id === a.id ? { ...g, order: b.order } : g.id === b.id ? { ...g, order: a.order } : g,
-    ));
+    const a = groups[idx],
+      b = groups[swap];
+    wfStore.fieldGroups.update((arr) =>
+      arr.map((g) =>
+        g.id === a.id ? { ...g, order: b.order } : g.id === b.id ? { ...g, order: a.order } : g,
+      ),
+    );
   };
 
   return (
@@ -893,12 +1293,19 @@ function FieldsTab({ versionId }: { versionId: string }) {
           <h3 className="font-semibold text-sm">مجموعات الحقول (تبويبات شاشة الطلب)</h3>
         </div>
         <p className="text-xs text-muted-foreground mb-4">
-          كل مجموعة تظهر كتبويب في شاشة الطلب (عرض/تعديل/إضافة). الحقول بدون مجموعة تظهر في تبويب «عام».
+          كل مجموعة تظهر كتبويب في شاشة الطلب (عرض/تعديل/إضافة). الحقول بدون مجموعة تظهر في تبويب
+          «عام».
         </p>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-          <Input placeholder="اسم المجموعة (مثال: بيانات مقدم الطلب)" value={groupName}
-            onChange={(e) => setGroupName(e.target.value)} className="md:col-span-3" />
-          <Button onClick={addGroup}><Plus className="ms-1 h-4 w-4" /> إضافة مجموعة</Button>
+          <Input
+            placeholder="اسم المجموعة (مثال: بيانات مقدم الطلب)"
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+            className="md:col-span-3"
+          />
+          <Button onClick={addGroup}>
+            <Plus className="ms-1 h-4 w-4" /> إضافة مجموعة
+          </Button>
         </div>
         {groups.length === 0 ? (
           <p className="text-sm text-muted-foreground">لا توجد مجموعات بعد.</p>
@@ -906,16 +1313,34 @@ function FieldsTab({ versionId }: { versionId: string }) {
           <div className="space-y-2">
             {groups.map((g, i) => (
               <div key={g.id} className="flex items-center gap-2 rounded-lg border px-3 py-2">
-                <Badge variant="secondary" className="font-mono text-[10px]">{i + 1}</Badge>
+                <Badge variant="secondary" className="font-mono text-[10px]">
+                  {i + 1}
+                </Badge>
                 <span className="font-medium text-sm flex-1">{g.name}</span>
                 {g.system && <Badge variant="outline">افتراضي</Badge>}
                 <span className="text-xs text-muted-foreground">
                   {fields.filter((f) => f.groupId === g.id).length} حقل
                 </span>
-                <Button size="icon" variant="ghost" onClick={() => moveGroup(g.id, -1)} disabled={i === 0}><ChevronUp className="h-4 w-4" /></Button>
-                <Button size="icon" variant="ghost" onClick={() => moveGroup(g.id, 1)} disabled={i === groups.length - 1}><ChevronDown className="h-4 w-4" /></Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => moveGroup(g.id, -1)}
+                  disabled={i === 0}
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => moveGroup(g.id, 1)}
+                  disabled={i === groups.length - 1}
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
                 {!g.system && (
-                  <Button size="icon" variant="ghost" onClick={() => removeGroup(g.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  <Button size="icon" variant="ghost" onClick={() => removeGroup(g.id)}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
                 )}
               </div>
             ))}
@@ -926,27 +1351,52 @@ function FieldsTab({ versionId }: { versionId: string }) {
       {/* Fields */}
       <Card className="p-5">
         <div className="grid grid-cols-1 md:grid-cols-7 gap-3 mb-4">
-          <Input placeholder="مفتاح الحقل (مثال: amount)" value={key} onChange={(e) => setKey(e.target.value)} />
+          <Input
+            placeholder="مفتاح الحقل (مثال: amount)"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+          />
           <Input placeholder="اسم العرض" value={label} onChange={(e) => setLabel(e.target.value)} />
           <Select value={type} onValueChange={(v) => setType(v as FieldDefinition["type"])}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {FIELD_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+              {FIELD_TYPES.map((t) => (
+                <SelectItem key={t.value} value={t.value}>
+                  {t.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={groupId} onValueChange={setGroupId}>
-            <SelectTrigger><SelectValue placeholder="المجموعة" /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="المجموعة" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value={NO_GROUP}>بدون مجموعة (عام)</SelectItem>
-              {groups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+              {groups.map((g) => (
+                <SelectItem key={g.id} value={g.id}>
+                  {g.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           {type === "dynamic_select" ? (
             <div className="md:col-span-2">
-              <Select value={sourceValue} onValueChange={(v) => setSourceValue(v as DynamicSourceOption)}>
-                <SelectTrigger><SelectValue placeholder="المصدر" /></SelectTrigger>
+              <Select
+                value={sourceValue}
+                onValueChange={(v) => setSourceValue(v as DynamicSourceOption)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="المصدر" />
+                </SelectTrigger>
                 <SelectContent>
-                  {dynamicSourceOptions.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  {dynamicSourceOptions.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -959,13 +1409,19 @@ function FieldsTab({ versionId }: { versionId: string }) {
               className="md:col-span-2"
             />
           ) : null}
-          <Button onClick={add}><Plus className="ms-1 h-4 w-4" /> إضافة حقل</Button>
+          <Button onClick={add}>
+            <Plus className="ms-1 h-4 w-4" /> إضافة حقل
+          </Button>
         </div>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>المفتاح</TableHead><TableHead>الاسم</TableHead><TableHead>النوع</TableHead>
-              <TableHead>المجموعة</TableHead><TableHead>الخيارات</TableHead><TableHead></TableHead>
+              <TableHead>المفتاح</TableHead>
+              <TableHead>الاسم</TableHead>
+              <TableHead>النوع</TableHead>
+              <TableHead>المجموعة</TableHead>
+              <TableHead>الخيارات</TableHead>
+              <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -978,13 +1434,24 @@ function FieldsTab({ versionId }: { versionId: string }) {
                     {f.system && <Badge variant="outline">افتراضي</Badge>}
                   </div>
                 </TableCell>
-                <TableCell><Badge variant="outline">{fieldTypeLabel(f.type)}</Badge></TableCell>
                 <TableCell>
-                  <Select value={f.groupId ?? NO_GROUP} onValueChange={(v) => setFieldGroup(f.id, v)}>
-                    <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
+                  <Badge variant="outline">{fieldTypeLabel(f.type)}</Badge>
+                </TableCell>
+                <TableCell>
+                  <Select
+                    value={f.groupId ?? NO_GROUP}
+                    onValueChange={(v) => setFieldGroup(f.id, v)}
+                  >
+                    <SelectTrigger className="h-8 w-44 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={NO_GROUP}>عام</SelectItem>
-                      {groups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                      {groups.map((g) => (
+                        <SelectItem key={g.id} value={g.id}>
+                          {g.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </TableCell>
@@ -997,7 +1464,9 @@ function FieldsTab({ versionId }: { versionId: string }) {
                 </TableCell>
                 <TableCell>
                   {!f.system && (
-                    <Button size="icon" variant="ghost" onClick={() => remove(f.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    <Button size="icon" variant="ghost" onClick={() => remove(f.id)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   )}
                 </TableCell>
               </TableRow>
@@ -1013,7 +1482,10 @@ function FieldsTab({ versionId }: { versionId: string }) {
 // Rules grid (stage × field)
 // ============================================================
 function RulesTab({ versionId }: { versionId: string }) {
-  const stages = wfStore.stages.use().filter((s) => s.workflowVersionId === versionId).sort((a, b) => a.order - b.order);
+  const stages = wfStore.stages
+    .use()
+    .filter((s) => s.workflowVersionId === versionId)
+    .sort((a, b) => a.order - b.order);
   const fields = wfStore.fieldDefs.use().filter((f) => f.workflowVersionId === versionId);
   const rules = wfStore.fieldRules.use();
   const [stageId, setStageId] = useState(stages[0]?.id ?? "");
@@ -1025,12 +1497,22 @@ function RulesTab({ versionId }: { versionId: string }) {
   const upsert = (fieldKey: string, patch: Partial<FieldRule>) => {
     const existing = ruleFor(fieldKey);
     if (existing) {
-      wfStore.fieldRules.update((arr) => arr.map((r) => r.id === existing.id ? { ...r, ...patch } : r));
+      wfStore.fieldRules.update((arr) =>
+        arr.map((r) => (r.id === existing.id ? { ...r, ...patch } : r)),
+      );
     } else {
-      wfStore.fieldRules.update((arr) => [...arr, {
-        id: uid("fr"), stageId, fieldKey,
-        visible: true, editable: true, required: false, ...patch,
-      }]);
+      wfStore.fieldRules.update((arr) => [
+        ...arr,
+        {
+          id: uid("fr"),
+          stageId,
+          fieldKey,
+          visible: true,
+          editable: true,
+          required: false,
+          ...patch,
+        },
+      ]);
     }
   };
 
@@ -1039,15 +1521,25 @@ function RulesTab({ versionId }: { versionId: string }) {
       <div className="mb-4 max-w-sm">
         <Label className="text-xs text-muted-foreground">المرحلة</Label>
         <Select value={stageId} onValueChange={setStageId}>
-          <SelectTrigger><SelectValue placeholder="اختر مرحلة..." /></SelectTrigger>
-          <SelectContent>{stages.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+          <SelectTrigger>
+            <SelectValue placeholder="اختر مرحلة..." />
+          </SelectTrigger>
+          <SelectContent>
+            {stages.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </div>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>الحقل</TableHead><TableHead>ظاهر</TableHead>
-            <TableHead>قابل للتعديل</TableHead><TableHead>إلزامي</TableHead>
+            <TableHead>الحقل</TableHead>
+            <TableHead>ظاهر</TableHead>
+            <TableHead>قابل للتعديل</TableHead>
+            <TableHead>إلزامي</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -1058,10 +1550,19 @@ function RulesTab({ versionId }: { versionId: string }) {
             const q = r?.required ?? false;
             return (
               <TableRow key={f.id}>
-                <TableCell><div className="font-medium">{f.label}</div><div className="text-[11px] font-mono text-muted-foreground">{f.key}</div></TableCell>
-                <TableCell><Switch checked={v} onCheckedChange={(c) => upsert(f.key, { visible: c })} /></TableCell>
-                <TableCell><Switch checked={e} onCheckedChange={(c) => upsert(f.key, { editable: c })} /></TableCell>
-                <TableCell><Switch checked={q} onCheckedChange={(c) => upsert(f.key, { required: c })} /></TableCell>
+                <TableCell>
+                  <div className="font-medium">{f.label}</div>
+                  <div className="text-[11px] font-mono text-muted-foreground">{f.key}</div>
+                </TableCell>
+                <TableCell>
+                  <Switch checked={v} onCheckedChange={(c) => upsert(f.key, { visible: c })} />
+                </TableCell>
+                <TableCell>
+                  <Switch checked={e} onCheckedChange={(c) => upsert(f.key, { editable: c })} />
+                </TableCell>
+                <TableCell>
+                  <Switch checked={q} onCheckedChange={(c) => upsert(f.key, { required: c })} />
+                </TableCell>
               </TableRow>
             );
           })}
@@ -1083,7 +1584,8 @@ function ActionsTab() {
     if (!code || !name) return toast.error("الرمز والاسم مطلوبان");
     const a: WorkflowAction = { id: uid("act"), code, name, kind: "custom" };
     wfStore.actions.update((arr) => [...arr, a]);
-    setCode(""); setName("");
+    setCode("");
+    setName("");
   };
   const remove = (id: string) => wfStore.actions.update((arr) => arr.filter((x) => x.id !== id));
 
@@ -1091,20 +1593,38 @@ function ActionsTab() {
     <Card className="p-5">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
         <Input placeholder="رمز الإجراء" value={code} onChange={(e) => setCode(e.target.value)} />
-        <Input placeholder="اسم الإجراء" value={name} onChange={(e) => setName(e.target.value)} className="md:col-span-2" />
-        <Button onClick={add}><Plus className="ms-1 h-4 w-4" /> إضافة</Button>
+        <Input
+          placeholder="اسم الإجراء"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="md:col-span-2"
+        />
+        <Button onClick={add}>
+          <Plus className="ms-1 h-4 w-4" /> إضافة
+        </Button>
       </div>
       <Table>
         <TableHeader>
-          <TableRow><TableHead>الرمز</TableHead><TableHead>الاسم</TableHead><TableHead>النوع</TableHead><TableHead></TableHead></TableRow>
+          <TableRow>
+            <TableHead>الرمز</TableHead>
+            <TableHead>الاسم</TableHead>
+            <TableHead>النوع</TableHead>
+            <TableHead></TableHead>
+          </TableRow>
         </TableHeader>
         <TableBody>
           {actions.map((a) => (
             <TableRow key={a.id}>
               <TableCell className="font-mono text-xs">{a.code}</TableCell>
               <TableCell>{a.name}</TableCell>
-              <TableCell><Badge variant="outline">{a.kind ?? "custom"}</Badge></TableCell>
-              <TableCell><Button size="icon" variant="ghost" onClick={() => remove(a.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+              <TableCell>
+                <Badge variant="outline">{a.kind ?? "custom"}</Badge>
+              </TableCell>
+              <TableCell>
+                <Button size="icon" variant="ghost" onClick={() => remove(a.id)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

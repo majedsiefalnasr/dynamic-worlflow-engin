@@ -42,8 +42,8 @@ function markSeedVersion() {
 function seed() {
   // ---------- Organizations ----------
   const orgs: WfOrganization[] = [
-    { id: "org_bank", name: "البنك التجاري" },
-    { id: "org_committee", name: "اللجنة الوطنية لتنظيم وتمويل الواردات" },
+    { id: "org_bank", name: "البنوك التجارية" },
+    { id: "org_committee", name: "اللجنة الوطنية لتمويل الواردات" },
   ];
   store.orgs.set(orgs);
 
@@ -52,10 +52,10 @@ function seed() {
     { id: "team_entry", organizationId: "org_bank", name: "فريق الإدخال" },
     { id: "team_internal", organizationId: "org_bank", name: "فريق المراجعة الداخلية" },
     { id: "team_fx", organizationId: "org_bank", name: "فريق العمليات الخارجية" },
-    { id: "team_admin_bank", organizationId: "org_bank", name: "فريق الإدارة (بنك)" },
+    { id: "team_admin_bank", organizationId: "org_bank", name: "فريق الإدارة (البنك)" },
     { id: "team_support", organizationId: "org_committee", name: "فريق اللجنة المساندة" },
     { id: "team_exec", organizationId: "org_committee", name: "فريق اللجنة التنفيذية" },
-    { id: "team_fx_confirm", organizationId: "org_committee", name: "فريق تأكيد العملات" },
+    { id: "team_fx_confirm", organizationId: "org_committee", name: "فريق تأكيد العمليات" },
   ];
   store.teams.set(teams);
 
@@ -67,7 +67,7 @@ function seed() {
     { id: "role_support", code: "SUPPORT", name: "عضو لجنة مساندة" },
     { id: "role_exec_member", code: "EXEC_MEMBER", name: "عضو اللجنة التنفيذية" },
     { id: "role_exec_lead", code: "EXEC_LEAD", name: "قائد اللجنة التنفيذية" },
-    { id: "role_fx_confirm", code: "FX_CONFIRM", name: "عضو تأكيد العملات" },
+    { id: "role_fx_confirm", code: "FX_CONFIRM", name: "عضو تأكيد العمليات" },
     { id: "role_admin", code: "ADMIN", name: "مسؤول النظام" },
   ];
   store.roles.set(roles);
@@ -199,7 +199,7 @@ function seed() {
     fd(version.id, "requestType", "نوع الطلب", "select", ["طلب مصارفة وتحويل خارجي", "طلب تمويل واردات", "طلب اعتماد مستندي"], "fg_invoice", undefined, true),
     fd(version.id, "coverageType", "نوع التغطية", "select", ["كلي", "جزئي"], "fg_invoice", undefined, true),
     fd(version.id, "foreignCurrencySource", "مصادر العملة الأجنبية", "select", ["حساب العميل", "موارد البنك", "مصدر خارجي"], "fg_invoice", undefined, true),
-    fd(version.id, "paymentTerms", "شروط الدفع", "select", ["كلي", "جزئي", "دفعة مقدمة"], "fg_invoice", undefined, true),
+    fd(version.id, "paymentTerms", "شروط الدفع", "select", ["اعتماد مستندي", "تحويل مباشر", "دفعة مقدمة"], "fg_invoice", undefined, true),
     fd(version.id, "requestCurrency", "عملة الطلب", "select", ["دولار أمريكي", "يورو", "ريال سعودي"], "fg_invoice", undefined, true),
     fd(version.id, "requestPercentage", "نسبة الطلب %", "number", undefined, "fg_invoice", undefined, true),
     fd(version.id, "invoiceType", "نوع الفاتورة", "select", ["فاتورة تجارية", "فاتورة أولية"], "fg_invoice", undefined, true),
@@ -318,38 +318,38 @@ type InstanceSeed = {
 
 const SAMPLE_REQUESTS: InstanceSeed[] = [
   // ─── stg_create (مسودة / إنشاء) ─────────────────────────────────────
-  inst("stg_create", "active", { importType: "مواد غذائية", importerName: "شركة هائل سعيد أنعم", financeAmount: 120000, currency: "USD", paymentTerms: "L/C اعتماد مستندي", supplierName: "Cargill Inc.", originCountry: "الولايات المتحدة", invoiceNumber: "INV-2026-10000", arrivalPort: "ميناء عدن" }),
-  inst("stg_create", "active", { importType: "قطع غيار", importerName: "مجموعة الشيباني", financeAmount: 340000, currency: "USD", paymentTerms: "تحويل مباشر", supplierName: "Siemens AG", originCountry: "ألمانيا", invoiceNumber: "INV-2026-10011", arrivalPort: "ميناء الحديدة" }),
+  inst("stg_create", "active", { importType: "مواد غذائية", importerName: "شركة هائل سعيد أنعم", financeAmount: 120000, currency: "دولار أمريكي", paymentTerms: "اعتماد مستندي", supplierName: "Cargill Inc.", originCountry: "الولايات المتحدة", invoiceNumber: "INV-2026-10000", arrivalPort: "ميناء عدن" }),
+  inst("stg_create", "active", { importType: "قطع غيار", importerName: "مجموعة الشيباني", financeAmount: 340000, currency: "دولار أمريكي", paymentTerms: "تحويل مباشر", supplierName: "Siemens AG", originCountry: "ألمانيا", invoiceNumber: "INV-2026-10011", arrivalPort: "ميناء الحديدة" }),
 
   // ─── stg_internal (المراجعة الداخلية) ───────────────────────────────
-  inst("stg_internal", "active", { importType: "أدوية ومستلزمات طبية", importerName: "شركة ثابت إخوان", financeAmount: 510000, currency: "USD", paymentTerms: "L/C اعتماد مستندي", supplierName: "Pfizer Ltd.", originCountry: "الولايات المتحدة", invoiceNumber: "INV-2026-10022", arrivalPort: "ميناء عدن" }),
-  inst("stg_internal", "active", { importType: "أدوية ومستلزمات طبية", importerName: "شركة الكميم للأدوية", financeAmount: 89000, currency: "EUR", paymentTerms: "تحويل مباشر", supplierName: "Bayer AG", originCountry: "ألمانيا", invoiceNumber: "INV-2026-10033", arrivalPort: "ميناء المكلا" }),
+  inst("stg_internal", "active", { importType: "أدوية ومستلزمات طبية", importerName: "شركة ثابت إخوان", financeAmount: 510000, currency: "دولار أمريكي", paymentTerms: "اعتماد مستندي", supplierName: "Pfizer Ltd.", originCountry: "الولايات المتحدة", invoiceNumber: "INV-2026-10022", arrivalPort: "ميناء عدن" }),
+  inst("stg_internal", "active", { importType: "أدوية ومستلزمات طبية", importerName: "شركة الكميم للأدوية", financeAmount: 89000, currency: "يورو", paymentTerms: "تحويل مباشر", supplierName: "Bayer AG", originCountry: "ألمانيا", invoiceNumber: "INV-2026-10033", arrivalPort: "ميناء المكلا" }),
 
   // ─── stg_support (المراجعة المساندة) ────────────────────────────────
-  inst("stg_support", "active", { importType: "مشتقات نفطية", importerName: "مجموعة الأهدل", financeAmount: 720000, currency: "USD", paymentTerms: "L/C اعتماد مستندي", supplierName: "Saudi Aramco Trading", originCountry: "السعودية", invoiceNumber: "INV-2026-10044", arrivalPort: "ميناء الحديدة" }),
-  inst("stg_support", "active", { importType: "إلكترونيات", importerName: "شركة هائل سعيد أنعم", financeAmount: 145000, currency: "SAR", paymentTerms: "دفعة مقدمة", supplierName: "Siemens AG", originCountry: "ألمانيا", invoiceNumber: "INV-2026-10055", arrivalPort: "منفذ الوديعة" }),
+  inst("stg_support", "active", { importType: "مشتقات نفطية", importerName: "مجموعة الأهدل", financeAmount: 720000, currency: "دولار أمريكي", paymentTerms: "اعتماد مستندي", supplierName: "Saudi Aramco Trading", originCountry: "السعودية", invoiceNumber: "INV-2026-10044", arrivalPort: "ميناء الحديدة" }),
+  inst("stg_support", "active", { importType: "إلكترونيات", importerName: "شركة هائل سعيد أنعم", financeAmount: 145000, currency: "ريال سعودي", paymentTerms: "دفعة مقدمة", supplierName: "Siemens AG", originCountry: "ألمانيا", invoiceNumber: "INV-2026-10055", arrivalPort: "منفذ الوديعة" }),
 
   // ─── stg_exec (القرار التنفيذي) ─────────────────────────────────────
-  inst("stg_exec", "active", { importType: "مواد غذائية", importerName: "مجموعة الشيباني", financeAmount: 980000, currency: "USD", paymentTerms: "L/C اعتماد مستندي", supplierName: "Cargill Inc.", originCountry: "الولايات المتحدة", invoiceNumber: "INV-2026-10066", arrivalPort: "ميناء عدن" }),
-  inst("stg_exec", "active", { importType: "مواد بناء", importerName: "شركة ثابت إخوان", financeAmount: 230000, currency: "EUR", paymentTerms: "تحويل مباشر", supplierName: "Siemens AG", originCountry: "ألمانيا", invoiceNumber: "INV-2026-10077", arrivalPort: "ميناء الحديدة" }),
+  inst("stg_exec", "active", { importType: "مواد غذائية", importerName: "مجموعة الشيباني", financeAmount: 980000, currency: "دولار أمريكي", paymentTerms: "اعتماد مستندي", supplierName: "Cargill Inc.", originCountry: "الولايات المتحدة", invoiceNumber: "INV-2026-10066", arrivalPort: "ميناء عدن" }),
+  inst("stg_exec", "active", { importType: "مواد بناء", importerName: "شركة ثابت إخوان", financeAmount: 230000, currency: "يورو", paymentTerms: "تحويل مباشر", supplierName: "Siemens AG", originCountry: "ألمانيا", invoiceNumber: "INV-2026-10077", arrivalPort: "ميناء الحديدة" }),
 
   // ─── stg_fx (عمليات الصرف) ──────────────────────────────────────────
-  inst("stg_fx", "active", { importType: "أدوية ومستلزمات طبية", importerName: "شركة الكميم للأدوية", financeAmount: 415000, currency: "USD", paymentTerms: "L/C اعتماد مستندي", supplierName: "Pfizer Ltd.", originCountry: "الولايات المتحدة", invoiceNumber: "INV-2026-10088", arrivalPort: "ميناء المكلا" }),
-  inst("stg_fx", "active", { importType: "مشتقات نفطية", importerName: "مجموعة الأهدل", financeAmount: 1250000, currency: "USD", paymentTerms: "L/C اعتماد مستندي", supplierName: "Saudi Aramco Trading", originCountry: "السعودية", invoiceNumber: "INV-2026-10099", arrivalPort: "ميناء عدن" }),
+  inst("stg_fx", "active", { importType: "أدوية ومستلزمات طبية", importerName: "شركة الكميم للأدوية", financeAmount: 415000, currency: "دولار أمريكي", paymentTerms: "اعتماد مستندي", supplierName: "Pfizer Ltd.", originCountry: "الولايات المتحدة", invoiceNumber: "INV-2026-10088", arrivalPort: "ميناء المكلا" }),
+  inst("stg_fx", "active", { importType: "مشتقات نفطية", importerName: "مجموعة الأهدل", financeAmount: 1250000, currency: "دولار أمريكي", paymentTerms: "اعتماد مستندي", supplierName: "Saudi Aramco Trading", originCountry: "السعودية", invoiceNumber: "INV-2026-10099", arrivalPort: "ميناء عدن" }),
 
   // ─── stg_fx_confirm (تأكيد الصرف) ───────────────────────────────────
-  inst("stg_fx_confirm", "active", { importType: "مواد غذائية", importerName: "شركة هائل سعيد أنعم", financeAmount: 640000, currency: "USD", paymentTerms: "L/C اعتماد مستندي", supplierName: "Cargill Inc.", originCountry: "الولايات المتحدة", invoiceNumber: "INV-2026-10110", arrivalPort: "ميناء الحديدة" }),
-  inst("stg_fx_confirm", "active", { importType: "مشتقات نفطية", importerName: "مجموعة الشيباني", financeAmount: 1100000, currency: "USD", paymentTerms: "L/C اعتماد مستندي", supplierName: "Saudi Aramco Trading", originCountry: "السعودية", invoiceNumber: "INV-2026-10121", arrivalPort: "ميناء عدن" }),
+  inst("stg_fx_confirm", "active", { importType: "مواد غذائية", importerName: "شركة هائل سعيد أنعم", financeAmount: 640000, currency: "دولار أمريكي", paymentTerms: "اعتماد مستندي", supplierName: "Cargill Inc.", originCountry: "الولايات المتحدة", invoiceNumber: "INV-2026-10110", arrivalPort: "ميناء الحديدة" }),
+  inst("stg_fx_confirm", "active", { importType: "مشتقات نفطية", importerName: "مجموعة الشيباني", financeAmount: 1100000, currency: "دولار أمريكي", paymentTerms: "اعتماد مستندي", supplierName: "Saudi Aramco Trading", originCountry: "السعودية", invoiceNumber: "INV-2026-10121", arrivalPort: "ميناء عدن" }),
 
   // ─── stg_final (الاعتماد النهائي) ───────────────────────────────────
-  inst("stg_final", "active", { importType: "إلكترونيات", importerName: "شركة ثابت إخوان", financeAmount: 420000, currency: "EUR", paymentTerms: "تحويل مباشر", supplierName: "Bayer AG", originCountry: "ألمانيا", invoiceNumber: "INV-2026-10132", arrivalPort: "منفذ الوديعة" }),
+  inst("stg_final", "active", { importType: "إلكترونيات", importerName: "شركة ثابت إخوان", financeAmount: 420000, currency: "يورو", paymentTerms: "تحويل مباشر", supplierName: "Bayer AG", originCountry: "ألمانيا", invoiceNumber: "INV-2026-10132", arrivalPort: "منفذ الوديعة" }),
 
   // ─── stg_closed (مكتمل — اعتماد نهائي) ──────────────────────────────
-  inst("stg_closed", "closed", { importType: "مواد غذائية", importerName: "مجموعة الأهدل", financeAmount: 540000, currency: "USD", paymentTerms: "L/C اعتماد مستندي", supplierName: "Cargill Inc.", originCountry: "الولايات المتحدة", invoiceNumber: "INV-2026-10143", arrivalPort: "ميناء عدن" }),
-  inst("stg_closed", "closed", { importType: "قطع غيار", importerName: "شركة الكميم للأدوية", financeAmount: 1280000, currency: "USD", paymentTerms: "تحويل مباشر", supplierName: "Siemens AG", originCountry: "ألمانيا", invoiceNumber: "INV-2026-10154", arrivalPort: "ميناء الحديدة" }),
+  inst("stg_closed", "closed", { importType: "مواد غذائية", importerName: "مجموعة الأهدل", financeAmount: 540000, currency: "دولار أمريكي", paymentTerms: "اعتماد مستندي", supplierName: "Cargill Inc.", originCountry: "الولايات المتحدة", invoiceNumber: "INV-2026-10143", arrivalPort: "ميناء عدن" }),
+  inst("stg_closed", "closed", { importType: "قطع غيار", importerName: "شركة الكميم للأدوية", financeAmount: 1280000, currency: "دولار أمريكي", paymentTerms: "تحويل مباشر", supplierName: "Siemens AG", originCountry: "ألمانيا", invoiceNumber: "INV-2026-10154", arrivalPort: "ميناء الحديدة" }),
 
   // ─── stg_closed (مرفوض نهائياً من اللجنة التنفيذية) ─────────────────
-  inst("stg_closed", "rejected", { importType: "مشتقات نفطية", importerName: "شركة هائل سعيد أنعم", financeAmount: 980000, currency: "USD", paymentTerms: "L/C اعتماد مستندي", supplierName: "Saudi Aramco Trading", originCountry: "السعودية", invoiceNumber: "INV-2026-10165", arrivalPort: "ميناء المكلا" }),
+  inst("stg_closed", "rejected", { importType: "مشتقات نفطية", importerName: "شركة هائل سعيد أنعم", financeAmount: 980000, currency: "دولار أمريكي", paymentTerms: "اعتماد مستندي", supplierName: "Saudi Aramco Trading", originCountry: "السعودية", invoiceNumber: "INV-2026-10165", arrivalPort: "ميناء المكلا" }),
 ];
 
 function seedInstances(versionId: string) {
@@ -527,6 +527,7 @@ function enrichRequestData(data: Record<string, unknown>): Record<string, unknow
     requestType: "طلب مصارفة وتحويل خارجي",
     coverageType: "كلي",
     foreignCurrencySource: "حساب العميل",
+    paymentTerms: "اعتماد مستندي",
     requestCurrency: data.currency ?? "دولار أمريكي",
     requestPercentage: 100,
     invoiceType: "فاتورة تجارية",

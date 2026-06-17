@@ -3,7 +3,7 @@
 
 const NS = "cby.v2";
 const VERSION_KEY = `${NS}.version`;
-const CURRENT_VERSION = "2026-06-16-screens";
+const CURRENT_VERSION = "2026-06-17-seed-sync-v2";
 
 const isBrowser = typeof window !== "undefined";
 
@@ -32,7 +32,7 @@ export function dbResetAll(): void {
   const keys: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k && k.startsWith(NS + ".")) keys.push(k);
+    if (k && (k.startsWith(NS + ".") || k === "cby:users")) keys.push(k);
   }
   keys.forEach((k) => localStorage.removeItem(k));
   localStorage.setItem(VERSION_KEY, CURRENT_VERSION);

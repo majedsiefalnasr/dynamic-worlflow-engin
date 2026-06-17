@@ -1,9 +1,28 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
-  LayoutDashboard, FileText, Users, BarChart3,
-  Settings, Bell, Search, Sun, Moon, LogOut, Languages,
-  Building2, ScrollText, AlertTriangle, ChevronLeft, UserCog, Network,
-  FileCheck2, KeyRound, ShieldCheck, Menu, X, Database,
+  LayoutDashboard,
+  FileText,
+  Users,
+  BarChart3,
+  Settings,
+  Bell,
+  Search,
+  Sun,
+  Moon,
+  LogOut,
+  Languages,
+  Building2,
+  ScrollText,
+  AlertTriangle,
+  ChevronLeft,
+  UserCog,
+  Network,
+  FileCheck2,
+  KeyRound,
+  ShieldCheck,
+  Menu,
+  X,
+  Database,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth, auth, ROLE_LABELS, type Role } from "@/lib/mock";
@@ -16,12 +35,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type NavItem = {
   to: string;
@@ -40,8 +61,18 @@ const NAV: NavItem[] = [
   { to: "/audit", label: "التدقيق والامتثال", icon: ScrollText, screen: "audit" },
   { to: "/notifications", label: "الإشعارات", icon: Bell },
   { to: "/admin/workflows", label: "مصمم سير العمل", icon: FileCheck2, roles: ["platform_admin"] },
-  { to: "/admin/reference-data", label: "البيانات الأساسية", icon: Database, roles: ["platform_admin"] },
-  { to: "/admin/screen-permissions", label: "صلاحيات الشاشات", icon: ShieldCheck, roles: ["platform_admin"] },
+  {
+    to: "/admin/reference-data",
+    label: "البيانات الأساسية",
+    icon: Database,
+    roles: ["platform_admin"],
+  },
+  {
+    to: "/admin/screen-permissions",
+    label: "صلاحيات الشاشات",
+    icon: ShieldCheck,
+    roles: ["platform_admin"],
+  },
   { to: "/admin/entities", label: "إدارة البنوك", icon: Network, roles: ["platform_admin"] },
   { to: "/admin/orgs", label: "إدارة الجهات", icon: Building2, roles: ["platform_admin"] },
   { to: "/admin/cby-staff", label: "مستخدمي النظام", icon: UserCog, roles: ["platform_admin"] },
@@ -105,7 +136,7 @@ export function AppShell() {
           )}
           <button
             onClick={() => setMobileOpen(false)}
-            className="ms-auto lg:hidden text-sidebar-foreground/70 hover:text-sidebar-foreground"
+            className="ms-auto grid h-11 w-11 place-items-center rounded-md text-sidebar-foreground/70 hover:text-sidebar-foreground"
             aria-label="إغلاق القائمة"
           >
             <X className="h-5 w-5" />
@@ -120,7 +151,7 @@ export function AppShell() {
                 to={it.to}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all",
+                  "group flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all",
                   active
                     ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-soft"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -137,7 +168,7 @@ export function AppShell() {
         <div className="absolute bottom-0 inset-x-0 p-3 border-t border-sidebar-border bg-sidebar hidden lg:block">
           <button
             onClick={() => setCollapsed((c) => !c)}
-            className="w-full text-xs text-sidebar-foreground/60 hover:text-sidebar-foreground py-2"
+            className="min-h-11 w-full rounded-md py-2 text-xs text-sidebar-foreground/60 hover:text-sidebar-foreground"
           >
             {collapsed ? "توسيع ›" : "‹ طي الشريط الجانبي"}
           </button>
@@ -167,80 +198,120 @@ export function AppShell() {
           <div className="ms-auto flex items-center gap-1.5 sm:gap-3">
             <RoleSwitcher />
 
-          <Button variant="ghost" size="icon" onClick={() => auth.setLang(auth.lang === "ar" ? "en" : "ar")}>
-            <Languages className="h-5 w-5" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => auth.toggleTheme()}>
-            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-          </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => auth.setLang(auth.lang === "ar" ? "en" : "ar")}
+              aria-label={
+                auth.lang === "ar" ? "Switch language to English" : "تغيير اللغة إلى العربية"
+              }
+            >
+              <Languages className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => auth.toggleTheme()}
+              aria-label={theme === "dark" ? "تفعيل الوضع الفاتح" : "تفعيل الوضع الداكن"}
+            >
+              {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </Button>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-                {unread > 0 && (
-                  <span className="absolute top-1.5 left-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-card" />
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-96 p-0">
-              <div className="px-4 py-3 border-b flex items-center justify-between">
-                <div className="font-semibold">الإشعارات</div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">{unread} جديد</Badge>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative" aria-label="فتح الإشعارات">
+                  <Bell className="h-5 w-5" />
                   {unread > 0 && (
-                    <button onClick={markAllRead} className="text-[11px] text-primary hover:underline">قراءة الكل</button>
+                    <span
+                      className="absolute top-1.5 left-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-card"
+                      aria-hidden="true"
+                    />
                   )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-96 p-0">
+                <div className="px-4 py-3 border-b flex items-center justify-between">
+                  <div className="font-semibold">الإشعارات</div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">{unread} جديد</Badge>
+                    {unread > 0 && (
+                      <button
+                        onClick={markAllRead}
+                        className="text-[11px] text-primary hover:underline"
+                      >
+                        قراءة الكل
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="max-h-96 overflow-auto divide-y">
-                {notifs.slice(0, 12).map((n) => (
-                  <div key={n.id} className="p-4 hover:bg-muted/50 cursor-pointer flex gap-3">
-                    <div className={cn("mt-1 h-2 w-2 rounded-full shrink-0", n.unread ? "bg-accent" : "bg-muted")} />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{n.title}</div>
-                      <div className="text-xs text-muted-foreground truncate">{n.body}</div>
-                      <div className="text-[10px] text-muted-foreground mt-1">{n.time}</div>
+                <div className="max-h-96 overflow-auto divide-y">
+                  {notifs.slice(0, 12).map((n) => (
+                    <div key={n.id} className="p-4 hover:bg-muted/50 cursor-pointer flex gap-3">
+                      <div
+                        className={cn(
+                          "mt-1 h-2 w-2 rounded-full shrink-0",
+                          n.unread ? "bg-accent" : "bg-muted",
+                        )}
+                        aria-hidden="true"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{n.title}</div>
+                        <div className="text-xs text-muted-foreground truncate">{n.body}</div>
+                        <div className="text-[10px] text-muted-foreground mt-1">{n.time}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="p-2 border-t text-center">
+                  <Link to="/notifications" className="text-xs text-primary hover:underline">
+                    عرض كل الإشعارات
+                  </Link>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="flex min-h-11 items-center gap-3 rounded-full py-1 pl-1 pr-2 hover:bg-muted/60"
+                  aria-label="فتح قائمة المستخدم"
+                >
+                  <div className="text-right leading-tight hidden sm:block">
+                    <div className="text-sm font-semibold">{user.name}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {ROLE_LABELS[user.role]}
                     </div>
                   </div>
-                ))}
-              </div>
-              <div className="p-2 border-t text-center">
-                <Link to="/notifications" className="text-xs text-primary hover:underline">عرض كل الإشعارات</Link>
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-3 pr-2 pl-1 py-1 rounded-full hover:bg-muted/60">
-                <div className="text-right leading-tight hidden sm:block">
-                  <div className="text-sm font-semibold">{user.name}</div>
-                  <div className="text-[11px] text-muted-foreground">{ROLE_LABELS[user.role]}</div>
-                </div>
-                <div className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
-                  {user.avatar}
-                </div>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuLabel>
-                <div className="font-semibold">{user.name}</div>
-                <div className="text-xs font-normal text-muted-foreground">{user.email}</div>
-                <div className="text-xs font-normal text-muted-foreground mt-0.5">{user.org}</div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => nav({ to: "/profile" })}>الملف الشخصي</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => nav({ to: "/settings" })}>الإعدادات</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={() => { auth.logout(); nav({ to: "/login" }); }}
-                className="text-destructive"
-              >
-                <LogOut className="h-4 w-4 ml-2" /> تسجيل الخروج
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  <div className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
+                    {user.avatar}
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>
+                  <div className="font-semibold">{user.name}</div>
+                  <div className="text-xs font-normal text-muted-foreground">{user.email}</div>
+                  <div className="text-xs font-normal text-muted-foreground mt-0.5">{user.org}</div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => nav({ to: "/profile" })}>
+                  الملف الشخصي
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => nav({ to: "/settings" })}>
+                  الإعدادات
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={() => {
+                    auth.logout();
+                    nav({ to: "/login" });
+                  }}
+                  className="text-destructive"
+                >
+                  <LogOut className="h-4 w-4 ml-2" /> تسجيل الخروج
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
@@ -249,7 +320,7 @@ export function AppShell() {
         </main>
 
         <footer className="px-4 lg:px-6 py-4 text-xs text-muted-foreground border-t flex flex-col sm:flex-row items-center gap-2 sm:justify-between text-center">
-          <div>© 2025 البنك المركزي اليمني — جميع الحقوق محفوظة</div>
+          <div>© 2026 البنك المركزي اليمني — جميع الحقوق محفوظة</div>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-3.5 w-3.5" />
             بيئة عرض توضيحي (Prototype)
@@ -261,7 +332,10 @@ export function AppShell() {
 }
 
 export function PageHeader({
-  title, subtitle, actions, breadcrumbs,
+  title,
+  subtitle,
+  actions,
+  breadcrumbs,
 }: {
   title: string;
   subtitle?: string;
@@ -271,11 +345,20 @@ export function PageHeader({
   return (
     <div className="mb-6">
       {breadcrumbs && (
-        <nav className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+        <nav className="text-xs text-muted-foreground mb-2 flex flex-wrap items-center gap-1.5">
           {breadcrumbs.map((b, i) => (
             <span key={i} className="flex items-center gap-1.5">
               {i > 0 && <span>/</span>}
-              {b.to ? <Link to={b.to} className="hover:text-foreground">{b.label}</Link> : <span>{b.label}</span>}
+              {b.to ? (
+                <Link
+                  to={b.to}
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-foreground"
+                >
+                  {b.label}
+                </Link>
+              ) : (
+                <span className="inline-flex min-h-11 items-center">{b.label}</span>
+              )}
             </span>
           ))}
         </nav>
@@ -285,7 +368,7 @@ export function PageHeader({
           <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
           {subtitle && <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>}
         </div>
-        {actions && <div className="flex items-center gap-2">{actions}</div>}
+        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
     </div>
   );

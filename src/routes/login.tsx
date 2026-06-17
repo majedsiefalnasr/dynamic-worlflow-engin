@@ -34,10 +34,14 @@ function Login() {
   return (
     <div dir="rtl" className="min-h-screen grid lg:grid-cols-2 bg-background">
       <div className="hidden lg:flex relative bg-gradient-hero text-white p-12 flex-col justify-between overflow-hidden">
-        <div className="absolute inset-0 opacity-10" style={{
-          backgroundImage: "radial-gradient(circle at 20% 80%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
-        }} />
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 20% 80%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
         <div className="relative">
           <div className="flex items-center gap-3">
             <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/10 backdrop-blur border border-white/20 text-2xl font-bold">
@@ -54,7 +58,8 @@ function Login() {
             منصة إدارة ومراجعة طلبات تمويل الواردات
           </h1>
           <p className="text-white/80 text-lg leading-relaxed">
-            دورة عمل ديناميكية بالكامل: مصمم سير عمل يحدد المراحل، الحقول، الصلاحيات، والإجراءات بدون كود.
+            دورة عمل ديناميكية بالكامل: مصمم سير عمل يحدد المراحل، الحقول، الصلاحيات، والإجراءات
+            بدون كود.
           </p>
         </div>
         <div className="relative text-xs text-white/50">
@@ -74,12 +79,24 @@ function Login() {
               </div>
 
               <div className="space-y-2">
-                <Label>البريد الإلكتروني المؤسسي</Label>
-                <Input type="email" defaultValue={selected.email} required />
+                <Label htmlFor="login-email">البريد الإلكتروني المؤسسي</Label>
+                <Input
+                  id="login-email"
+                  type="email"
+                  defaultValue={selected.email}
+                  autoComplete="username"
+                  required
+                />
               </div>
               <div className="space-y-2">
-                <Label>كلمة المرور</Label>
-                <Input type="password" defaultValue="••••••••••" required />
+                <Label htmlFor="login-password">كلمة المرور</Label>
+                <Input
+                  id="login-password"
+                  type="password"
+                  defaultValue="••••••••••"
+                  autoComplete="current-password"
+                  required
+                />
               </div>
 
               <div className="space-y-2">
@@ -92,6 +109,7 @@ function Login() {
                       onClick={() => setSelectedUserId(u.id)}
                       className={cn(
                         "text-right px-3 py-2 rounded-lg border text-xs transition-all flex items-center justify-between gap-2",
+                        "min-h-11",
                         selectedUserId === u.id
                           ? "border-primary bg-primary/5 ring-2 ring-primary/20"
                           : "border-border hover:border-primary/40 hover:bg-muted/50",
@@ -101,7 +119,9 @@ function Login() {
                         <div className="font-semibold truncate">{u.name}</div>
                         <div className="text-[10px] text-muted-foreground truncate">{u.org}</div>
                       </div>
-                      <span className="shrink-0 px-2 py-0.5 rounded-full bg-muted text-[10px]">{ROLE_LABELS[u.role]}</span>
+                      <span className="shrink-0 px-2 py-0.5 rounded-full bg-muted text-[10px]">
+                        {ROLE_LABELS[u.role]}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -128,6 +148,9 @@ function Login() {
                 {[2, 4, 8, 1, 9, 6].map((d, i) => (
                   <input
                     key={i}
+                    aria-label={`رقم التحقق ${i + 1}`}
+                    inputMode="numeric"
+                    autoComplete={i === 0 ? "one-time-code" : undefined}
                     defaultValue={d}
                     maxLength={1}
                     className="h-14 w-12 rounded-lg border-2 text-center text-2xl font-bold focus:border-primary outline-none"
@@ -138,14 +161,21 @@ function Login() {
                 <div className="flex items-start gap-3">
                   <Lock className="h-4 w-4 mt-0.5 text-accent" />
                   <div className="text-xs text-muted-foreground leading-relaxed">
-                    سيتم تسجيل دخولك بصلاحيات: <span className="font-semibold text-foreground">{ROLE_LABELS[selected.role]}</span>
+                    سيتم تسجيل دخولك بصلاحيات:{" "}
+                    <span className="font-semibold text-foreground">
+                      {ROLE_LABELS[selected.role]}
+                    </span>
                   </div>
                 </div>
               </Card>
               <Button type="submit" className="w-full h-11 text-base">
                 تأكيد ودخول <ChevronLeft className="h-4 w-4 mr-1" />
               </Button>
-              <button type="button" onClick={() => setStep("login")} className="block mx-auto text-xs text-muted-foreground hover:text-foreground">
+              <button
+                type="button"
+                onClick={() => setStep("login")}
+                className="mx-auto block min-h-11 rounded-md px-4 text-xs text-muted-foreground hover:text-foreground"
+              >
                 ← رجوع
               </button>
             </form>

@@ -343,7 +343,7 @@ export const MANAGED_SCREENS: ScreenDef[] = [
     label: "إدارة التجار",
     to: "/merchants",
     description: "عرض شاشة التجار (إدارة بيانات التجار تتبع البنك المالك للتاجر).",
-    caps: ["view"],
+    caps: ["view", "add"],
   },
   {
     key: "reports",
@@ -371,7 +371,7 @@ export type ScreenPerms = Record<ManualScreenKey, Partial<Record<Role, ScreenCap
 
 const DEFAULT_SCREEN_PERMS: ScreenPerms = {
   merchants: {
-    bank_admin: ["view"],
+    bank_admin: ["view", "add"],
   },
   reports: {
     bank_admin: ["view"],

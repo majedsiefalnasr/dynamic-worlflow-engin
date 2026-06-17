@@ -133,7 +133,7 @@ export function instanceAmount(instance: WorkflowInstance): number {
 }
 
 export function instanceCurrency(instance: WorkflowInstance): string {
-  return stringValue(instance.data.currency) || "USD";
+  return stringValue(instance.data.currency) || "دولار أمريكي";
 }
 
 export function instanceGoodsType(instance: WorkflowInstance): string {
@@ -230,4 +230,28 @@ export function roleCanCreateRequest(user: User | null | undefined): boolean {
 
 export function stringValue(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+export function isDuplicateInvoice(
+  data: Record<string, unknown>,
+  excludeInstanceId?: string,
+): { duplicate: boolean; refs: string[] } {
+  const invoiceNumber = stringValue(data.invoiceNumber).trim();
+  const taxNumber = stringValue(data.taxNumber).trim();
+  const coverageType = stringValue(data.coverageType).trim();
+  if (!invoiceNumber || !taxNumber || coverageType !== "كلي") {
+    return { duplicate: false, refs: [] };
+  }
+  const matches = wfStore.instances.get().filter((inst) => {
+    if (inst.id === excludeInstanceId) return false;
+    return (
+      stringValue(inst.data.invoiceNumber).trim() === invoiceNumber &&
+      stringValue(inst.data.taxNumber).trim() === taxNumber &&
+      stringValue(inst.data.coverageType).trim() === "كلي"
+    );
+  });
+  return {
+    duplicate: matches.length > 0,
+    refs: matches.map((m) => instanceRef(m)),
+  };
 }
