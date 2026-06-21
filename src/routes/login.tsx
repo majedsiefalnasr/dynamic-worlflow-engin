@@ -32,49 +32,41 @@ function Login() {
   const selected = DEMO_USERS.find((u) => u.id === selectedUserId)!;
 
   return (
-    <div dir="rtl" className="min-h-screen grid lg:grid-cols-2 bg-background">
-      <div className="hidden lg:flex relative bg-gradient-hero text-white p-12 flex-col justify-between overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-10"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 20% 80%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
-          }}
-        />
-        <div className="relative">
+    <div
+      dir="rtl"
+      className="grid min-h-screen bg-background lg:grid-cols-[minmax(0,1fr)_minmax(32rem,0.9fr)]"
+    >
+      <div className="hidden bg-primary px-12 py-10 text-primary-foreground lg:flex lg:flex-col lg:justify-between">
+        <div>
           <div className="flex items-center gap-3">
-            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/10 backdrop-blur border border-white/20 text-2xl font-bold">
+            <div className="grid h-12 w-12 place-items-center rounded-xl border border-white/20 text-lg font-semibold">
               ب.م
             </div>
             <div>
-              <div className="font-bold text-lg">البنك المركزي اليمني</div>
-              <div className="text-sm text-white/70">Central Bank of Yemen</div>
+              <div className="font-semibold">البنك المركزي اليمني</div>
+              <div className="text-sm text-white/70">منصة تمويل الواردات</div>
             </div>
           </div>
         </div>
-        <div className="relative space-y-6">
-          <h1 className="text-4xl font-bold leading-tight text-balance">
-            منصة إدارة ومراجعة طلبات تمويل الواردات
+        <div className="max-w-xl space-y-4">
+          <h1 className="text-3xl font-semibold leading-tight">
+            مراجعة طلبات تمويل الواردات ضمن مسار واضح
           </h1>
-          <p className="text-white/80 text-lg leading-relaxed">
-            دورة عمل ديناميكية بالكامل: مصمم سير عمل يحدد المراحل، الحقول، الصلاحيات، والإجراءات
-            بدون كود.
+          <p className="max-w-[58ch] text-base leading-7 text-white/80 text-pretty">
+            إدارة الطلبات ومراجعتها واعتمادها وفق صلاحيات كل مستخدم والمراحل المعتمدة في سير العمل.
           </p>
         </div>
-        <div className="relative text-xs text-white/50">
-          محمي بأعلى معايير الأمن السيبراني · ISO 27001
-        </div>
+        <div className="text-sm text-white/65">وصول مؤسسي مع مصادقة متعددة العوامل</div>
       </div>
 
-      <div className="flex items-center justify-center p-6 sm:p-12">
+      <div className="flex items-center justify-center px-5 py-10 sm:p-12">
         <div className="w-full max-w-md">
           {step === "login" ? (
             <form onSubmit={handleLogin} className="space-y-6">
               <div>
-                <h2 className="text-2xl font-bold">تسجيل الدخول</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  أدخل بياناتك للوصول إلى منصة الواردات
+                <h2 className="text-2xl font-semibold">تسجيل الدخول</h2>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  أدخل بيانات الحساب المؤسسي، ثم أكمل التحقق بخطوتين.
                 </p>
               </div>
 
@@ -100,7 +92,12 @@ function Login() {
               </div>
 
               <div className="space-y-2">
-                <Label>اختر مستخدم العرض التوضيحي</Label>
+                <div className="space-y-1">
+                  <Label>الحساب التجريبي</Label>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    اختر الحساب الذي تريد اختبار صلاحياته في هذه النسخة.
+                  </p>
+                </div>
                 <div className="grid gap-1.5 max-h-72 overflow-y-auto pr-1">
                   {DEMO_USERS.map((u) => (
                     <button
@@ -108,7 +105,7 @@ function Login() {
                       key={u.id}
                       onClick={() => setSelectedUserId(u.id)}
                       className={cn(
-                        "text-right px-3 py-2 rounded-lg border text-xs transition-all flex items-center justify-between gap-2",
+                        "flex min-h-11 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-right text-xs transition-colors",
                         "min-h-11",
                         selectedUserId === u.id
                           ? "border-primary bg-primary/5 ring-2 ring-primary/20"
@@ -128,7 +125,7 @@ function Login() {
               </div>
 
               <Button type="submit" className="w-full h-11 text-base">
-                متابعة <ChevronLeft className="h-4 w-4 mr-1" />
+                متابعة إلى التحقق <ChevronLeft className="h-4 w-4 mr-1" />
               </Button>
 
               <div className="text-xs text-muted-foreground text-center flex items-center justify-center gap-2">
@@ -139,7 +136,7 @@ function Login() {
           ) : (
             <form onSubmit={handleOtp} className="space-y-6">
               <div>
-                <h2 className="text-2xl font-bold">رمز التحقق (OTP)</h2>
+                <h2 className="text-2xl font-semibold">رمز التحقق</h2>
                 <p className="text-sm text-muted-foreground mt-1">
                   أدخل الرمز المرسل إلى هاتفك المنتهي بـ ••42
                 </p>
@@ -153,11 +150,11 @@ function Login() {
                     autoComplete={i === 0 ? "one-time-code" : undefined}
                     defaultValue={d}
                     maxLength={1}
-                    className="h-14 w-12 rounded-lg border-2 text-center text-2xl font-bold focus:border-primary outline-none"
+                    className="h-14 w-12 rounded-lg border text-center text-xl font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-ring/20"
                   />
                 ))}
               </div>
-              <Card className="p-4 bg-muted/40 border-dashed">
+              <Card className="border bg-muted/40 p-4 shadow-none">
                 <div className="flex items-start gap-3">
                   <Lock className="h-4 w-4 mt-0.5 text-accent" />
                   <div className="text-xs text-muted-foreground leading-relaxed">
@@ -169,21 +166,21 @@ function Login() {
                 </div>
               </Card>
               <Button type="submit" className="w-full h-11 text-base">
-                تأكيد ودخول <ChevronLeft className="h-4 w-4 mr-1" />
+                تسجيل الدخول <ChevronLeft className="h-4 w-4 mr-1" />
               </Button>
               <button
                 type="button"
                 onClick={() => setStep("login")}
                 className="mx-auto block min-h-11 rounded-md px-4 text-xs text-muted-foreground hover:text-foreground"
               >
-                ← رجوع
+                العودة إلى بيانات الدخول
               </button>
             </form>
           )}
 
           <div className="mt-12 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
             <Building2 className="h-3.5 w-3.5" />
-            البنك المركزي اليمني — منصة الواردات v3.0
+            البنك المركزي اليمني · منصة الواردات v3.0
           </div>
         </div>
       </div>

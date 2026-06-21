@@ -35,7 +35,7 @@ function Dashboard() {
     <div className="space-y-6">
       <PageHeader
         title={`أهلاً، ${user.name.split(" ")[0]}`}
-        subtitle={`لوحة ${ROLE_LABELS[user.roleId] ?? user.roleId} — تعمل الآن بالكامل من محرّك سير العمل`}
+        subtitle={`الطلبات والمهام المتاحة لك بصلاحيات ${ROLE_LABELS[user.roleId] ?? user.roleId}.`}
         actions={
           roleCanCreateRequest(user) ? (
             <Button asChild>
@@ -49,7 +49,7 @@ function Dashboard() {
 
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Kpi
-          label="ضمن نطاقي"
+          label="إجمالي الطلبات"
           value={stats.total}
           icon={FileText}
           tone="text-primary bg-primary/10"
@@ -58,7 +58,7 @@ function Dashboard() {
           label="قيد المعالجة"
           value={stats.active}
           icon={Clock}
-          tone="text-warning bg-warning/10"
+          tone="text-warning-text bg-warning/10"
         />
         <Kpi
           label="مغلقة"
@@ -74,19 +74,19 @@ function Dashboard() {
         />
       </div>
 
-      <Card className="p-5 shadow-card border-0">
+      <Card className="border-0 p-5 shadow-card">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="font-semibold">أحدث طلبات سير العمل</h3>
+            <h2 className="font-semibold">أحدث الطلبات</h2>
             <p className="text-xs text-muted-foreground">
-              البيانات معروضة من instances المحرّك، وليس من الطلبات القديمة.
+              أحدث طلبات التمويل المتاحة ضمن نطاق صلاحياتك.
             </p>
           </div>
           <Link
             to="/workflows"
             className="flex min-h-11 items-center gap-1 rounded-md px-3 text-xs text-accent hover:underline"
           >
-            عرض الكل <ArrowUpRight className="h-3 w-3" />
+            عرض جميع الطلبات <ArrowUpRight className="h-3 w-3" />
           </Link>
         </div>
 
@@ -96,15 +96,27 @@ function Dashboard() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="text-xs text-muted-foreground border-b">
                 <tr className="text-right">
-                  <th className="py-2.5">المرجع</th>
-                  <th className="py-2.5">مقدم الطلب</th>
-                  <th className="py-2.5">المبلغ</th>
-                  <th className="py-2.5">المرحلة</th>
-                  <th className="py-2.5">التقدم</th>
-                  <th className="py-2.5 text-left">إجراء</th>
+                  <th scope="col" className="py-2.5">
+                    المرجع
+                  </th>
+                  <th scope="col" className="py-2.5">
+                    مقدم الطلب
+                  </th>
+                  <th scope="col" className="py-2.5">
+                    المبلغ
+                  </th>
+                  <th scope="col" className="py-2.5">
+                    المرحلة
+                  </th>
+                  <th scope="col" className="py-2.5">
+                    التقدم
+                  </th>
+                  <th scope="col" className="py-2.5 text-left">
+                    إجراء
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -130,7 +142,7 @@ function Dashboard() {
                     <td className="py-3 text-left">
                       <Button asChild variant="ghost" size="sm">
                         <Link to="/workflows/instances/$id" params={{ id: inst.id }}>
-                          فتح
+                          عرض الطلب
                         </Link>
                       </Button>
                     </td>
@@ -157,12 +169,12 @@ function Kpi({
   tone: string;
 }) {
   return (
-    <Card className="p-5 shadow-card border-0">
+    <Card className="border-0 p-4 shadow-card sm:p-5">
       <div className={`h-10 w-10 rounded-xl grid place-items-center ${tone}`}>
         <Icon className="h-5 w-5" />
       </div>
       <div className="mt-4">
-        <div className="text-2xl font-bold tracking-tight">{value.toLocaleString("en-US")}</div>
+        <div className="text-2xl font-semibold tabular-nums">{value.toLocaleString("en-US")}</div>
         <div className="text-sm text-muted-foreground">{label}</div>
       </div>
     </Card>

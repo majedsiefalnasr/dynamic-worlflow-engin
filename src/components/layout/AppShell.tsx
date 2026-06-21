@@ -60,7 +60,12 @@ const NAV: NavItem[] = [
   { to: "/reports", label: "التقارير والتحليلات", icon: BarChart3, screen: "reports" },
   { to: "/audit", label: "التدقيق والامتثال", icon: ScrollText, screen: "audit" },
   { to: "/notifications", label: "الإشعارات", icon: Bell },
-  { to: "/admin/workflows", label: "مصمم سير العمل", icon: FileCheck2, roles: ["rc_platform_admin"] },
+  {
+    to: "/admin/workflows",
+    label: "مصمم سير العمل",
+    icon: FileCheck2,
+    roles: ["rc_platform_admin"],
+  },
   {
     to: "/admin/reference-data",
     label: "البيانات الأساسية",
@@ -133,7 +138,7 @@ export function AppShell() {
               className={cn(
                 "group flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
                 active
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-soft"
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 isCollapsed && "justify-center",
               )}
@@ -181,7 +186,7 @@ export function AppShell() {
       </Sheet>
 
       <div className="flex flex-1 flex-col min-w-0">
-        <header className="sticky top-0 z-30 h-16 border-b bg-card/80 backdrop-blur-md flex items-center gap-2 px-4 lg:px-6">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b bg-card px-4 lg:px-6">
           <Button
             variant="ghost"
             size="icon"
@@ -246,7 +251,7 @@ export function AppShell() {
                         onClick={markAllRead}
                         className="text-xs text-primary hover:underline"
                       >
-                        قراءة الكل
+                        تحديد الكل كمقروء
                       </button>
                     )}
                   </div>
@@ -331,10 +336,10 @@ export function AppShell() {
         </main>
 
         <footer className="px-4 lg:px-6 py-4 text-xs text-muted-foreground border-t flex flex-col sm:flex-row items-center gap-2 sm:justify-between text-center">
-          <div>© 2026 البنك المركزي اليمني — جميع الحقوق محفوظة</div>
+          <div>© 2026 البنك المركزي اليمني، جميع الحقوق محفوظة</div>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-3.5 w-3.5" />
-            بيئة عرض توضيحي (Prototype)
+            نسخة تجريبية للاختبار
           </div>
         </footer>
       </div>
@@ -354,7 +359,7 @@ export function PageHeader({
   breadcrumbs?: { label: string; to?: string }[];
 }) {
   return (
-    <div className="mb-6">
+    <div className="mb-7">
       {breadcrumbs && (
         <nav className="text-xs text-muted-foreground mb-2 flex flex-wrap items-center gap-1.5">
           {breadcrumbs.map((b, i) => (
@@ -375,9 +380,13 @@ export function PageHeader({
         </nav>
       )}
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-          {subtitle && <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>}
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold">{title}</h1>
+          {subtitle && (
+            <p className="mt-1 max-w-[70ch] text-sm leading-6 text-muted-foreground text-pretty">
+              {subtitle}
+            </p>
+          )}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>

@@ -25,7 +25,7 @@ export function LockedBanner({
       icon: AlertCircle,
       title: "بانتظار إجراء",
       defaultMsg: "هذا الطلب بانتظار خطوة من جهة أخرى.",
-      cls: "bg-warning/10 border-warning/30 text-warning",
+      cls: "bg-warning/10 border-warning/30 text-warning-text",
     },
   }[variant];
   const Icon = cfg.icon;
@@ -34,7 +34,7 @@ export function LockedBanner({
       <Icon className="h-5 w-5 mt-0.5 shrink-0" />
       <div className="flex-1 text-sm">
         <div className="font-semibold">{cfg.title}</div>
-        <div className="opacity-80">{message ?? cfg.defaultMsg}</div>
+        <div>{message ?? cfg.defaultMsg}</div>
       </div>
     </div>
   );

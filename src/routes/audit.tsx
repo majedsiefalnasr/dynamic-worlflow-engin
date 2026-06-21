@@ -44,7 +44,12 @@ function Audit() {
             icon: Activity,
             tone: "text-info bg-info/10",
           },
-          { l: "تنبيهات مفتوحة", v: "9", icon: AlertTriangle, tone: "text-warning bg-warning/10" },
+          {
+            l: "تنبيهات مفتوحة",
+            v: "9",
+            icon: AlertTriangle,
+            tone: "text-warning-text bg-warning/10",
+          },
           {
             l: "فواتير مكررة",
             v: duplicates.length.toString(),
@@ -64,7 +69,7 @@ function Audit() {
             </div>
             <div className="min-w-0">
               <div className="text-xs text-muted-foreground">{k.l}</div>
-              <div className="text-xl font-bold">{k.v}</div>
+              <div className="text-xl font-semibold tabular-nums">{k.v}</div>
             </div>
           </Card>
         ))}
@@ -98,15 +103,27 @@ function Audit() {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[720px] text-sm">
                 <thead className="bg-muted/40 text-xs text-muted-foreground">
                   <tr className="text-right">
-                    <th className="px-4 py-3">المستخدم</th>
-                    <th className="px-4 py-3">الإجراء</th>
-                    <th className="px-4 py-3">الطلب</th>
-                    <th className="px-4 py-3">الجهاز</th>
-                    <th className="px-4 py-3">IP</th>
-                    <th className="px-4 py-3">التوقيت</th>
+                    <th scope="col" className="px-4 py-3">
+                      المستخدم
+                    </th>
+                    <th scope="col" className="px-4 py-3">
+                      الإجراء
+                    </th>
+                    <th scope="col" className="px-4 py-3">
+                      الطلب
+                    </th>
+                    <th scope="col" className="px-4 py-3">
+                      الجهاز
+                    </th>
+                    <th scope="col" className="px-4 py-3">
+                      IP
+                    </th>
+                    <th scope="col" className="px-4 py-3">
+                      التوقيت
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -183,7 +200,7 @@ function Audit() {
                       r.l === "عالية"
                         ? "text-destructive"
                         : r.l === "متوسطة"
-                          ? "text-warning"
+                          ? "text-warning-text"
                           : "text-info"
                     }`}
                   />

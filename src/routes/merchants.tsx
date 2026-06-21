@@ -24,7 +24,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth, ENTITIES, type Merchant } from "@/lib/mock";
-import { merchantsCell, logAudit, referenceLabels, referenceTablesCell, screenPermsCell } from "@/lib/governance";
+import {
+  merchantsCell,
+  logAudit,
+  referenceLabels,
+  referenceTablesCell,
+  screenPermsCell,
+} from "@/lib/governance";
 import { canScreen } from "@/lib/workflow-bridge";
 import { toast } from "sonner";
 import { ScreenGuard } from "@/components/workflow/ScreenGuard";
@@ -203,17 +209,31 @@ function Merchants() {
       {isPlatform ? (
         <Card className="shadow-card border-0 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[860px] text-sm">
               <thead className="bg-muted/40 text-xs text-muted-foreground">
                 <tr className="text-right">
-                  <th className="p-3 font-semibold">التاجر</th>
-                  <th className="p-3 font-semibold">الرقم الضريبي</th>
-                  <th className="p-3 font-semibold">الشركات المرتبطة</th>
-                  <th className="p-3 font-semibold">القطاع</th>
-                  <th className="p-3 font-semibold">البنك التابع له</th>
-                  <th className="p-3 font-semibold">الحالة</th>
-                  <th className="p-3 font-semibold tabular-nums">المعاملات</th>
-                  <th className="p-3 font-semibold w-12"></th>
+                  <th scope="col" className="p-3 font-semibold">
+                    التاجر
+                  </th>
+                  <th scope="col" className="p-3 font-semibold">
+                    الرقم الضريبي
+                  </th>
+                  <th scope="col" className="p-3 font-semibold">
+                    الشركات المرتبطة
+                  </th>
+                  <th scope="col" className="p-3 font-semibold">
+                    القطاع
+                  </th>
+                  <th scope="col" className="p-3 font-semibold">
+                    البنك التابع له
+                  </th>
+                  <th scope="col" className="p-3 font-semibold">
+                    الحالة
+                  </th>
+                  <th scope="col" className="p-3 font-semibold tabular-nums">
+                    المعاملات
+                  </th>
+                  <th scope="col" className="p-3 font-semibold w-12"></th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -235,8 +255,8 @@ function Merchants() {
                       <Badge
                         className={
                           m.status === "active"
-                            ? "bg-success/15 text-success border-0"
-                            : "bg-destructive/15 text-destructive border-0"
+                            ? "border-0 bg-success/15 text-success"
+                            : "border-0 bg-destructive/15 text-destructive"
                         }
                       >
                         {m.status === "active" ? "نشط" : "موقوف"}
@@ -280,8 +300,8 @@ function Merchants() {
                 <Badge
                   className={
                     m.status === "active"
-                      ? "bg-success/15 text-success border-0"
-                      : "bg-destructive/15 text-destructive border-0"
+                      ? "border-0 bg-success/15 text-success"
+                      : "border-0 bg-destructive/15 text-destructive"
                   }
                 >
                   {m.status === "active" ? "نشط" : "موقوف"}
@@ -399,7 +419,7 @@ function Merchants() {
               <DialogTitle className="flex items-center gap-2">
                 <Building2 className="h-5 w-5" /> {viewing.name}
               </DialogTitle>
-              <DialogDescription>تفاصيل التاجر — عرض فقط</DialogDescription>
+              <DialogDescription>تفاصيل التاجر، عرض فقط</DialogDescription>
             </DialogHeader>
             <div className="grid sm:grid-cols-2 gap-3 py-2 text-sm">
               <DetailRow k="الرقم الضريبي" v={viewing.tax} />
@@ -438,7 +458,7 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone: 
       <div className={`h-9 w-9 rounded-lg grid place-items-center ${tone}`}>
         <Building2 className="h-4 w-4" />
       </div>
-      <div className="mt-2 text-2xl font-bold tabular-nums">{value}</div>
+      <div className="mt-2 text-2xl font-semibold tabular-nums">{value}</div>
       <div className="text-xs text-muted-foreground">{label}</div>
     </Card>
   );
@@ -603,7 +623,7 @@ function MerchantDialog({
             <Input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="المدينة – الشارع"
+              placeholder="المدينة، الشارع"
             />
           </Field>
         </div>
@@ -649,6 +669,7 @@ function MerchantDialog({
                   type="button"
                   size="icon"
                   variant="ghost"
+                  aria-label="إزالة المالك"
                   onClick={() => setOwners((prev) => prev.filter((o) => o.id !== owner.id))}
                 >
                   <Trash2 className="h-4 w-4 text-destructive" />

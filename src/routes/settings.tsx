@@ -25,28 +25,28 @@ function SettingsPage() {
     <div>
       <PageHeader
         title="إعدادات النظام"
-        subtitle="إدارة سير العمل، الإشعارات، والأمن"
+        subtitle="ضبط سير العمل وقنوات الإشعارات وسياسات الوصول وإعدادات المنصة."
         breadcrumbs={[{ label: "الرئيسية", to: "/" }, { label: "الإعدادات" }]}
       />
 
       <Tabs defaultValue="workflow">
         <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
-          <TabsTrigger className="min-h-10 flex-1 basis-32 sm:flex-none" value="workflow">
+          <TabsTrigger className="min-h-11 flex-1 basis-32 sm:flex-none" value="workflow">
             <Workflow className="h-4 w-4 ml-1" /> سير العمل
           </TabsTrigger>
-          <TabsTrigger className="min-h-10 flex-1 basis-32 sm:flex-none" value="email">
+          <TabsTrigger className="min-h-11 flex-1 basis-32 sm:flex-none" value="email">
             <Mail className="h-4 w-4 ml-1" /> البريد
           </TabsTrigger>
-          <TabsTrigger className="min-h-10 flex-1 basis-32 sm:flex-none" value="notif">
+          <TabsTrigger className="min-h-11 flex-1 basis-32 sm:flex-none" value="notif">
             <Bell className="h-4 w-4 ml-1" /> الإشعارات
           </TabsTrigger>
-          <TabsTrigger className="min-h-10 flex-1 basis-32 sm:flex-none" value="security">
+          <TabsTrigger className="min-h-11 flex-1 basis-32 sm:flex-none" value="security">
             <ShieldAlert className="h-4 w-4 ml-1" /> الأمن
           </TabsTrigger>
-          <TabsTrigger className="min-h-10 flex-1 basis-32 sm:flex-none" value="general">
+          <TabsTrigger className="min-h-11 flex-1 basis-32 sm:flex-none" value="general">
             <Cog className="h-4 w-4 ml-1" /> عام
           </TabsTrigger>
-          <TabsTrigger className="min-h-10 flex-1 basis-32 sm:flex-none" value="demo">
+          <TabsTrigger className="min-h-11 flex-1 basis-32 sm:flex-none" value="demo">
             <Database className="h-4 w-4 ml-1" /> بيانات العرض
           </TabsTrigger>
         </TabsList>
@@ -80,20 +80,20 @@ function SettingsPage() {
             <h3 className="font-semibold">إعدادات محرّك سير العمل</h3>
             <div className="grid md:grid-cols-2 gap-5">
               <div className="space-y-2">
-                <Label>اسم سير العمل الافتراضي</Label>
-                <Input defaultValue="تمويل الواردات" />
+                <Label htmlFor="workflow-name">اسم سير العمل الافتراضي</Label>
+                <Input id="workflow-name" defaultValue="تمويل الواردات" />
               </div>
               <div className="space-y-2">
-                <Label>عدد المراحل النشطة</Label>
-                <Input defaultValue="8" />
+                <Label htmlFor="workflow-stage-count">عدد المراحل النشطة</Label>
+                <Input id="workflow-stage-count" defaultValue="8" inputMode="numeric" />
               </div>
               <div className="space-y-2">
-                <Label>نسخة المحرّك الحالية</Label>
-                <Input defaultValue="1.0" />
+                <Label htmlFor="workflow-version">نسخة المحرّك الحالية</Label>
+                <Input id="workflow-version" defaultValue="1.0" />
               </div>
               <div className="space-y-2">
-                <Label>مهلة المراجعة (ساعات)</Label>
-                <Input defaultValue="48" />
+                <Label htmlFor="workflow-review-hours">مهلة المراجعة (ساعات)</Label>
+                <Input id="workflow-review-hours" defaultValue="48" inputMode="numeric" />
               </div>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg border">
@@ -103,13 +103,13 @@ function SettingsPage() {
                   إظهار/إخفاء وتعديل الحقول حسب المرحلة الحالية
                 </div>
               </div>
-              <Switch defaultChecked />
+              <Switch defaultChecked aria-label="استخدام قواعد الحقول من المصمم" />
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg border">
               <div>
                 <div className="font-medium text-sm">تفعيل سجل تاريخ سير العمل</div>
               </div>
-              <Switch defaultChecked />
+              <Switch defaultChecked aria-label="تفعيل سجل تاريخ سير العمل" />
             </div>
             <Button>حفظ التغييرات</Button>
           </Card>
@@ -120,30 +120,31 @@ function SettingsPage() {
             <h3 className="font-semibold">إعدادات SMTP</h3>
             <div className="grid md:grid-cols-2 gap-5">
               <div className="space-y-2">
-                <Label>SMTP Host</Label>
-                <Input defaultValue="smtp.cby.gov.ye" />
+                <Label htmlFor="smtp-host">خادم SMTP</Label>
+                <Input id="smtp-host" defaultValue="smtp.cby.gov.ye" />
               </div>
               <div className="space-y-2">
-                <Label>Port</Label>
-                <Input defaultValue="587" />
+                <Label htmlFor="smtp-port">المنفذ</Label>
+                <Input id="smtp-port" defaultValue="587" inputMode="numeric" />
               </div>
               <div className="space-y-2">
-                <Label>المستخدم</Label>
-                <Input defaultValue="noreply@cby.gov.ye" />
+                <Label htmlFor="smtp-user">المستخدم</Label>
+                <Input id="smtp-user" defaultValue="noreply@cby.gov.ye" />
               </div>
               <div className="space-y-2">
-                <Label>كلمة المرور</Label>
-                <Input type="password" defaultValue="************" />
+                <Label htmlFor="smtp-password">كلمة المرور</Label>
+                <Input id="smtp-password" type="password" defaultValue="************" />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>قالب إشعار اعتماد طلب</Label>
+              <Label htmlFor="approval-email-template">قالب إشعار اعتماد طلب</Label>
               <Textarea
+                id="approval-email-template"
                 rows={4}
                 defaultValue="عزيزي {{importerName}}،&#10;تم تنفيذ إجراء جديد على الطلب رقم {{invoiceNumber}} داخل محرّك سير العمل."
               />
             </div>
-            <Button>حفظ</Button>
+            <Button>حفظ إعدادات البريد</Button>
           </Card>
         </TabsContent>
 
@@ -159,7 +160,7 @@ function SettingsPage() {
             ].map((t) => (
               <div key={t} className="flex items-center justify-between p-3 rounded-lg border">
                 <div className="text-sm">{t}</div>
-                <Switch defaultChecked />
+                <Switch defaultChecked aria-label={t} />
               </div>
             ))}
           </Card>
@@ -181,7 +182,7 @@ function SettingsPage() {
                 className="flex items-center justify-between p-3 rounded-lg border"
               >
                 <div className="text-sm">{t}</div>
-                <Switch defaultChecked={v as boolean} />
+                <Switch defaultChecked={v as boolean} aria-label={t as string} />
               </div>
             ))}
           </Card>
@@ -192,26 +193,26 @@ function SettingsPage() {
             <h3 className="font-semibold">إعدادات عامة</h3>
             <div className="grid md:grid-cols-2 gap-5">
               <div className="space-y-2">
-                <Label>اسم المنصة</Label>
-                <Input defaultValue="منصة إدارة وتمويل الواردات" />
+                <Label htmlFor="platform-name">اسم المنصة</Label>
+                <Input id="platform-name" defaultValue="منصة إدارة وتمويل الواردات" />
               </div>
               <div className="space-y-2">
-                <Label>الجهة</Label>
-                <Input defaultValue="البنك المركزي اليمني" />
+                <Label htmlFor="platform-organization">الجهة</Label>
+                <Input id="platform-organization" defaultValue="البنك المركزي اليمني" />
               </div>
               <div className="space-y-2">
-                <Label>اللغة الافتراضية</Label>
-                <Input defaultValue="العربية" />
+                <Label htmlFor="platform-language">اللغة الافتراضية</Label>
+                <Input id="platform-language" defaultValue="العربية" />
               </div>
               <div className="space-y-2">
-                <Label>المنطقة الزمنية</Label>
-                <Input defaultValue="GMT+3 (Arabia)" />
+                <Label htmlFor="platform-timezone">المنطقة الزمنية</Label>
+                <Input id="platform-timezone" defaultValue="GMT+3 (Arabia)" />
               </div>
             </div>
             <div className="flex items-center gap-3 p-4 rounded-lg bg-info/5 border border-info/20">
               <Database className="h-5 w-5 text-info" />
               <div className="text-xs">
-                آخر نسخة احتياطية: <span className="font-semibold">29 أكتوبر 2025 — 02:00</span>
+                آخر نسخة احتياطية: <span className="font-semibold">29 أكتوبر 2025، 02:00</span>
               </div>
             </div>
           </Card>
