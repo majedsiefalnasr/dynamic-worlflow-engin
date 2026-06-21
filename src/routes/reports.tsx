@@ -94,7 +94,7 @@ function Reports() {
             <div className="text-xs text-muted-foreground">{k.l}</div>
             <div className="flex items-end justify-between mt-1">
               <div className="text-xl font-bold">{k.v}</div>
-              <Badge variant="secondary" className="text-[10px]">
+              <Badge variant="secondary" className="text-xs">
                 {k.s}
               </Badge>
             </div>

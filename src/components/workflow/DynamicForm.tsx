@@ -199,7 +199,7 @@ export function DynamicForm({ fields, value, onChange, groups, readOnly = false 
           const active = stepIdx === idx;
           return (
             <TabsTrigger key={t.id} value={t.id} className="min-w-32 flex-1 gap-2 rounded-xl py-3 data-[state=active]:bg-background">
-              <span className={`grid h-8 w-8 place-items-center rounded-full text-xs font-bold ${done ? "bg-success text-white" : active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+              <span className={`grid h-8 w-8 place-items-center rounded-full text-xs font-bold ${done ? "bg-success text-success-foreground" : active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
                 {done ? <Check className="h-4 w-4" /> : stepIdx + 1}
               </span>
               <span>{t.name}</span>
@@ -382,7 +382,7 @@ function FieldControl({
             <SelectTrigger id={id}><SelectValue placeholder="اختر..." /></SelectTrigger>
             <SelectContent>
               {opts.length === 0
-                ? <div className="px-2 py-1.5 text-xs text-muted-foreground">لا توجد بيانات في المصدر</div>
+                ? <div role="status" className="px-2 py-1.5 text-xs text-muted-foreground">لا توجد بيانات في المصدر</div>
                 : opts.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
             </SelectContent>
           </Select>
@@ -446,13 +446,13 @@ function FileUploadCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               {required ? (
-                <Badge variant="destructive" className="text-[10px] shrink-0">إلزامي</Badge>
+                <Badge variant="destructive" className="text-xs shrink-0">إلزامي</Badge>
               ) : (
-                <Badge variant="secondary" className="text-[10px] shrink-0">اختياري</Badge>
+                <Badge variant="secondary" className="text-xs shrink-0">اختياري</Badge>
               )}
             </div>
             <div className="font-semibold text-sm mt-2">{label}</div>
-            <div className="text-[11px] text-muted-foreground mt-0.5">
+            <div className="text-xs text-muted-foreground mt-0.5">
               {required ? "مطلوب" : "اختياري"} · PDF, JPG (حد أقصى 10MB)
             </div>
           </div>

@@ -79,12 +79,12 @@ export function OrgProcessStepper({ instance }: { instance: WorkflowInstance }) 
                   {processLabelForStage(s, user)}
                 </span>
                 {mine && (
-                  <Badge variant="outline" className="h-4 px-1.5 text-[10px] border-primary/40 text-primary">دورك</Badge>
+                  <Badge variant="outline" className="h-4 px-1.5 text-xs border-primary/40 text-primary">دورك</Badge>
                 )}
               </div>
               <div
                 className={cn(
-                  "text-[11px] mt-0.5",
+                  "text-xs mt-0.5",
                   isCurrent && !rejected && "text-primary",
                   isCurrent && rejected && "text-destructive",
                   !isCurrent && "text-muted-foreground",

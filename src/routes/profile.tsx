@@ -52,7 +52,7 @@ function Profile() {
 
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="p-6 shadow-card border-0 text-center">
-          <div className="h-24 w-24 rounded-full bg-gradient-hero text-white grid place-items-center text-3xl font-bold mx-auto">
+          <div className="h-24 w-24 rounded-full bg-primary text-primary-foreground grid place-items-center text-3xl font-bold mx-auto">
             {user.avatar}
           </div>
           <div className="mt-4 font-bold text-lg flex items-center justify-center gap-1.5">
@@ -66,7 +66,7 @@ function Profile() {
             {stats.map((s) => (
               <div key={s.l}>
                 <div className="font-bold tabular-nums">{s.v}</div>
-                <div className="text-[10px] text-muted-foreground">{s.l}</div>
+                <div className="text-xs text-muted-foreground">{s.l}</div>
               </div>
             ))}
           </div>
@@ -115,7 +115,7 @@ function Profile() {
                     <div className="h-8 w-8 rounded-lg bg-muted grid place-items-center"><Activity className="h-4 w-4" /></div>
                     <div className="flex-1 text-sm">
                       <div className="font-medium">{a.action}</div>
-                      {a.ref && <div className="text-[11px] text-muted-foreground font-mono">{a.ref}</div>}
+                      {a.ref && <div className="text-xs text-muted-foreground font-mono">{a.ref}</div>}
                     </div>
                     <div className="text-xs text-muted-foreground">{new Date(a.ts).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" })}</div>
                   </div>

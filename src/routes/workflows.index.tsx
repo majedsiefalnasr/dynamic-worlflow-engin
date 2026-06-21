@@ -174,7 +174,7 @@ function WorkflowsHome() {
                   </TableCell>
                   <TableCell className="w-32">
                     <Progress value={progressForInstance(inst)} className="h-1.5" />
-                    <div className="text-[10px] text-muted-foreground mt-1 tabular-nums">{progressForInstance(inst)}%</div>
+                    <div className="text-xs text-muted-foreground mt-1 tabular-nums">{progressForInstance(inst)}%</div>
                   </TableCell>
                   <TableCell>
                     <Link to="/workflows/instances/$id" params={{ id: inst.id }}>

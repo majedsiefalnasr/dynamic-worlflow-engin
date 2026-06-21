@@ -210,10 +210,10 @@ function SystemUsers() {
               <tr key={u.id} className="border-t hover:bg-muted/30">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-full bg-gradient-hero text-white grid place-items-center text-xs font-bold">{u.avatar}</div>
+                    <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-bold">{u.avatar}</div>
                     <div>
                       <div className="font-medium">{u.name}</div>
-                      {u.phone && <div className="text-[11px] text-muted-foreground">{u.phone}</div>}
+                      {u.phone && <div className="text-xs text-muted-foreground">{u.phone}</div>}
                     </div>
                   </div>
                 </td>
@@ -414,7 +414,7 @@ function UserDialog({
               </SelectContent>
             </Select>
             {teamsForOrg.length === 0 && (
-              <p className="text-[11px] text-destructive">لا توجد فرق نشطة لهذه الجهة.</p>
+              <p className="text-xs text-destructive">لا توجد فرق نشطة لهذه الجهة.</p>
             )}
           </div>
           <div className="space-y-1.5">
@@ -431,7 +431,7 @@ function UserDialog({
               </SelectContent>
             </Select>
             {rolesForOrg.length === 0 && (
-              <p className="text-[11px] text-destructive">لا توجد أدوار نشطة لهذه الجهة. أضف من شاشة "إدارة الأدوار".</p>
+              <p className="text-xs text-destructive">لا توجد أدوار نشطة لهذه الجهة. أضف من شاشة "إدارة الأدوار".</p>
             )}
           </div>
         </div>

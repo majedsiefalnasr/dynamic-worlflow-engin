@@ -142,10 +142,10 @@ function BankUsers() {
               <tr key={u.id} className="border-t hover:bg-muted/30">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-full bg-gradient-hero text-white grid place-items-center text-xs font-bold">{u.avatar}</div>
+                    <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-bold">{u.avatar}</div>
                     <div>
                       <div className="font-medium">{u.name}</div>
-                      {u.phone && <div className="text-[11px] text-muted-foreground">{u.phone}</div>}
+                      {u.phone && <div className="text-xs text-muted-foreground">{u.phone}</div>}
                     </div>
                   </div>
                 </td>

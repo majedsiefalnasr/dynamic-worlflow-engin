@@ -290,7 +290,7 @@ function QuickRow({
     <div className="flex items-center gap-3">
       <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">{icon}</span>
       <div className="min-w-0">
-        <dt className="text-[11px] text-muted-foreground">{label}</dt>
+        <dt className="text-xs text-muted-foreground">{label}</dt>
         <dd className={`text-sm font-medium truncate ${valueClass ?? ""}`}>{value}</dd>
       </div>
     </div>

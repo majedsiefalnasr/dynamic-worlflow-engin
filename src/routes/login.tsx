@@ -117,9 +117,9 @@ function Login() {
                     >
                       <div className="text-right min-w-0">
                         <div className="font-semibold truncate">{u.name}</div>
-                        <div className="text-[10px] text-muted-foreground truncate">{u.org}</div>
+                        <div className="text-xs text-muted-foreground truncate">{u.org}</div>
                       </div>
-                      <span className="shrink-0 px-2 py-0.5 rounded-full bg-muted text-[10px]">
+                      <span className="shrink-0 px-2 py-0.5 rounded-full bg-muted text-xs">
                         {ROLE_LABELS[u.roleId] ?? u.roleId}
                       </span>
                     </button>

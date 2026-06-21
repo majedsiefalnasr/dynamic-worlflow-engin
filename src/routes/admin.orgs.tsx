@@ -150,7 +150,7 @@ function OrgsAdmin() {
                       <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary grid place-items-center"><Network className="h-4 w-4" /></div>
                       <div>
                         <div className="font-medium">{o.label}</div>
-                        <div className="text-[11px] text-muted-foreground" dir="ltr">{o.id}</div>
+                        <div className="text-xs text-muted-foreground" dir="ltr">{o.id}</div>
                       </div>
                     </div>
                   </td>
@@ -230,7 +230,7 @@ function OrgDialog({ title, initial, onSave }: { title: string; initial?: OrgRec
                   <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="min-w-0">
                     <span className="block text-sm font-medium text-foreground">{option.label}</span>
-                    <span className="block text-[11px] font-normal leading-5 text-muted-foreground">
+                    <span className="block text-xs font-normal leading-5 text-muted-foreground">
                       {option.description}
                     </span>
                   </span>

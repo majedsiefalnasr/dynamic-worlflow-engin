@@ -157,7 +157,7 @@ function TeamsAdmin() {
                 <tr key={t.id} className="border-t hover:bg-muted/30">
                   <td className="px-4 py-3">
                     <div className="font-medium">{t.label}</div>
-                    <div className="text-[11px] text-muted-foreground" dir="ltr">{t.id}</div>
+                    <div className="text-xs text-muted-foreground" dir="ltr">{t.id}</div>
                   </td>
                   <td className="px-4 py-3 text-xs">
                     <div className="flex items-center gap-1.5">

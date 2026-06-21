@@ -27,7 +27,7 @@ export function RoleSwitcher() {
                 <div className="text-sm truncate">{u.name}</div>
                 <div className="text-[10.5px] text-muted-foreground truncate">{ROLE_LABELS[u.roleId] ?? u.roleId}</div>
               </div>
-              {user.id === u.id && <span className="text-[10px] text-success">نشط</span>}
+              {user.id === u.id && <span className="text-xs text-success">نشط</span>}
             </div>
           </DropdownMenuItem>
         ))}

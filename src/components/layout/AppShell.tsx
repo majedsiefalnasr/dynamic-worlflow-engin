@@ -21,7 +21,6 @@ import {
   KeyRound,
   ShieldCheck,
   Menu,
-  X,
   Database,
 } from "lucide-react";
 import { useState } from "react";
@@ -43,6 +42,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 type NavItem = {
   to: string;
@@ -105,75 +105,80 @@ export function AppShell() {
   const notifs = notificationsCell.use();
   const unread = notifs.filter((n) => n.unread).length;
 
+  // Shared sidebar body. `isCollapsed` is desktop-only; the mobile Sheet always
+  // shows full labels. `onNavigate` lets the mobile drawer close on selection.
+  const sidebarBody = (isCollapsed: boolean, onNavigate?: () => void) => (
+    <>
+      <div className="flex h-16 items-center gap-3 px-5 border-b border-sidebar-border shrink-0">
+        <div className="grid h-10 w-10 place-items-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground font-bold shrink-0">
+          ب م
+        </div>
+        {!isCollapsed && (
+          <div className="leading-tight">
+            <div className="font-bold">منصة الواردات</div>
+            <div className="text-xs text-sidebar-foreground/60">البنك المركزي اليمني</div>
+          </div>
+        )}
+      </div>
+      <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+        {items.map((it) => {
+          const active = it.to === "/" ? path === "/" : path.startsWith(it.to);
+          return (
+            <Link
+              key={it.to}
+              to={it.to}
+              aria-label={it.label}
+              title={isCollapsed ? it.label : undefined}
+              onClick={onNavigate}
+              className={cn(
+                "group flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+                active
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-soft"
+                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                isCollapsed && "justify-center",
+              )}
+            >
+              <it.icon className="h-5 w-5 shrink-0" />
+              {!isCollapsed && <span className="truncate">{it.label}</span>}
+              {!isCollapsed && active && <ChevronLeft className="h-4 w-4 ms-auto opacity-60" />}
+            </Link>
+          );
+        })}
+      </nav>
+    </>
+  );
+
   return (
     <div dir="rtl" className="flex min-h-screen w-full bg-background text-foreground">
-      {/* Mobile backdrop */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={() => setMobileOpen(false)}
-          aria-hidden
-        />
-      )}
-
+      {/* Desktop sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 right-0 z-50 h-screen shrink-0 bg-sidebar text-sidebar-foreground border-l border-sidebar-border transition-transform duration-300",
-          "lg:sticky lg:top-0 lg:translate-x-0",
-          mobileOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0",
-          collapsed ? "w-72 lg:w-20" : "w-72",
+          "hidden lg:flex lg:flex-col lg:sticky lg:top-0 lg:h-screen shrink-0 bg-sidebar text-sidebar-foreground border-l border-sidebar-border transition-[width] duration-300",
+          collapsed ? "lg:w-20" : "lg:w-72",
         )}
       >
-        <div className="flex h-16 items-center gap-3 px-5 border-b border-sidebar-border">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground font-bold shrink-0">
-            ب م
-          </div>
-          {!collapsed && (
-            <div className="leading-tight">
-              <div className="font-bold">منصة الواردات</div>
-              <div className="text-[11px] text-sidebar-foreground/60">البنك المركزي اليمني</div>
-            </div>
-          )}
-          <button
-            onClick={() => setMobileOpen(false)}
-            className="ms-auto grid h-11 w-11 place-items-center rounded-md text-sidebar-foreground/70 hover:text-sidebar-foreground"
-            aria-label="إغلاق القائمة"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <nav className="p-3 space-y-1 overflow-y-auto h-[calc(100vh-9rem)]">
-          {items.map((it) => {
-            const active = it.to === "/" ? path === "/" : path.startsWith(it.to);
-            return (
-              <Link
-                key={it.to}
-                to={it.to}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "group flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all",
-                  active
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-soft"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                )}
-              >
-                <it.icon className="h-5 w-5 shrink-0" />
-                {!collapsed && <span className="truncate">{it.label}</span>}
-                {!collapsed && active && <ChevronLeft className="h-4 w-4 ms-auto opacity-60" />}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="absolute bottom-0 inset-x-0 p-3 border-t border-sidebar-border bg-sidebar hidden lg:block">
+        {sidebarBody(collapsed)}
+        <div className="p-3 border-t border-sidebar-border bg-sidebar shrink-0">
           <button
             onClick={() => setCollapsed((c) => !c)}
             className="min-h-11 w-full rounded-md py-2 text-xs text-sidebar-foreground/60 hover:text-sidebar-foreground"
+            aria-label={collapsed ? "توسيع الشريط الجانبي" : "طي الشريط الجانبي"}
           >
-            {collapsed ? "توسيع ›" : "‹ طي الشريط الجانبي"}
+            {collapsed ? "›" : "‹ طي الشريط الجانبي"}
           </button>
         </div>
       </aside>
+
+      {/* Mobile drawer (Radix Dialog: focus trap, Escape, scroll lock) */}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent
+          side="right"
+          className="w-72 p-0 flex flex-col gap-0 bg-sidebar text-sidebar-foreground border-sidebar-border"
+        >
+          <SheetTitle className="sr-only">القائمة الرئيسية</SheetTitle>
+          {sidebarBody(false, () => setMobileOpen(false))}
+        </SheetContent>
+      </Sheet>
 
       <div className="flex flex-1 flex-col min-w-0">
         <header className="sticky top-0 z-30 h-16 border-b bg-card/80 backdrop-blur-md flex items-center gap-2 px-4 lg:px-6">
@@ -190,6 +195,8 @@ export function AppShell() {
           <div className="relative w-full max-w-md hidden sm:block">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              type="search"
+              aria-label="بحث"
               placeholder="ابحث عن طلب، تاجر، أو رقم فاتورة..."
               className="pr-10 bg-muted/50 border-transparent focus-visible:bg-card"
             />
@@ -237,7 +244,7 @@ export function AppShell() {
                     {unread > 0 && (
                       <button
                         onClick={markAllRead}
-                        className="text-[11px] text-primary hover:underline"
+                        className="text-xs text-primary hover:underline"
                       >
                         قراءة الكل
                       </button>
@@ -246,7 +253,11 @@ export function AppShell() {
                 </div>
                 <div className="max-h-96 overflow-auto divide-y">
                   {notifs.slice(0, 12).map((n) => (
-                    <div key={n.id} className="p-4 hover:bg-muted/50 cursor-pointer flex gap-3">
+                    <Link
+                      key={n.id}
+                      to="/notifications"
+                      className="p-4 hover:bg-muted/50 flex gap-3"
+                    >
                       <div
                         className={cn(
                           "mt-1 h-2 w-2 rounded-full shrink-0",
@@ -257,9 +268,9 @@ export function AppShell() {
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm truncate">{n.title}</div>
                         <div className="text-xs text-muted-foreground truncate">{n.body}</div>
-                        <div className="text-[10px] text-muted-foreground mt-1">{n.time}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{n.time}</div>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
                 <div className="p-2 border-t text-center">
@@ -278,7 +289,7 @@ export function AppShell() {
                 >
                   <div className="text-right leading-tight hidden sm:block">
                     <div className="text-sm font-semibold">{user.name}</div>
-                    <div className="text-[11px] text-muted-foreground">
+                    <div className="text-xs text-muted-foreground">
                       {ROLE_LABELS[user.roleId] ?? user.roleId}
                     </div>
                   </div>

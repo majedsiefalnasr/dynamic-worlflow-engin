@@ -488,7 +488,7 @@ function StageRoutingSection({
       <div className="mb-3 flex items-center justify-between">
         <div>
           <div className="font-semibold">{stage.name}</div>
-          <div className="text-[11px] font-mono text-muted-foreground">{stage.code}</div>
+          <div className="text-xs font-mono text-muted-foreground">{stage.code}</div>
         </div>
         <Badge variant="secondary">{rules.length} قاعدة</Badge>
       </div>
@@ -689,12 +689,12 @@ function StageGroupsManager({ versionId }: { versionId: string }) {
         <div className="space-y-2">
           {groups.map((g, i) => (
             <div key={g.id} className="flex items-center gap-2 rounded-lg border px-3 py-2">
-              <Badge variant="secondary" className="font-mono text-[10px]">
+              <Badge variant="secondary" className="font-mono text-xs">
                 {i + 1}
               </Badge>
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-sm">{g.name}</div>
-                <div className="text-[11px] text-muted-foreground truncate">
+                <div className="text-xs text-muted-foreground truncate">
                   {audienceSummary(g)}
                 </div>
               </div>
@@ -798,7 +798,7 @@ function AudienceDialog({ group, onClose }: { group: StageGroup; onClose: () => 
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end py-2">
         <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">الجهة</Label>
+          <Label className="text-xs text-muted-foreground">الجهة</Label>
           <Select
             value={orgId}
             onValueChange={(v) => {
@@ -821,7 +821,7 @@ function AudienceDialog({ group, onClose }: { group: StageGroup; onClose: () => 
           </Select>
         </div>
         <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">الفريق</Label>
+          <Label className="text-xs text-muted-foreground">الفريق</Label>
           <Select value={teamId} onValueChange={setTeamId}>
             <SelectTrigger>
               <SelectValue />
@@ -837,7 +837,7 @@ function AudienceDialog({ group, onClose }: { group: StageGroup; onClose: () => 
           </Select>
         </div>
         <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">الدور</Label>
+          <Label className="text-xs text-muted-foreground">الدور</Label>
           <Select value={roleId} onValueChange={setRoleId}>
             <SelectTrigger>
               <SelectValue />
@@ -865,7 +865,7 @@ function AudienceDialog({ group, onClose }: { group: StageGroup; onClose: () => 
         ) : (
           rows.map((r, idx) => (
             <div key={idx} className="flex items-center gap-2 rounded-lg border px-3 py-2">
-              <Badge variant="secondary" className="font-mono text-[10px]">
+              <Badge variant="secondary" className="font-mono text-xs">
                 {idx + 1}
               </Badge>
               <span className="flex-1 text-sm">
@@ -1317,7 +1317,7 @@ function FieldsTab({ versionId }: { versionId: string }) {
           <div className="space-y-2">
             {groups.map((g, i) => (
               <div key={g.id} className="flex items-center gap-2 rounded-lg border px-3 py-2">
-                <Badge variant="secondary" className="font-mono text-[10px]">
+                <Badge variant="secondary" className="font-mono text-xs">
                   {i + 1}
                 </Badge>
                 <span className="font-medium text-sm flex-1">{g.name}</span>
@@ -1556,7 +1556,7 @@ function RulesTab({ versionId }: { versionId: string }) {
               <TableRow key={f.id}>
                 <TableCell>
                   <div className="font-medium">{f.label}</div>
-                  <div className="text-[11px] font-mono text-muted-foreground">{f.key}</div>
+                  <div className="text-xs font-mono text-muted-foreground">{f.key}</div>
                 </TableCell>
                 <TableCell>
                   <Switch checked={v} onCheckedChange={(c) => upsert(f.key, { visible: c })} />

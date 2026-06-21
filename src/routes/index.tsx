@@ -123,7 +123,7 @@ function Dashboard() {
                     </td>
                     <td className="py-3 w-36">
                       <Progress value={progressForInstance(inst)} className="h-1.5" />
-                      <div className="text-[10px] text-muted-foreground mt-1">
+                      <div className="text-xs text-muted-foreground mt-1">
                         {progressForInstance(inst)}%
                       </div>
                     </td>

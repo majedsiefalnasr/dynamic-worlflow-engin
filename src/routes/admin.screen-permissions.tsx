@@ -128,7 +128,7 @@ function ScreenPermissionsAdmin() {
                   </th>
                 ))}
               </tr>
-              <tr className="bg-muted/20 text-[11px] text-muted-foreground">
+              <tr className="bg-muted/20 text-xs text-muted-foreground">
                 {GROUPS.map((g) =>
                   g.caps.map((c, i) => (
                     <th
@@ -149,7 +149,7 @@ function ScreenPermissionsAdmin() {
                     <td className="px-5 py-3 font-medium sticky inset-s-0 bg-card z-10">
                       <div>{role.name}</div>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                        <Badge variant="secondary" className="text-[10px] font-normal">
+                        <Badge variant="secondary" className="text-xs font-normal">
                           {getOrgLabel(role.orgId)}
                         </Badge>
                       </div>

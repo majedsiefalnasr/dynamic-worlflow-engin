@@ -279,7 +279,7 @@ function Notifications() {
                         <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                           {n.body}
                         </div>
-                        <div className="text-[10px] text-muted-foreground mt-1">{n.time}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{n.time}</div>
                       </div>
                       <div
                         className="flex items-start gap-1 shrink-0"
