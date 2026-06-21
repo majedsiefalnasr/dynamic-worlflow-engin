@@ -15,19 +15,19 @@ import { toast } from "sonner";
 import {
   roleCatalogCell, orgsCell, getOrgLabel, logAudit, type RoleCatalogEntry,
 } from "@/lib/governance";
-import { DEMO_USERS, ROLE_LABELS, useAuth, type Role } from "@/lib/mock";
+import { DEMO_USERS, useAuth } from "@/lib/mock";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
 
 export const Route = createFileRoute("/admin/roles")({
   component: () => (
-    <RoleGuard allow={["platform_admin"]}>
+    <RoleGuard allow={["rc_platform_admin"]}>
       <RolesAdmin />
     </RoleGuard>
   ),
 });
 
 
-type Payload = { name: string; orgId: string; legacyRole: Role };
+type Payload = { name: string; orgId: string };
 
 function RolesAdmin() {
   const { user } = useAuth();
@@ -46,7 +46,7 @@ function RolesAdmin() {
   }, [roles, q, orgFilter]);
 
   function audit(action: string, ref: string, notes?: string) {
-    if (user) logAudit({ userId: user.id, userName: user.name, role: user.role, action, ref, notes });
+    if (user) logAudit({ userId: user.id, userName: user.name, role: user.roleId, action, ref, notes });
   }
 
   function add(p: Payload) {
@@ -81,7 +81,7 @@ function RolesAdmin() {
     <div>
       <PageHeader
         title="إدارة الأدوار"
-        subtitle="تعريف الأدوار المتاحة في النظام — كل دور يتبع جهة ويُربط بصلاحيات أساسية في محرّك سير العمل"
+        subtitle="تعريف الأدوار المتاحة في النظام وربط كل دور بالجهة التابعة له"
         breadcrumbs={[{ label: "الرئيسية", to: "/" }, { label: "إدارة الأدوار" }]}
         actions={
           <Dialog open={openAdd} onOpenChange={setOpenAdd}>
@@ -113,7 +113,6 @@ function RolesAdmin() {
             <tr className="text-right">
               <th className="px-4 py-3">اسم الدور</th>
               <th className="px-4 py-3">الجهة</th>
-              <th className="px-4 py-3">الصلاحيات الأساسية</th>
               <th className="px-4 py-3">المستخدمون</th>
               <th className="px-4 py-3">النوع</th>
               <th className="px-4 py-3">الحالة</th>
@@ -122,7 +121,7 @@ function RolesAdmin() {
           </thead>
           <tbody>
             {list.map((r) => {
-              const userCount = DEMO_USERS.filter((u) => u.role === r.legacyRole).length;
+              const userCount = DEMO_USERS.filter((u) => u.roleId === r.id).length;
               return (
                 <tr key={r.id} className="border-t hover:bg-muted/30">
                   <td className="px-4 py-3">
@@ -132,7 +131,6 @@ function RolesAdmin() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-xs">{getOrgLabel(r.orgId)}</td>
-                  <td className="px-4 py-3"><Badge variant="secondary" className="text-[10px]">{ROLE_LABELS[r.legacyRole]}</Badge></td>
                   <td className="px-4 py-3 text-xs tabular-nums">{userCount}</td>
                   <td className="px-4 py-3">
                     {r.builtin
@@ -161,7 +159,7 @@ function RolesAdmin() {
               );
             })}
             {list.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">لا توجد أدوار.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">لا توجد أدوار.</td></tr>
             )}
           </tbody>
         </table>
@@ -183,8 +181,6 @@ function RoleDialog({ title, initial, orgs, onSave }: {
   const [name, setName] = useState(initial?.name ?? "");
   const [orgId, setOrgId] = useState<string>(initial?.orgId ?? (orgs[0]?.id ?? "bank"));
   const valid = name.trim().length > 0 && orgId;
-  const defaultLegacyFor = (oid: string): Role =>
-    oid === "platform" ? "platform_admin" : oid === "committee" ? "support_member" : "bank_intake";
   return (
     <DialogContent dir="rtl" className="sm:max-w-md">
       <DialogHeader>
@@ -207,7 +203,7 @@ function RoleDialog({ title, initial, orgs, onSave }: {
         </div>
       </div>
       <DialogFooter>
-        <Button disabled={!valid} onClick={() => valid && onSave({ name: name.trim(), orgId, legacyRole: initial?.legacyRole ?? defaultLegacyFor(orgId) })}>
+        <Button disabled={!valid} onClick={() => valid && onSave({ name: name.trim(), orgId })}>
           {initial ? "حفظ التعديلات" : "إضافة الدور"}
         </Button>
       </DialogFooter>

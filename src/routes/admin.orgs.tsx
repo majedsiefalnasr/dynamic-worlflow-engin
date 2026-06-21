@@ -7,26 +7,38 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
-  orgsCell, teamsCell, roleCatalogCell, logAudit, type OrgRecord,
+  getOrgCategory, orgsCell, teamsCell, roleCatalogCell, logAudit,
+  type OrgCategory, type OrgRecord,
 } from "@/lib/governance";
 import { DEMO_USERS, useAuth } from "@/lib/mock";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
 
 export const Route = createFileRoute("/admin/orgs")({
   component: () => (
-    <RoleGuard allow={["platform_admin"]}>
+    <RoleGuard allow={["rc_platform_admin"]}>
       <OrgsAdmin />
     </RoleGuard>
   ),
 });
 
-type Payload = { label: string; isBank: boolean };
+type Payload = { label: string; category: OrgCategory };
+
+const ORG_CATEGORIES: {
+  value: OrgCategory;
+  label: string;
+  description: string;
+  icon: typeof Building2;
+}[] = [
+  { value: "bank", label: "بنوك", description: "البنوك التجارية وشركات الصرافة.", icon: Building2 },
+  { value: "committee", label: "اللجنة الوطنية", description: "الجهات التابعة للجنة الوطنية لتمويل الواردات.", icon: Landmark },
+  { value: "other", label: "أخرى", description: "الإدارات والجهات التي لا تنتمي للتصنيفين السابقين.", icon: Network },
+];
 
 function OrgsAdmin() {
   const { user } = useAuth();
@@ -43,7 +55,7 @@ function OrgsAdmin() {
   }, [orgs, q]);
 
   function audit(action: string, ref: string, notes?: string) {
-    if (user) logAudit({ userId: user.id, userName: user.name, role: user.role, action, ref, notes });
+    if (user) logAudit({ userId: user.id, userName: user.name, role: user.roleId, action, ref, notes });
   }
 
   function slug(s: string) {
@@ -54,14 +66,18 @@ function OrgsAdmin() {
   function add(p: Payload) {
     let id = slug(p.label);
     if (orgs.some((o) => o.id === id)) id = `${id}_${Date.now().toString(36)}`;
-    orgsCell.set((prev) => [...prev, { id, label: p.label, active: true, isBank: p.isBank }]);
+    orgsCell.set((prev) => [...prev, { id, label: p.label, active: true, category: p.category }]);
     audit("إضافة جهة", id, p.label);
     toast.success(`تمت إضافة الجهة "${p.label}"`);
     setOpenAdd(false);
   }
 
   function update(target: OrgRecord, p: Payload) {
-    orgsCell.set((prev) => prev.map((o) => o.id === target.id ? { ...o, label: p.label, isBank: p.isBank } : o));
+    orgsCell.set((prev) => prev.map((o) => (
+      o.id === target.id
+        ? { ...o, label: p.label, category: p.category, isBank: undefined }
+        : o
+    )));
     audit("تعديل جهة", target.id, p.label);
     toast.success("تم حفظ التعديلات");
     setEditing(null);
@@ -142,9 +158,7 @@ function OrgsAdmin() {
                   <td className="px-4 py-3 text-xs tabular-nums">{roleCount}</td>
                   <td className="px-4 py-3 text-xs tabular-nums">{userCount}</td>
                   <td className="px-4 py-3">
-                    {o.isBank
-                      ? <Badge className="bg-info/15 text-info border-0 gap-1"><Landmark className="h-3 w-3" /> بنوك</Badge>
-                      : <span className="text-xs text-muted-foreground">—</span>}
+                    <OrgCategoryBadge category={getOrgCategory(o)} />
                   </td>
                   <td className="px-4 py-3">
                     {o.builtin
@@ -188,7 +202,7 @@ function OrgsAdmin() {
 
 function OrgDialog({ title, initial, onSave }: { title: string; initial?: OrgRecord; onSave: (p: Payload) => void }) {
   const [label, setLabel] = useState(initial?.label ?? "");
-  const [isBank, setIsBank] = useState(initial?.isBank ?? false);
+  const [category, setCategory] = useState<OrgCategory>(getOrgCategory(initial));
   const valid = label.trim().length > 0;
   return (
     <DialogContent dir="rtl" className="sm:max-w-md">
@@ -201,22 +215,47 @@ function OrgDialog({ title, initial, onSave }: { title: string; initial?: OrgRec
           <Label>اسم الجهة *</Label>
           <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="مثال: شركات الصرافة" />
         </div>
-        <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
-          <div className="flex items-center gap-2">
-            <Landmark className="h-4 w-4 text-info" />
-            <div>
-              <Label className="cursor-pointer">بنوك</Label>
-              <p className="text-[11px] text-muted-foreground">حدّد إذا كانت هذه الجهة بنكاً (مثل: الصرافات).</p>
-            </div>
-          </div>
-          <Switch checked={isBank} onCheckedChange={setIsBank} />
+        <div className="space-y-2">
+          <Label>تصنيف الجهة *</Label>
+          <RadioGroup value={category} onValueChange={(value) => setCategory(value as OrgCategory)}>
+            {ORG_CATEGORIES.map((option) => {
+              const Icon = option.icon;
+              return (
+                <Label
+                  key={option.value}
+                  htmlFor={`org-category-${option.value}`}
+                  className="flex min-h-14 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
+                >
+                  <RadioGroupItem id={`org-category-${option.value}`} value={option.value} />
+                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-foreground">{option.label}</span>
+                    <span className="block text-[11px] font-normal leading-5 text-muted-foreground">
+                      {option.description}
+                    </span>
+                  </span>
+                </Label>
+              );
+            })}
+          </RadioGroup>
         </div>
       </div>
       <DialogFooter>
-        <Button disabled={!valid} onClick={() => valid && onSave({ label: label.trim(), isBank })}>
+        <Button disabled={!valid} onClick={() => valid && onSave({ label: label.trim(), category })}>
           {initial ? "حفظ التعديلات" : "إضافة الجهة"}
         </Button>
       </DialogFooter>
     </DialogContent>
+  );
+}
+
+function OrgCategoryBadge({ category }: { category: OrgCategory }) {
+  const option = ORG_CATEGORIES.find((item) => item.value === category) ?? ORG_CATEGORIES[2];
+  const Icon = option.icon;
+  return (
+    <Badge className="gap-1 border-0 bg-info/15 text-info">
+      <Icon className="h-3 w-3" />
+      {option.label}
+    </Badge>
   );
 }

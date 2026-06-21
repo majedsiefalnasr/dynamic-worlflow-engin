@@ -17,7 +17,7 @@ import { RoleGuard } from "@/components/workflow/RoleGuard";
 
 export const Route = createFileRoute("/admin/entities")({
   component: () => (
-    <RoleGuard allow={["platform_admin"]}>
+    <RoleGuard allow={["rc_platform_admin"]}>
       <EntitiesAdmin />
     </RoleGuard>
   ),
@@ -46,14 +46,14 @@ function EntitiesAdmin() {
   function add(p: EntityPayload) {
     const e: Entity = { id: `e_${Date.now()}`, type: "bank", ...p };
     entitiesCell.set((prev) => [...prev, e]);
-    if (user) logAudit({ userId: user.id, userName: user.name, role: user.role, action: "إضافة بنك جديد", ref: e.id, notes: e.name });
+    if (user) logAudit({ userId: user.id, userName: user.name, role: user.roleId, action: "إضافة بنك جديد", ref: e.id, notes: e.name });
     toast.success(`تم إضافة "${p.name}"`);
     setOpenAdd(false);
   }
 
   function update(id: string, p: EntityPayload) {
     entitiesCell.set((prev) => prev.map((x) => (x.id === id ? { ...x, ...p } : x)));
-    if (user) logAudit({ userId: user.id, userName: user.name, role: user.role, action: "تعديل بيانات بنك", ref: id, notes: p.name });
+    if (user) logAudit({ userId: user.id, userName: user.name, role: user.roleId, action: "تعديل بيانات بنك", ref: id, notes: p.name });
     toast.success("تم حفظ التعديلات");
     setEditing(null);
   }
@@ -61,7 +61,7 @@ function EntitiesAdmin() {
   function toggleStatus(e: Entity) {
     const next: Entity["status"] = e.status === "active" ? "suspended" : "active";
     entitiesCell.set((prev) => prev.map((x) => (x.id === e.id ? { ...x, status: next } : x)));
-    if (user) logAudit({ userId: user.id, userName: user.name, role: user.role, action: next === "active" ? "تفعيل بنك" : "إيقاف بنك", ref: e.id, notes: e.name });
+    if (user) logAudit({ userId: user.id, userName: user.name, role: user.roleId, action: next === "active" ? "تفعيل بنك" : "إيقاف بنك", ref: e.id, notes: e.name });
     toast.success(next === "active" ? `تم تفعيل ${e.name}` : `تم إيقاف ${e.name}`);
   }
 

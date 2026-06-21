@@ -18,7 +18,7 @@ import {
 } from "@/lib/workflow-engine";
 import { useAuth } from "@/lib/mock";
 import {
-  getLegacyWorkflowUser,
+  getWorkflowUser,
   instanceAmount,
   instanceCurrency,
   instanceGoodsType,
@@ -77,7 +77,7 @@ function WorkflowsHome() {
     if (!roleCanCreateRequest(user)) return toast.error("لا تملك صلاحية إنشاء طلب");
     if (!publishedVer) return toast.error("لا توجد نسخة منشورة");
 
-    const wfUser = getLegacyWorkflowUser(user);
+    const wfUser = getWorkflowUser(user);
     if (!wfUser) return toast.error("المستخدم غير مربوط بمحرّك سير العمل");
 
     const initial = getInitialStage(publishedVer.id);
@@ -96,7 +96,7 @@ function WorkflowsHome() {
         breadcrumbs={[{ label: "الرئيسية", to: "/" }, { label: "الطلبات" }]}
         actions={
           <>
-            {user?.role === "platform_admin" && (
+            {user?.roleId === "rc_platform_admin" && (
               <Link to="/admin/workflows" className="inline-block">
                 <Button variant="outline"><Workflow className="ms-1 h-4 w-4" /> مصمم سير العمل</Button>
               </Link>

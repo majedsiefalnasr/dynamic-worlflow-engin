@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
-import { ROLE_LABELS, useAuth, type Role } from "@/lib/mock";
+import { useAuth } from "@/lib/mock";
 import {
   MANAGED_SCREENS, SCREEN_CAP_LABELS,
   screenPermsCell, roleCatalogCell, getOrgLabel,
@@ -18,7 +18,7 @@ import { wfStore } from "@/lib/workflow-engine";
 
 export const Route = createFileRoute("/admin/screen-permissions")({
   component: () => (
-    <RoleGuard allow={["platform_admin"]} message="صلاحيات ظهور الشاشات متاحة لمسؤول النظام فقط.">
+    <RoleGuard allow={["rc_platform_admin"]} message="صلاحيات ظهور الشاشات متاحة لمسؤول النظام فقط.">
       <ScreenPermissionsAdmin />
     </RoleGuard>
   ),
@@ -56,16 +56,16 @@ function ScreenPermissionsAdmin() {
   wfStore.assignments.use();
   wfStore.versions.use();
   const roleRows = roleCatalog
-    .filter((r) => r.active && r.legacyRole !== "platform_admin")
+    .filter((r) => r.active && r.id !== "rc_platform_admin")
     .sort((a, b) => `${a.orgId}-${a.name}`.localeCompare(`${b.orgId}-${b.name}`));
 
   function toggle(screen: ManualScreenKey, label: string, role: RoleCatalogEntry, cap: ScreenCapability, enabled: boolean) {
-    setScreenPermission(screen, role.legacyRole, cap, enabled);
+    setScreenPermission(screen, role.id, cap, enabled);
     if (user) {
       logAudit({
         userId: user.id,
         userName: user.name,
-        role: user.role,
+        role: user.roleId,
         action: `${enabled ? "منح" : "إلغاء"} صلاحية ${SCREEN_CAP_LABELS[cap]}`,
         ref: `${screen}:${role.id}`,
         notes: `${label} — ${role.name}`,
@@ -143,7 +143,7 @@ function ScreenPermissionsAdmin() {
             </thead>
             <tbody>
               {roleRows.map((role) => {
-                const reqAccess = requestsAccessForRole(role.legacyRole);
+                const reqAccess = requestsAccessForRole(role.id);
                 return (
                   <tr key={role.id} className="border-t hover:bg-muted/20">
                     <td className="px-5 py-3 font-medium sticky inset-s-0 bg-card z-10">
@@ -152,11 +152,6 @@ function ScreenPermissionsAdmin() {
                         <Badge variant="secondary" className="text-[10px] font-normal">
                           {getOrgLabel(role.orgId)}
                         </Badge>
-                        {role.name !== ROLE_LABELS[role.legacyRole] && (
-                          <Badge variant="outline" className="text-[10px] font-normal">
-                            {ROLE_LABELS[role.legacyRole]}
-                          </Badge>
-                        )}
                       </div>
                     </td>
                     {GROUPS.map((g) =>
@@ -173,8 +168,8 @@ function ScreenPermissionsAdmin() {
                                 <X className="h-4 w-4 text-muted-foreground/40" />
                               )
                             ) : (() => {
-                              const checked = manualScreenCan(role.legacyRole, g.key, c.cap);
-                              const viewLockedByAdd = c.cap === "view" && manualScreenCan(role.legacyRole, g.key, "add");
+                              const checked = manualScreenCan(role.id, g.key, c.cap);
+                              const viewLockedByAdd = c.cap === "view" && manualScreenCan(role.id, g.key, "add");
                               return (
                                 <Switch
                                   checked={checked}

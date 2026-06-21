@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { auth, DEMO_USERS, ROLE_LABELS } from "@/lib/mock";
-import { syncWfUserFromLegacy } from "@/lib/workflow-bridge";
+import { syncWorkflowUser } from "@/lib/workflow-bridge";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/login")({ component: Login });
@@ -25,7 +25,7 @@ function Login() {
     e.preventDefault();
     const u = DEMO_USERS.find((u) => u.id === selectedUserId)!;
     auth.login(u);
-    syncWfUserFromLegacy(u);
+    syncWorkflowUser(u);
     nav({ to: "/" });
   };
 
@@ -120,7 +120,7 @@ function Login() {
                         <div className="text-[10px] text-muted-foreground truncate">{u.org}</div>
                       </div>
                       <span className="shrink-0 px-2 py-0.5 rounded-full bg-muted text-[10px]">
-                        {ROLE_LABELS[u.role]}
+                        {ROLE_LABELS[u.roleId] ?? u.roleId}
                       </span>
                     </button>
                   ))}
@@ -163,7 +163,7 @@ function Login() {
                   <div className="text-xs text-muted-foreground leading-relaxed">
                     سيتم تسجيل دخولك بصلاحيات:{" "}
                     <span className="font-semibold text-foreground">
-                      {ROLE_LABELS[selected.role]}
+                      {ROLE_LABELS[selected.roleId] ?? selected.roleId}
                     </span>
                   </div>
                 </div>

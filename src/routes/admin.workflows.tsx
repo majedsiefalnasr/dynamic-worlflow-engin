@@ -70,7 +70,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/workflows")({
   component: () => (
-    <RoleGuard allow={["platform_admin"]} message="مصمم سير العمل متاح لمسؤول النظام فقط.">
+    <RoleGuard allow={["rc_platform_admin"]} message="مصمم سير العمل متاح لمسؤول النظام فقط.">
       <DesignerPage />
     </RoleGuard>
   ),
@@ -1185,22 +1185,26 @@ function FieldsTab({ versionId }: { versionId: string }) {
   const [label, setLabel] = useState("");
   const [type, setType] = useState<FieldDefinition["type"]>("text");
   const [options, setOptions] = useState("");
-  const [sourceValue, setSourceValue] = useState<DynamicSourceOption>("merchants");
+  const [sourceValue, setSourceValue] = useState<DynamicSourceOption>(
+    () => (referenceTables[0] ? referenceSourceValue(referenceTables[0].key) : ("" as DynamicSourceOption)),
+  );
   const [groupId, setGroupId] = useState<string>(NO_GROUP);
   const [groupName, setGroupName] = useState("");
+  // Merchant name and linked company are derived from the tax number, so they
+  // are not offered as dynamic-list sources — only reference tables are.
   const dynamicSourceOptions = useMemo(
-    () => [
-      ...DYNAMIC_SOURCES,
-      ...referenceTables.map((t) => ({
+    () =>
+      referenceTables.map((t) => ({
         value: referenceSourceValue(t.key),
         label: t.label,
       })),
-    ],
     [referenceTables],
   );
 
   const add = () => {
     if (!key || !label) return toast.error("الرمز والوصف مطلوبان");
+    if (type === "dynamic_select" && !isReferenceSourceValue(sourceValue))
+      return toast.error("اختر مصدر البيانات");
     const dynamicSource =
       type === "dynamic_select"
         ? isReferenceSourceValue(sourceValue)
@@ -1232,7 +1236,7 @@ function FieldsTab({ versionId }: { versionId: string }) {
     setKey("");
     setLabel("");
     setOptions("");
-    setSourceValue("merchants");
+    setSourceValue(referenceTables[0] ? referenceSourceValue(referenceTables[0].key) : ("" as DynamicSourceOption));
   };
   const remove = (id: string) => {
     const f = fields.find((x) => x.id === id);

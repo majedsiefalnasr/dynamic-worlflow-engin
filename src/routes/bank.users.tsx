@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Users as UsersIcon, Edit, Search, Power, ShieldCheck } from "lucide-react";
+import { Plus, Users as UsersIcon, Edit, Search, Power, ShieldCheck, type LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DEMO_USERS, ROLE_LABELS, useAuth, ENTITIES, BANK_ROLES, type User, type Role } from "@/lib/mock";
+import { DEMO_USERS, saveUsers, useAuth, ENTITIES, type User, type RoleId } from "@/lib/mock";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { logAudit } from "@/lib/governance";
+import { logAudit, roleCatalogCell, teamsCell } from "@/lib/governance";
+import { upsertWorkflowUser } from "@/lib/workflow-bridge";
 
 export const Route = createFileRoute("/bank/users")({ component: BankUsers });
 
@@ -21,30 +22,34 @@ function BankUsers() {
   const [openAdd, setOpenAdd] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [q, setQ] = useState("");
-  const [roleFilter, setRoleFilter] = useState<"all" | Role>("all");
+  const roles = roleCatalogCell.use().filter((role) => role.active && role.orgId === "bank");
+  const teams = teamsCell.use();
+  const [roleFilter, setRoleFilter] = useState<"all" | RoleId>("all");
+  const entityId = user?.entityId;
+  const entity = ENTITIES.find((candidate) => candidate.id === entityId);
 
-  if (!user) return null;
-  if (user.role !== "bank_admin") {
-    return <div className="p-6 text-sm text-muted-foreground">هذه الصفحة مخصصة لمسؤول الجهة فقط.</div>;
-  }
-  const entity = ENTITIES.find((e) => e.id === user.entityId);
   const list = useMemo(() => {
     void version;
     const s = q.trim().toLowerCase();
-    return DEMO_USERS.filter((u) => u.entityId === user.entityId)
-      .filter((u) => roleFilter === "all" || u.role === roleFilter)
+    return DEMO_USERS.filter((u) => u.entityId === entityId)
+      .filter((u) => roleFilter === "all" || u.roleId === roleFilter)
       .filter((u) => !s || u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s));
-  }, [version, q, roleFilter, user.entityId]);
+  }, [version, q, roleFilter, entityId]);
 
   const stats = useMemo(() => {
     void version;
-    const all = DEMO_USERS.filter((u) => u.entityId === user.entityId);
+    const all = DEMO_USERS.filter((u) => u.entityId === entityId);
     return {
       total: all.length,
       active: all.filter((u) => u.active !== false).length,
       inactive: all.filter((u) => u.active === false).length,
     };
-  }, [version, user.entityId]);
+  }, [version, entityId]);
+
+  if (!user) return null;
+  if (user.roleId !== "rc_bank_admin") {
+    return <div className="p-6 text-sm text-muted-foreground">هذه الصفحة مخصصة لمسؤول الجهة فقط.</div>;
+  }
 
   function refresh() { setVersion((v) => v + 1); }
 
@@ -54,10 +59,11 @@ function BankUsers() {
     const next = u.active === false;
     DEMO_USERS[idx] = { ...DEMO_USERS[idx], active: next };
     logAudit({
-      userId: user!.id, userName: user!.name, role: user!.role,
+      userId: user!.id, userName: user!.name, role: user!.roleId,
       action: next ? "تفعيل موظف" : "إلغاء تفعيل موظف",
       ref: u.email, notes: u.name,
     });
+    saveUsers();
     toast.success(next ? `تم تفعيل ${u.name}` : `تم إلغاء تفعيل ${u.name}`);
     refresh();
   }
@@ -75,17 +81,22 @@ function BankUsers() {
             </DialogTrigger>
             <UserDialog
               title="إضافة موظف للجهة"
+              roles={roles}
               onSave={(payload) => {
                 const u: User = {
                   id: `u${Date.now()}`,
                   ...payload,
                   entityId: user!.entityId,
+                  orgKind: "bank",
+                  teamId: teams.find((team) => team.roleCode === payload.roleId)?.id,
                   org: entity?.name ?? "",
                   avatar: payload.name.split(" ").map((s) => s[0]).join("").slice(0, 2),
                   active: true,
                 };
                 DEMO_USERS.push(u);
-                logAudit({ userId: user!.id, userName: user!.name, role: user!.role, action: "إضافة موظف للجهة", ref: u.email, notes: `${u.name} — ${ROLE_LABELS[u.role]}` });
+                upsertWorkflowUser(u);
+                saveUsers();
+                logAudit({ userId: user!.id, userName: user!.name, role: user!.roleId, action: "إضافة موظف للجهة", ref: u.email, notes: `${u.name} — ${roles.find((role) => role.id === u.roleId)?.name ?? u.roleId}` });
                 toast.success(`تمت إضافة ${u.name}`);
                 refresh();
                 setOpenAdd(false);
@@ -106,11 +117,11 @@ function BankUsers() {
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} className="pr-10" placeholder="بحث بالاسم أو البريد..." />
         </div>
-        <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as any)}>
+        <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as "all" | RoleId)}>
           <SelectTrigger className="w-full sm:w-56"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">كل الأدوار</SelectItem>
-            {BANK_ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}
+            {roles.map((role) => <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>)}
           </SelectContent>
         </Select>
       </Card>
@@ -139,7 +150,7 @@ function BankUsers() {
                   </div>
                 </td>
                 <td className="px-4 py-3 text-xs">{u.email}</td>
-                <td className="px-4 py-3"><Badge variant="secondary">{ROLE_LABELS[u.role]}</Badge></td>
+                <td className="px-4 py-3"><Badge variant="secondary">{roles.find((role) => role.id === u.roleId)?.name ?? u.roleId}</Badge></td>
                 <td className="px-4 py-3">
                   {u.active === false
                     ? <Badge className="bg-destructive/15 text-destructive border-0">غير نشط</Badge>
@@ -177,16 +188,20 @@ function BankUsers() {
           <UserDialog
             title="تعديل بيانات الموظف"
             initial={editing}
+            roles={roles}
             onSave={(payload) => {
               const idx = DEMO_USERS.findIndex((x) => x.id === editing.id);
               if (idx >= 0) {
                 DEMO_USERS[idx] = {
                   ...DEMO_USERS[idx],
                   ...payload,
+                  teamId: teams.find((team) => team.roleCode === payload.roleId)?.id,
                   avatar: payload.name.split(" ").map((s) => s[0]).join("").slice(0, 2),
                 };
+                upsertWorkflowUser(DEMO_USERS[idx]);
+                saveUsers();
               }
-              logAudit({ userId: user!.id, userName: user!.name, role: user!.role, action: "تعديل بيانات موظف", ref: editing.email, notes: payload.name });
+              logAudit({ userId: user!.id, userName: user!.name, role: user!.roleId, action: "تعديل بيانات موظف", ref: editing.email, notes: payload.name });
               toast.success("تم حفظ التعديلات");
               refresh();
               setEditing(null);
@@ -198,7 +213,7 @@ function BankUsers() {
   );
 }
 
-function StatCard({ label, value, icon: Icon, tone }: { label: string; value: number; icon: any; tone: string }) {
+function StatCard({ label, value, icon: Icon, tone }: { label: string; value: number; icon: LucideIcon; tone: string }) {
   return (
     <Card className="p-4 shadow-card border-0">
       <div className={`h-9 w-9 rounded-lg grid place-items-center ${tone}`}>
@@ -210,13 +225,13 @@ function StatCard({ label, value, icon: Icon, tone }: { label: string; value: nu
   );
 }
 
-type UserPayload = { name: string; email: string; role: Role; phone?: string };
+type UserPayload = { name: string; email: string; roleId: RoleId; phone?: string };
 
-function UserDialog({ title, initial, onSave }: { title: string; initial?: User; onSave: (u: UserPayload) => void }) {
+function UserDialog({ title, initial, roles, onSave }: { title: string; initial?: User; roles: { id: string; name: string }[]; onSave: (u: UserPayload) => void }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
-  const [role, setRole] = useState<Role>(initial?.role ?? "bank_intake");
+  const [roleId, setRoleId] = useState<RoleId>(initial?.roleId ?? roles[0]?.id ?? "rc_bank_intake");
   const valid = name.trim() && /\S+@\S+\.\S+/.test(email);
 
   return (
@@ -231,16 +246,16 @@ function UserDialog({ title, initial, onSave }: { title: string; initial?: User;
         <div className="space-y-1.5"><Label>الهاتف</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+9677…" /></div>
         <div className="space-y-1.5">
           <Label>الدور الفرعي *</Label>
-          <Select value={role} onValueChange={(v) => setRole(v as Role)}>
+          <Select value={roleId} onValueChange={setRoleId}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              {BANK_ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}
+              {roles.map((role) => <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
       </div>
       <DialogFooter>
-        <Button onClick={() => valid && onSave({ name: name.trim(), email: email.trim(), phone: phone.trim() || undefined, role })} disabled={!valid}>
+        <Button onClick={() => valid && onSave({ name: name.trim(), email: email.trim(), phone: phone.trim() || undefined, roleId })} disabled={!valid}>
           {initial ? "حفظ التعديلات" : "إضافة الموظف"}
         </Button>
       </DialogFooter>

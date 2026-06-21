@@ -121,7 +121,7 @@ function bucketLabel(time: string) {
 function Notifications() {
   const items = notificationsCell.use();
   const auth = useAuth();
-  const role = auth?.user?.role;
+  const role = auth?.user?.roleId;
 
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
@@ -136,7 +136,7 @@ function Notifications() {
           n.audience === "all" ||
           n.audience === role ||
           (n.audience === "cby" &&
-            ["platform_admin", "support_member", "executive_member"].includes(role)),
+            ["rc_platform_admin", "rc_support_member", "rc_executive_member"].includes(role)),
       );
     }
     if (filter === "unread") xs = xs.filter((n) => n.unread);

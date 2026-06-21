@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
-  ArrowLeft, ShieldCheck, Lock, MessageSquare, Download, Eye,
+  ArrowLeft, ShieldCheck, Lock, MessageSquare, Download,
   User as UserIcon, Building2, MapPin, CalendarDays, Activity,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -20,6 +20,7 @@ import {
 } from "@/lib/workflow-engine";
 import { useWfUser } from "@/lib/workflow-engine/wfAuth";
 import { useAuth } from "@/lib/mock";
+import { getOrgCategory } from "@/lib/governance";
 import {
   canScreen, progressForInstance, instanceRef, instanceTitle,
   instanceGoodsType, instanceAmount, instanceCurrency, isDuplicateInvoice,
@@ -50,7 +51,7 @@ function InstancePage() {
   wfStore.assignments.use();
   const user = useWfUser();
   const { user: legacyUser } = useAuth();
-  const isAdmin = legacyUser?.role === "platform_admin";
+  const isAdmin = legacyUser?.roleId === "rc_platform_admin";
   const canActOnRequests = canScreen(legacyUser, "requests", "edit");
 
   const instance = instances.find((i) => i.id === id);
@@ -85,6 +86,7 @@ function InstancePage() {
   const canSeeStage = isAdmin || canView(instance.currentStageId, user);
   // تعديل الحقول مسموح فقط لمن يملك صلاحية التنفيذ على المرحلة + صلاحية شاشة الطلبات.
   const canEditFields = isExecutor && canActOnRequests;
+  const showActionPanel = canSeeStage && isExecutor && canActOnRequests;
   const history = getInstanceHistory(instance.id);
 
   const progress = progressForInstance(instance);
@@ -97,6 +99,7 @@ function InstancePage() {
   }
 
   const checkDuplicate = () => {
+    if (getOrgCategory(legacyUser?.orgKind) !== "committee") return false;
     const { duplicate, refs } = isDuplicateInvoice(draftData, instance.id);
     if (duplicate) {
       toast.error(`فاتورة مكررة (كلي) — نفس الرقم الضريبي ورقم الفاتورة موجود في: ${refs.join("، ")}`);
@@ -219,50 +222,35 @@ function InstancePage() {
           </Card>
 
           {/* Actions */}
-          {canSeeStage && (
+          {showActionPanel && (
             <Card className="p-5">
               <h2 className="font-semibold mb-4">الإجراءات المتاحة</h2>
-              {!user && <p className="text-sm text-muted-foreground">اختر مستخدمًا من صفحة سير العمل لتنفيذ الإجراءات.</p>}
-              {user && !isExecutor && (
-                <Button variant="outline" size="sm" onClick={() => document.getElementById("request-data")?.scrollIntoView({ behavior: "smooth" })}>
-                  <Eye className="ms-1 h-4 w-4" /> عرض بيانات الطلب
-                </Button>
-              )}
-              {isExecutor && !canActOnRequests && (
-                <Button variant="outline" size="sm" onClick={() => document.getElementById("request-data")?.scrollIntoView({ behavior: "smooth" })}>
-                  <Eye className="ms-1 h-4 w-4" /> عرض بيانات الطلب
-                </Button>
-              )}
-              {isExecutor && canActOnRequests && (
-                <>
-                  <div className="space-y-1.5 mb-4">
-                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                      <MessageSquare className="h-3.5 w-3.5" /> ملاحظات (اختيارية)
-                    </label>
-                    <Textarea value={comments} onChange={(e) => setComments(e.target.value)} rows={2} />
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="secondary" onClick={onSaveDraft}>حفظ المسودة</Button>
-                    {actions.length === 0 && (
-                      <span className="text-xs text-muted-foreground self-center">
-                        لا توجد انتقالات معرَّفة لهذه المرحلة.
-                      </span>
-                    )}
-                    {actions.map((a) => {
-                      const isReject = /REJECT/i.test(a.actionCode);
-                      return (
-                        <Button
-                          key={a.id}
-                          variant={isReject ? "destructive" : "default"}
-                          onClick={() => onAction(a.id, a.actionName)}
-                        >
-                          {a.actionName}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
+              <div className="space-y-1.5 mb-4">
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <MessageSquare className="h-3.5 w-3.5" /> ملاحظات (اختيارية)
+                </label>
+                <Textarea value={comments} onChange={(e) => setComments(e.target.value)} rows={2} />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={onSaveDraft}>حفظ المسودة</Button>
+                {actions.length === 0 && (
+                  <span className="text-xs text-muted-foreground self-center">
+                    لا توجد انتقالات معرَّفة لهذه المرحلة.
+                  </span>
+                )}
+                {actions.map((a) => {
+                  const isReject = /REJECT/i.test(a.actionCode);
+                  return (
+                    <Button
+                      key={a.id}
+                      variant={isReject ? "destructive" : "default"}
+                      onClick={() => onAction(a.id, a.actionName)}
+                    >
+                      {a.actionName}
+                    </Button>
+                  );
+                })}
+              </div>
             </Card>
           )}
         </div>

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Users as UsersIcon, Edit, Power, Search, Building2, Landmark, ShieldCheck, Trash2 } from "lucide-react";
+import { Plus, Users as UsersIcon, Edit, Power, Search, Building2, Landmark, ShieldCheck, Trash2, type LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/teams")({
   component: () => (
-    <RoleGuard allow={["platform_admin"]}>
+    <RoleGuard allow={["rc_platform_admin"]}>
       <TeamsAdmin />
     </RoleGuard>
   ),
@@ -57,13 +57,12 @@ function TeamsAdmin() {
   }), [teams]);
 
   function audit(action: string, ref: string, notes?: string) {
-    if (user) logAudit({ userId: user.id, userName: user.name, role: user.role, action, ref, notes });
+    if (user) logAudit({ userId: user.id, userName: user.name, role: user.roleId, action, ref, notes });
   }
 
   function add(p: Payload) {
     const id = `team_${Date.now()}`;
-    // roleCode kept internally for backward-compat; admin now picks role per-user.
-    const t: TeamRecord = { id, label: p.label, orgKind: p.orgKind, roleCode: "bank_intake", active: true };
+    const t: TeamRecord = { id, label: p.label, orgKind: p.orgKind, roleCode: "rc_bank_intake", active: true };
     teamsCell.set((prev) => [...prev, t]);
     audit("إضافة فريق", id, p.label);
     toast.success(`تمت إضافة الفريق "${p.label}"`);
@@ -214,7 +213,7 @@ function TeamsAdmin() {
   );
 }
 
-function StatCard({ label, value, icon: Icon, tone }: { label: string; value: number; icon: any; tone: string }) {
+function StatCard({ label, value, icon: Icon, tone }: { label: string; value: number; icon: LucideIcon; tone: string }) {
   return (
     <Card className="p-4 shadow-card border-0">
       <div className={cn("h-9 w-9 rounded-lg grid place-items-center", tone)}>

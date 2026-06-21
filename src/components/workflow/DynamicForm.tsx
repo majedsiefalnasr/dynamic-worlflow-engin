@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Search, Upload } from "lucide-react";
+import { useRef, useState } from "react";
+import { Check, ChevronLeft, ChevronRight, FileText, Search, Upload } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -76,7 +76,16 @@ interface Props {
 }
 
 const UNGROUPED_ID = "__ungrouped";
-const LOCKED_MERCHANT_FIELDS = new Set(["taxCardExpiry", "commercialRegistration", "commercialRegistrationExpiry"]);
+// Merchant data is auto-filled from the tax number (and the linked-company
+// selection), so these fields are always view-only. `linkedCompany` stays
+// editable because picking it is what drives the commercial-registration fields.
+const LOCKED_MERCHANT_FIELDS = new Set([
+  "importerName",
+  "taxCardExpiry",
+  "commercialRegistration",
+  "commercialRegistrationExpiry",
+  "owners",
+]);
 
 /**
  * Metadata-driven form renderer. Reads field defs + per-stage rules and
@@ -130,6 +139,7 @@ export function DynamicForm({ fields, value, onChange, groups, readOnly = false 
   // the stage rules mark it editable (e.g. admin viewing a draft).
   const effFields = readOnly ? fields.map((f) => ({ ...f, editable: false })) : fields;
   const visible = effFields.filter((f) => f.visible);
+  const hasEditableFields = visible.some((field) => field.editable);
 
   if (visible.length === 0) {
     return <p className="text-sm text-muted-foreground">لا توجد حقول معروضة لهذه المرحلة.</p>;
@@ -148,6 +158,10 @@ export function DynamicForm({ fields, value, onChange, groups, readOnly = false 
     tabs.push({ id: UNGROUPED_ID, name: "عام", items: ungrouped });
   }
 
+  if (readOnly || !hasEditableFields) {
+    return <ReadOnlyForm tabs={tabs} value={value} />;
+  }
+
   const tabIds = tabs.map((t) => t.id);
   const wizardSteps = [...tabs, { id: "__review", name: "المراجعة والإرسال", items: [] }];
   const wizardIds = wizardSteps.map((t) => t.id);
@@ -159,10 +173,6 @@ export function DynamicForm({ fields, value, onChange, groups, readOnly = false 
   const currentStep = wizardSteps[idx];
   const currentItems = currentStep.id === "__review" ? [] : currentStep.items;
   const missingCurrent = requiredMissing(currentItems, value);
-
-  useEffect(() => {
-    if (!activeTab && tabs[0]) setActiveTab(tabs[0].id);
-  }, [activeTab, tabs]);
 
   const goNext = () => {
     if (missingCurrent.length > 0) {
@@ -232,6 +242,87 @@ export function DynamicForm({ fields, value, onChange, groups, readOnly = false 
       </div>
     </Tabs>
   );
+}
+
+function ReadOnlyForm({
+  tabs, value,
+}: {
+  tabs: { id: string; name: string; items: DynamicField[] }[];
+  value: Record<string, unknown>;
+}) {
+  const [activeTab, setActiveTab] = useState(tabs[0]?.id ?? "");
+  const current = tabs.some((tab) => tab.id === activeTab) ? activeTab : tabs[0]?.id;
+
+  if (!current) {
+    return <p className="text-sm text-muted-foreground">لا توجد بيانات للعرض.</p>;
+  }
+
+  return (
+    <Tabs value={current} onValueChange={setActiveTab}>
+      {tabs.length > 1 && (
+        <TabsList className="mb-5 flex h-auto w-full flex-wrap justify-start gap-1 rounded-lg bg-muted/60 p-1">
+          {tabs.map((tab) => (
+            <TabsTrigger
+              key={tab.id}
+              value={tab.id}
+              className="min-h-10 flex-none px-4 data-[state=active]:bg-background"
+            >
+              {tab.name}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      )}
+      {tabs.map((tab) => (
+        <TabsContent key={tab.id} value={tab.id} className="mt-0">
+          <dl className="grid grid-cols-1 gap-x-8 gap-y-0 md:grid-cols-2">
+            {tab.items.map((field) => (
+              <ReadOnlyField
+                key={field.def.id}
+                field={field}
+                value={value[field.def.key]}
+              />
+            ))}
+          </dl>
+        </TabsContent>
+      ))}
+    </Tabs>
+  );
+}
+
+function ReadOnlyField({ field, value }: { field: DynamicField; value: unknown }) {
+  const isLongText = field.def.type === "textarea";
+  const isFile = field.def.type === "file";
+
+  return (
+    <div className={`border-b py-3.5 last:border-b-0 ${isLongText ? "md:col-span-2" : ""}`}>
+      <dt className="mb-1 text-xs font-medium text-muted-foreground">{field.def.label}</dt>
+      <dd className={`text-sm font-medium leading-6 text-foreground ${isLongText ? "whitespace-pre-wrap" : "break-words"}`}>
+        {isFile && hasValue(value) ? (
+          <span className="inline-flex max-w-full items-center gap-2 rounded-md bg-muted/70 px-2.5 py-1.5">
+            <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="truncate">{String(value)}</span>
+          </span>
+        ) : (
+          formatDisplayValue(field.def.type, value)
+        )}
+      </dd>
+    </div>
+  );
+}
+
+function hasValue(value: unknown) {
+  return value !== undefined && value !== null && value !== "";
+}
+
+function formatDisplayValue(type: FieldDefinition["type"], value: unknown): string {
+  if (!hasValue(value)) return "غير متوفر";
+  if (typeof value === "boolean") return value ? "نعم" : "لا";
+  if (typeof value === "number") return value.toLocaleString("en-US");
+  if (type === "date" && typeof value === "string") {
+    const date = new Date(`${value}T00:00:00`);
+    if (!Number.isNaN(date.getTime())) return date.toLocaleDateString("ar");
+  }
+  return String(value);
 }
 
 function FieldsGrid({

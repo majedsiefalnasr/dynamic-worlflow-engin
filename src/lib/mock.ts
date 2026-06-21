@@ -5,28 +5,50 @@ import { useSyncExternalStore } from "react";
 // Request lifecycle data lives exclusively in `workflow-engine`.
 // ============================================================
 
-export type Role =
-  | "platform_admin"
-  | "bank_admin"
-  | "bank_intake"
-  | "bank_reviewer"
-  | "bank_swift"
-  | "support_member"
-  | "executive_member"
-  | "committee_manager";
+export type RoleId =
+  | "rc_platform_admin"
+  | "rc_bank_admin"
+  | "rc_bank_intake"
+  | "rc_bank_reviewer"
+  | "rc_bank_swift"
+  | "rc_support_member"
+  | "rc_executive_member"
+  | "rc_committee_manager"
+  | (string & {});
 
-export const ROLE_LABELS: Record<Role, string> = {
-  platform_admin: "مسؤول النظام (CBY)",
-  bank_admin: "مسؤول البنك التجاري",
-  bank_intake: "موظف إدخال البنك التجاري",
-  bank_reviewer: "مراجع داخلي بالبنك التجاري",
-  bank_swift: "موظف العمليات الخارجية بالبنك التجاري",
-  support_member: "عضو اللجنة المساندة",
-  executive_member: "عضو اللجنة التنفيذية",
-  committee_manager: "مدير اللجنة التنفيذية",
+export const ROLE_LABELS: Record<string, string> = {
+  rc_platform_admin: "مسؤول النظام (CBY)",
+  rc_bank_admin: "مسؤول البنك التجاري",
+  rc_bank_intake: "موظف إدخال البنك التجاري",
+  rc_bank_reviewer: "مراجع داخلي بالبنك التجاري",
+  rc_bank_swift: "موظف العمليات الخارجية بالبنك التجاري",
+  rc_support_member: "عضو اللجنة المساندة",
+  rc_executive_member: "عضو اللجنة التنفيذية",
+  rc_committee_manager: "مدير اللجنة التنفيذية",
 };
 
-export const BANK_ROLES: Role[] = ["bank_admin", "bank_intake", "bank_reviewer", "bank_swift"];
+export const BANK_ROLE_IDS: RoleId[] = [
+  "rc_bank_admin",
+  "rc_bank_intake",
+  "rc_bank_reviewer",
+  "rc_bank_swift",
+];
+
+const STORED_ROLE_ID_ALIASES: Record<string, RoleId> = {
+  platform_admin: "rc_platform_admin",
+  bank_admin: "rc_bank_admin",
+  bank_intake: "rc_bank_intake",
+  bank_reviewer: "rc_bank_reviewer",
+  bank_swift: "rc_bank_swift",
+  support_member: "rc_support_member",
+  executive_member: "rc_executive_member",
+  committee_manager: "rc_committee_manager",
+};
+
+export function normalizeRoleId(roleId: string | null | undefined): RoleId {
+  if (!roleId) return "rc_bank_intake";
+  return STORED_ROLE_ID_ALIASES[roleId] ?? roleId;
+}
 
 export type Entity = {
   id: string;
@@ -66,22 +88,22 @@ export const TEAM_LABELS: Record<TeamId, string> = {
 export const BANK_TEAMS: TeamId[] = ["team_entry", "team_internal", "team_fx", "team_admin_bank"];
 export const COMMITTEE_TEAMS: TeamId[] = ["team_support", "team_exec", "team_fx_confirm"];
 
-export const TEAM_ROLE: Record<TeamId, Role> = {
-  team_entry: "bank_intake",
-  team_internal: "bank_reviewer",
-  team_fx: "bank_swift",
-  team_admin_bank: "bank_admin",
-  team_support: "support_member",
-  team_exec: "executive_member",
-  team_fx_confirm: "committee_manager",
-  team_platform_admin: "platform_admin",
+export const TEAM_ROLE: Record<TeamId, RoleId> = {
+  team_entry: "rc_bank_intake",
+  team_internal: "rc_bank_reviewer",
+  team_fx: "rc_bank_swift",
+  team_admin_bank: "rc_bank_admin",
+  team_support: "rc_support_member",
+  team_exec: "rc_executive_member",
+  team_fx_confirm: "rc_committee_manager",
+  team_platform_admin: "rc_platform_admin",
 };
 
 export type User = {
   id: string;
   name: string;
   email: string;
-  role: Role;
+  roleId: RoleId;
   entityId: string | null;
   org: string;
   avatar: string;
@@ -89,22 +111,21 @@ export type User = {
   phone?: string;
   orgKind?: OrgKind;
   teamId?: TeamId;
-  roleId?: string;
 };
 
 export const DEMO_USERS: User[] = [
-  { id: "u1", name: "ياسر الحضرمي", email: "admin@cby.gov.ye", role: "platform_admin", entityId: null, org: "البنك المركزي – إدارة الأنظمة", avatar: "يح", teamId: "team_platform_admin" },
-  { id: "u4", name: "أحمد المقطري", email: "admin@ybank.ye", role: "bank_admin", entityId: "e1", org: "البنك اليمني للإنشاء والتعمير — فريق الإدارة (البنك)", avatar: "أم", orgKind: "bank", teamId: "team_admin_bank" },
-  { id: "u5", name: "علي القاضي", email: "intake@ybank.ye", role: "bank_intake", entityId: "e1", org: "البنك اليمني للإنشاء والتعمير — فريق الإدخال", avatar: "عق", orgKind: "bank", teamId: "team_entry" },
-  { id: "u6", name: "نوال الحاج", email: "reviewer@ybank.ye", role: "bank_reviewer", entityId: "e1", org: "البنك اليمني للإنشاء والتعمير — فريق المراجعة الداخلية", avatar: "نح", orgKind: "bank", teamId: "team_internal" },
-  { id: "u2", name: "محمد الشامي", email: "m.shami@cby.gov.ye", role: "support_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة المساندة", avatar: "مش", orgKind: "committee", teamId: "team_support" },
-  { id: "u7", name: "سامي العتمي", email: "swift@ybank.ye", role: "bank_swift", entityId: "e1", org: "البنك اليمني للإنشاء والتعمير — فريق العمليات الخارجية", avatar: "سع", orgKind: "bank", teamId: "team_fx" },
-  { id: "u9", name: "د. هدى الإرياني", email: "huda@cby.gov.ye", role: "committee_manager", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق تأكيد العمليات", avatar: "هإ", orgKind: "committee", teamId: "team_fx_confirm" },
-  { id: "u10", name: "م. سامي الذماري", email: "sami@cby.gov.ye", role: "executive_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة التنفيذية", avatar: "سذ", orgKind: "committee", teamId: "team_exec" },
-  { id: "u11", name: "د. ندى الكبسي", email: "nada@cby.gov.ye", role: "executive_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة التنفيذية", avatar: "نك", orgKind: "committee", teamId: "team_exec" },
-  { id: "u12", name: "أ. فهد الشرعبي", email: "fahd@cby.gov.ye", role: "executive_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة التنفيذية", avatar: "فش", orgKind: "committee", teamId: "team_exec" },
-  { id: "u13", name: "د. أمينة العزب", email: "amina@cby.gov.ye", role: "executive_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة التنفيذية", avatar: "أع", orgKind: "committee", teamId: "team_exec" },
-  { id: "u14", name: "م. خالد الأنسي", email: "khaled@cby.gov.ye", role: "executive_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة التنفيذية", avatar: "خأ", orgKind: "committee", teamId: "team_exec" },
+  { id: "u1", name: "ياسر الحضرمي", email: "admin@cby.gov.ye", roleId: "rc_platform_admin", entityId: null, org: "البنك المركزي – إدارة الأنظمة", avatar: "يح", orgKind: "platform", teamId: "team_platform_admin" },
+  { id: "u4", name: "أحمد المقطري", email: "admin@ybank.ye", roleId: "rc_bank_admin", entityId: "e1", org: "البنك اليمني للإنشاء والتعمير — فريق الإدارة (البنك)", avatar: "أم", orgKind: "bank", teamId: "team_admin_bank" },
+  { id: "u5", name: "علي القاضي", email: "intake@ybank.ye", roleId: "rc_bank_intake", entityId: "e1", org: "البنك اليمني للإنشاء والتعمير — فريق الإدخال", avatar: "عق", orgKind: "bank", teamId: "team_entry" },
+  { id: "u6", name: "نوال الحاج", email: "reviewer@ybank.ye", roleId: "rc_bank_reviewer", entityId: "e1", org: "البنك اليمني للإنشاء والتعمير — فريق المراجعة الداخلية", avatar: "نح", orgKind: "bank", teamId: "team_internal" },
+  { id: "u2", name: "محمد الشامي", email: "m.shami@cby.gov.ye", roleId: "rc_support_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة المساندة", avatar: "مش", orgKind: "committee", teamId: "team_support" },
+  { id: "u7", name: "سامي العتمي", email: "swift@ybank.ye", roleId: "rc_bank_swift", entityId: "e1", org: "البنك اليمني للإنشاء والتعمير — فريق العمليات الخارجية", avatar: "سع", orgKind: "bank", teamId: "team_fx" },
+  { id: "u9", name: "د. هدى الإرياني", email: "huda@cby.gov.ye", roleId: "rc_committee_manager", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق تأكيد العمليات", avatar: "هإ", orgKind: "committee", teamId: "team_fx_confirm" },
+  { id: "u10", name: "م. سامي الذماري", email: "sami@cby.gov.ye", roleId: "rc_executive_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة التنفيذية", avatar: "سذ", orgKind: "committee", teamId: "team_exec" },
+  { id: "u11", name: "د. ندى الكبسي", email: "nada@cby.gov.ye", roleId: "rc_executive_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة التنفيذية", avatar: "نك", orgKind: "committee", teamId: "team_exec" },
+  { id: "u12", name: "أ. فهد الشرعبي", email: "fahd@cby.gov.ye", roleId: "rc_executive_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة التنفيذية", avatar: "فش", orgKind: "committee", teamId: "team_exec" },
+  { id: "u13", name: "د. أمينة العزب", email: "amina@cby.gov.ye", roleId: "rc_executive_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة التنفيذية", avatar: "أع", orgKind: "committee", teamId: "team_exec" },
+  { id: "u14", name: "م. خالد الأنسي", email: "khaled@cby.gov.ye", roleId: "rc_executive_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة التنفيذية", avatar: "خأ", orgKind: "committee", teamId: "team_exec" },
 ];
 
 // Persist system users so additions/edits survive a page reload. The stored
@@ -115,7 +136,11 @@ function loadStoredUsers(): User[] | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(USERS_KEY);
-    return raw ? (JSON.parse(raw) as User[]) : null;
+    if (!raw) return null;
+    return (JSON.parse(raw) as Array<User & { role?: string }>).map(({ role, ...user }) => ({
+      ...user,
+      roleId: normalizeRoleId(user.roleId ?? role),
+    }));
   } catch {
     return null;
   }

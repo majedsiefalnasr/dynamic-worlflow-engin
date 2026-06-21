@@ -35,7 +35,7 @@ function Dashboard() {
     <div className="space-y-6">
       <PageHeader
         title={`أهلاً، ${user.name.split(" ")[0]}`}
-        subtitle={`لوحة ${ROLE_LABELS[user.role]} — تعمل الآن بالكامل من محرّك سير العمل`}
+        subtitle={`لوحة ${ROLE_LABELS[user.roleId] ?? user.roleId} — تعمل الآن بالكامل من محرّك سير العمل`}
         actions={
           roleCanCreateRequest(user) ? (
             <Button asChild>

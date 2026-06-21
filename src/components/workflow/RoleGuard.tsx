@@ -1,6 +1,6 @@
 import { ShieldAlert } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { useAuth, type Role } from "@/lib/mock";
+import { useAuth, type RoleId } from "@/lib/mock";
 import type { ReactNode } from "react";
 
 export function RoleGuard({
@@ -8,13 +8,13 @@ export function RoleGuard({
   children,
   message = "هذه الصفحة غير متاحة لدورك التشغيلي.",
 }: {
-  allow: Role[];
+  allow: RoleId[];
   children: ReactNode;
   message?: string;
 }) {
   const { user } = useAuth();
   if (!user) return null;
-  if (!allow.includes(user.role)) {
+  if (!allow.includes(user.roleId)) {
     return (
       <div className="p-6">
         <Card className="p-8 shadow-card border-0 flex items-start gap-4">

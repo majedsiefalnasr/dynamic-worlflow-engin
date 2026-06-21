@@ -25,7 +25,7 @@ import {
   Database,
 } from "lucide-react";
 import { useState } from "react";
-import { useAuth, auth, ROLE_LABELS, type Role } from "@/lib/mock";
+import { useAuth, auth, ROLE_LABELS, type RoleId } from "@/lib/mock";
 import { notificationsCell, markAllRead, screenPermsCell, type ScreenKey } from "@/lib/governance";
 import { canScreen } from "@/lib/workflow-bridge";
 import { wfStore } from "@/lib/workflow-engine";
@@ -48,7 +48,7 @@ type NavItem = {
   to: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  roles?: Role[];
+  roles?: RoleId[];
   screen?: ScreenKey;
 };
 
@@ -60,26 +60,26 @@ const NAV: NavItem[] = [
   { to: "/reports", label: "التقارير والتحليلات", icon: BarChart3, screen: "reports" },
   { to: "/audit", label: "التدقيق والامتثال", icon: ScrollText, screen: "audit" },
   { to: "/notifications", label: "الإشعارات", icon: Bell },
-  { to: "/admin/workflows", label: "مصمم سير العمل", icon: FileCheck2, roles: ["platform_admin"] },
+  { to: "/admin/workflows", label: "مصمم سير العمل", icon: FileCheck2, roles: ["rc_platform_admin"] },
   {
     to: "/admin/reference-data",
     label: "البيانات الأساسية",
     icon: Database,
-    roles: ["platform_admin"],
+    roles: ["rc_platform_admin"],
   },
   {
     to: "/admin/screen-permissions",
     label: "صلاحيات الشاشات",
     icon: ShieldCheck,
-    roles: ["platform_admin"],
+    roles: ["rc_platform_admin"],
   },
-  { to: "/admin/entities", label: "إدارة البنوك", icon: Network, roles: ["platform_admin"] },
-  { to: "/admin/orgs", label: "إدارة الجهات", icon: Building2, roles: ["platform_admin"] },
-  { to: "/admin/cby-staff", label: "مستخدمي النظام", icon: UserCog, roles: ["platform_admin"] },
-  { to: "/admin/teams", label: "إدارة الفرق", icon: Users, roles: ["platform_admin"] },
-  { to: "/admin/roles", label: "إدارة الأدوار", icon: KeyRound, roles: ["platform_admin"] },
-  { to: "/bank/users", label: "موظفو الجهة", icon: Users, roles: ["bank_admin"] },
-  { to: "/settings", label: "إعدادات النظام", icon: Settings, roles: ["platform_admin"] },
+  { to: "/admin/entities", label: "إدارة البنوك", icon: Network, roles: ["rc_platform_admin"] },
+  { to: "/admin/orgs", label: "إدارة الجهات", icon: Building2, roles: ["rc_platform_admin"] },
+  { to: "/admin/cby-staff", label: "مستخدمي النظام", icon: UserCog, roles: ["rc_platform_admin"] },
+  { to: "/admin/teams", label: "إدارة الفرق", icon: Users, roles: ["rc_platform_admin"] },
+  { to: "/admin/roles", label: "إدارة الأدوار", icon: KeyRound, roles: ["rc_platform_admin"] },
+  { to: "/bank/users", label: "موظفو الجهة", icon: Users, roles: ["rc_bank_admin"] },
+  { to: "/settings", label: "إعدادات النظام", icon: Settings, roles: ["rc_platform_admin"] },
 ];
 
 export function AppShell() {
@@ -99,7 +99,7 @@ export function AppShell() {
   wfStore.users.use();
   const items = NAV.filter((i) => {
     if (i.screen) return canScreen(user, i.screen, "view");
-    if (i.roles) return i.roles.includes(user.role);
+    if (i.roles) return i.roles.includes(user.roleId);
     return true;
   });
   const notifs = notificationsCell.use();
@@ -279,7 +279,7 @@ export function AppShell() {
                   <div className="text-right leading-tight hidden sm:block">
                     <div className="text-sm font-semibold">{user.name}</div>
                     <div className="text-[11px] text-muted-foreground">
-                      {ROLE_LABELS[user.role]}
+                      {ROLE_LABELS[user.roleId] ?? user.roleId}
                     </div>
                   </div>
                   <div className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground text-sm font-bold">

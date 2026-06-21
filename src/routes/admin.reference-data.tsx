@@ -16,7 +16,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/reference-data")({
   component: () => (
-    <RoleGuard allow={["platform_admin"]} message="البيانات الأساسية متاحة لمسؤول النظام فقط.">
+    <RoleGuard allow={["rc_platform_admin"]} message="البيانات الأساسية متاحة لمسؤول النظام فقط.">
       <ReferenceDataPage />
     </RoleGuard>
   ),

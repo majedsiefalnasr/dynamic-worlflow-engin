@@ -15,13 +15,19 @@ import {
   type WorkflowStage,
 } from "@/lib/workflow-engine";
 import { wfAuth } from "@/lib/workflow-engine/wfAuth";
-import { manualScreenCan, type ScreenCapability, type ScreenKey } from "@/lib/governance";
-import type { Role, User } from "@/lib/mock";
+import {
+  manualScreenCan,
+  roleCatalogCell,
+  teamsCell,
+  type ScreenCapability,
+  type ScreenKey,
+} from "@/lib/governance";
+import type { RoleId, User } from "@/lib/mock";
 
 // Built-in demo identities keep their richly-seeded engine users (e.g. the
 // exec lead also carries the member role). Everyone else gets a synthesized
 // engine identity derived from their org/team/role selection.
-const LEGACY_TO_WF_USER: Record<string, string> = {
+const BUILTIN_ACCOUNT_TO_WF_USER: Record<string, string> = {
   u1: "wu_admin",
   u2: "wu_support",
   u4: "wu_reviewer",
@@ -36,29 +42,16 @@ const LEGACY_TO_WF_USER: Record<string, string> = {
   u14: "wu_exec_member",
 };
 
-const LEGACY_ROLE_TO_ENGINE_ROLE: Record<Role, string> = {
-  platform_admin: "role_admin",
-  bank_admin: "role_reviewer",
-  bank_intake: "role_entry",
-  bank_reviewer: "role_reviewer",
-  bank_swift: "role_fx",
-  support_member: "role_support",
-  executive_member: "role_exec_member",
-  committee_manager: "role_exec_lead",
-};
-
 /**
- * Builds an engine identity (WfUser) from a legacy user's org/team/role so the
+ * Builds an engine identity (WfUser) from an account's org/team/role so the
  * permission engine recognizes users created in "مستخدمي النظام" — using the
  * same id aliasing the designer applies when saving assignments.
  */
-export function wfUserFromLegacy(user: User | null | undefined): WfUser | null {
+export function wfUserFromAccount(user: User | null | undefined): WfUser | null {
   if (!user) return null;
-  const orgRaw = user.orgKind ?? (user.role === "platform_admin" ? "committee" : "bank");
+  const orgRaw = user.orgKind ?? "bank";
   const organizationId = ORG_ID_ALIASES[orgRaw] ?? orgRaw;
-  const roleEngine = user.roleId
-    ? ROLE_ID_ALIASES[user.roleId] ?? user.roleId
-    : LEGACY_ROLE_TO_ENGINE_ROLE[user.role];
+  const roleEngine = ROLE_ID_ALIASES[user.roleId] ?? user.roleId;
   return {
     id: `wfu_${user.id}`,
     fullName: user.name,
@@ -69,12 +62,12 @@ export function wfUserFromLegacy(user: User | null | undefined): WfUser | null {
   };
 }
 
-/** Resolves the engine WfUser for a legacy user (built-in map or synthesized). */
-export function getLegacyWorkflowUser(user: User | null | undefined): WfUser | null {
+/** Resolves the engine WfUser for an account (built-in map or synthesized). */
+export function getWorkflowUser(user: User | null | undefined): WfUser | null {
   if (!user) return null;
-  const builtin = LEGACY_TO_WF_USER[user.id];
+  const builtin = BUILTIN_ACCOUNT_TO_WF_USER[user.id];
   if (builtin) return wfStore.users.get().find((u) => u.id === builtin) ?? null;
-  return wfUserFromLegacy(user);
+  return wfUserFromAccount(user);
 }
 
 /**
@@ -82,9 +75,9 @@ export function getLegacyWorkflowUser(user: User | null | undefined): WfUser | n
  * (assignments user picker) and to permission checks before/after reload.
  * Built-in demo users already exist in the seed and are left untouched.
  */
-export function upsertWfUserForLegacy(user: User | null | undefined) {
-  if (!user || LEGACY_TO_WF_USER[user.id]) return;
-  const wfUser = wfUserFromLegacy(user);
+export function upsertWorkflowUser(user: User | null | undefined) {
+  if (!user || BUILTIN_ACCOUNT_TO_WF_USER[user.id]) return;
+  const wfUser = wfUserFromAccount(user);
   if (!wfUser) return;
   wfStore.users.update((arr) => {
     const idx = arr.findIndex((u) => u.id === wfUser.id);
@@ -93,19 +86,19 @@ export function upsertWfUserForLegacy(user: User | null | undefined) {
   });
 }
 
-export function syncWfUserFromLegacy(user: User | null | undefined) {
+export function syncWorkflowUser(user: User | null | undefined) {
   if (!user) return wfAuth.setId(null);
-  const builtin = LEGACY_TO_WF_USER[user.id];
+  const builtin = BUILTIN_ACCOUNT_TO_WF_USER[user.id];
   if (builtin) return wfAuth.setId(builtin);
-  upsertWfUserForLegacy(user);
+  upsertWorkflowUser(user);
   wfAuth.setId(`wfu_${user.id}`);
 }
 
 export function visibleInstancesFor(user: User | null | undefined, instances = wfStore.instances.get()) {
   if (!user) return [];
-  if (user.role === "platform_admin") return instances;
+  if (user.roleId === "rc_platform_admin") return instances;
 
-  const wfUser = getLegacyWorkflowUser(user);
+  const wfUser = getWorkflowUser(user);
   return instances.filter((inst) => canViewByStageRouting(inst.currentStageId, wfUser));
 }
 
@@ -156,21 +149,17 @@ export function dashboardBuckets(instances: WorkflowInstance[]) {
   };
 }
 
-// Representative workflow-engine user per legacy role. Roles share the same
-// team/role assignments, so one representative user reflects the role's access.
-const ROLE_TO_WF_USER: Record<Role, string> = {
-  platform_admin: "wu_admin",
-  bank_admin: "wu_reviewer",
-  bank_intake: "wu_entry",
-  bank_reviewer: "wu_reviewer",
-  bank_swift: "wu_fx",
-  support_member: "wu_support",
-  executive_member: "wu_exec_member",
-  committee_manager: "wu_exec_lead",
-};
-
-function wfUserForRole(role: Role): WfUser | null {
-  return wfStore.users.get().find((u) => u.id === ROLE_TO_WF_USER[role]) ?? null;
+function wfUserForRole(roleId: RoleId): WfUser | null {
+  const role = roleCatalogCell.get().find((item) => item.id === roleId);
+  if (!role) return null;
+  return {
+    id: `role_preview_${roleId}`,
+    fullName: role.name,
+    email: `${roleId}@role.local`,
+    organizationId: ORG_ID_ALIASES[role.orgId] ?? role.orgId,
+    teamIds: teamsCell.get().filter((team) => team.roleCode === roleId).map((team) => team.id),
+    roleIds: [ROLE_ID_ALIASES[roleId] ?? roleId],
+  };
 }
 
 export type RequestsAccess = { view: boolean; add: boolean; edit: boolean };
@@ -207,21 +196,21 @@ function accessForWfUser(wfUser: WfUser | null, isAdmin: boolean): RequestsAcces
 }
 
 // Role-based view, used by the screen-permissions matrix (one row per role).
-export function requestsAccessForRole(role: Role): RequestsAccess {
-  return accessForWfUser(wfUserForRole(role), role === "platform_admin");
+export function requestsAccessForRole(roleId: RoleId): RequestsAccess {
+  return accessForWfUser(wfUserForRole(roleId), roleId === "rc_platform_admin");
 }
 
 // User-based view: reflects the user's actual org/team/role assignment, so
 // users created in "مستخدمي النظام" get exactly the access the designer grants.
 export function requestsAccessForUser(user: User | null | undefined): RequestsAccess {
-  return accessForWfUser(getLegacyWorkflowUser(user), user?.role === "platform_admin");
+  return accessForWfUser(getWorkflowUser(user), user?.roleId === "rc_platform_admin");
 }
 
 // Unified screen-permission gate. `requests` is derived from the designer
 // using the user's real identity; other screens fall back to the role matrix.
 export function canScreen(user: User | null | undefined, screen: ScreenKey, cap: ScreenCapability = "view"): boolean {
   if (screen === "requests") return requestsAccessForUser(user)[cap];
-  return user ? manualScreenCan(user.role, screen, cap) : false;
+  return user ? manualScreenCan(user.roleId, screen, cap) : false;
 }
 
 export function roleCanCreateRequest(user: User | null | undefined): boolean {

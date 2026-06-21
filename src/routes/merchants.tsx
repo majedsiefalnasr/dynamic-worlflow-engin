@@ -70,8 +70,8 @@ function Merchants() {
   const [viewing, setViewing] = useState<Merchant | null>(null);
 
   screenPermsCell.use();
-  const isPlatform = user?.role === "platform_admin";
-  const isBankAdmin = user?.role === "bank_admin";
+  const isPlatform = user?.roleId === "rc_platform_admin";
+  const isBankAdmin = user?.roleId === "rc_bank_admin";
   const canManage = !isPlatform && canScreen(user, "merchants", "add");
 
   // Bank admins see only their own bank's merchants
@@ -135,7 +135,7 @@ function Merchants() {
                   logAudit({
                     userId: user!.id,
                     userName: user!.name,
-                    role: user!.role,
+                    role: user!.roleId,
                     action: "إضافة تاجر جديد",
                     ref: m.cr,
                     notes: m.name,
@@ -340,7 +340,7 @@ function Merchants() {
                         logAudit({
                           userId: user!.id,
                           userName: user!.name,
-                          role: user!.role,
+                          role: user!.roleId,
                           action: "حذف تاجر",
                           ref: m.cr,
                           notes: m.name,
@@ -380,7 +380,7 @@ function Merchants() {
               logAudit({
                 userId: user!.id,
                 userName: user!.name,
-                role: user!.role,
+                role: user!.roleId,
                 action: "تعديل بيانات تاجر",
                 ref: m.cr,
                 notes: m.name,

@@ -59,7 +59,7 @@ function Profile() {
             {user.name}
             <BadgeCheck className="h-4 w-4 text-accent" />
           </div>
-          <Badge variant="secondary" className="mt-1">{ROLE_LABELS[user.role]}</Badge>
+          <Badge variant="secondary" className="mt-1">{ROLE_LABELS[user.roleId] ?? user.roleId}</Badge>
           <div className="text-xs text-muted-foreground mt-2">{user.org}</div>
 
           <div className="grid grid-cols-3 gap-3 mt-6 pt-6 border-t">
@@ -88,7 +88,7 @@ function Profile() {
             <div className="space-y-2"><Label>البريد الإلكتروني</Label><Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" /></div>
             <div className="space-y-2"><Label>رقم الهاتف</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+9677…" /></div>
             <div className="space-y-2"><Label>الجهة</Label><Input value={user.org} disabled /></div>
-            <div className="space-y-2"><Label>الدور</Label><Input value={ROLE_LABELS[user.role]} disabled /></div>
+            <div className="space-y-2"><Label>الدور</Label><Input value={ROLE_LABELS[user.roleId] ?? user.roleId} disabled /></div>
             <div className="space-y-2"><Label>المعرّف</Label><Input value={user.id} disabled className="font-mono text-xs" /></div>
           </div>
 

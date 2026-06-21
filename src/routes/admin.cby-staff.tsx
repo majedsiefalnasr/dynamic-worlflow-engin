@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, UserCog, Edit, Power, Search, ShieldCheck, Eye, Building2, Landmark, KeyRound } from "lucide-react";
+import { Plus, UserCog, Edit, Power, Search, ShieldCheck, Eye, Building2, Landmark, KeyRound, type LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,14 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  DEMO_USERS, ROLE_LABELS, saveUsers, useAuth,
+  DEMO_USERS, saveUsers, useAuth,
   type User,
 } from "@/lib/mock";
 import {
   entitiesCell, logAudit, teamsCell, orgsCell, roleCatalogCell,
-  getTeamLabel, getOrgLabel, getRoleCatalog,
+  getTeamLabel, getOrgLabel,
 } from "@/lib/governance";
-import { upsertWfUserForLegacy } from "@/lib/workflow-bridge";
+import { upsertWorkflowUser } from "@/lib/workflow-bridge";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -25,7 +25,7 @@ import { RoleGuard } from "@/components/workflow/RoleGuard";
 
 export const Route = createFileRoute("/admin/cby-staff")({
   component: () => (
-    <RoleGuard allow={["platform_admin"]}>
+    <RoleGuard allow={["rc_platform_admin"]}>
       <SystemUsers />
     </RoleGuard>
   ),
@@ -85,13 +85,11 @@ function SystemUsers() {
   }
 
   function add(p: Payload) {
-    const rc = getRoleCatalog(p.roleId);
     const u: User = {
       id: `u${Date.now()}`,
       name: p.name,
       email: p.email,
       phone: p.phone,
-      role: rc?.legacyRole ?? "bank_intake",
       roleId: p.roleId,
       orgKind: p.orgId,
       teamId: p.teamId,
@@ -101,9 +99,9 @@ function SystemUsers() {
       active: true,
     };
     DEMO_USERS.push(u);
-    upsertWfUserForLegacy(u);
+    upsertWorkflowUser(u);
     saveUsers();
-    if (user) logAudit({ userId: user.id, userName: user.name, role: user.role, action: "إضافة مستخدم نظام", ref: u.email, notes: `${u.name} — ${u.org}` });
+    if (user) logAudit({ userId: user.id, userName: user.name, role: user.roleId, action: "إضافة مستخدم نظام", ref: u.email, notes: `${u.name} — ${u.org}` });
     toast.success(`تمت إضافة ${u.name}`);
     refresh();
     setOpenAdd(false);
@@ -112,13 +110,11 @@ function SystemUsers() {
   function update(target: User, p: Payload) {
     const idx = DEMO_USERS.findIndex((x) => x.id === target.id);
     if (idx < 0) return;
-    const rc = getRoleCatalog(p.roleId);
     DEMO_USERS[idx] = {
       ...DEMO_USERS[idx],
       name: p.name,
       email: p.email,
       phone: p.phone,
-      role: rc?.legacyRole ?? DEMO_USERS[idx].role,
       roleId: p.roleId,
       orgKind: p.orgId,
       teamId: p.teamId,
@@ -126,9 +122,9 @@ function SystemUsers() {
       org: orgLabelFor(p),
       avatar: p.name.split(" ").map((s) => s[0]).join("").slice(0, 2),
     };
-    upsertWfUserForLegacy(DEMO_USERS[idx]);
+    upsertWorkflowUser(DEMO_USERS[idx]);
     saveUsers();
-    if (user) logAudit({ userId: user.id, userName: user.name, role: user.role, action: "تعديل بيانات مستخدم", ref: target.email, notes: p.name });
+    if (user) logAudit({ userId: user.id, userName: user.name, role: user.roleId, action: "تعديل بيانات مستخدم", ref: target.email, notes: p.name });
     toast.success("تم حفظ التعديلات");
     refresh();
     setEditing(null);
@@ -140,20 +136,17 @@ function SystemUsers() {
     const next = u.active === false;
     DEMO_USERS[idx] = { ...DEMO_USERS[idx], active: next };
     saveUsers();
-    if (user) logAudit({ userId: user.id, userName: user.name, role: user.role, action: next ? "تفعيل مستخدم" : "إلغاء تفعيل مستخدم", ref: u.email, notes: u.name });
+    if (user) logAudit({ userId: user.id, userName: user.name, role: user.roleId, action: next ? "تفعيل مستخدم" : "إلغاء تفعيل مستخدم", ref: u.email, notes: u.name });
     toast.success(next ? `تم تفعيل ${u.name}` : `تم إلغاء تفعيل ${u.name}`);
     refresh();
   }
 
   function deriveInitialRoleId(u: User): string {
-    if (u.roleId && roles.some((r) => r.id === u.roleId)) return u.roleId;
-    const match = roles.find((r) => r.legacyRole === u.role);
-    return match?.id ?? roles[0]?.id ?? "";
+    return roles.some((r) => r.id === u.roleId) ? u.roleId : roles[0]?.id ?? "";
   }
 
   function roleLabelFor(u: User): string {
-    const rc = u.roleId ? roles.find((r) => r.id === u.roleId) : undefined;
-    return rc?.name ?? ROLE_LABELS[u.role];
+    return roles.find((r) => r.id === u.roleId)?.name ?? u.roleId;
   }
 
   return (
@@ -309,7 +302,7 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function StatCard({ label, value, icon: Icon, tone }: { label: string; value: number; icon: any; tone: string }) {
+function StatCard({ label, value, icon: Icon, tone }: { label: string; value: number; icon: LucideIcon; tone: string }) {
   return (
     <Card className="p-4 shadow-card border-0">
       <div className={`h-9 w-9 rounded-lg grid place-items-center ${tone}`}>
