@@ -112,8 +112,11 @@ export function stageLabel(instance: WorkflowInstance): string {
 }
 
 export function instanceRef(instance: WorkflowInstance): string {
-  const invoice = stringValue(instance.data.invoiceNumber);
-  return invoice || instance.id.slice(-8).toUpperCase();
+  return stringValue(instance.data.requestIdentifier) || instance.id.slice(-8).toUpperCase();
+}
+
+export function instanceInvoiceNumber(instance: WorkflowInstance): string {
+  return stringValue(instance.data.invoiceNumber) || "—";
 }
 
 export function instanceTitle(instance: WorkflowInstance): string {
@@ -226,18 +229,15 @@ export function isDuplicateInvoice(
   excludeInstanceId?: string,
 ): { duplicate: boolean; refs: string[] } {
   const invoiceNumber = stringValue(data.invoiceNumber).trim();
-  const taxNumber = stringValue(data.taxNumber).trim();
-  const coverageType = stringValue(data.coverageType).trim();
-  if (!invoiceNumber || !taxNumber || coverageType !== "كلي") {
+  if (!invoiceNumber) {
     return { duplicate: false, refs: [] };
   }
-  const matches = wfStore.instances.get().filter((inst) => {
+  const instances = wfStore.instances.get();
+  const currentInstance = instances.find((instance) => instance.id === excludeInstanceId);
+  const matches = instances.filter((inst) => {
     if (inst.id === excludeInstanceId) return false;
-    return (
-      stringValue(inst.data.invoiceNumber).trim() === invoiceNumber &&
-      stringValue(inst.data.taxNumber).trim() === taxNumber &&
-      stringValue(inst.data.coverageType).trim() === "كلي"
-    );
+    if (currentInstance && inst.createdAt >= currentInstance.createdAt) return false;
+    return stringValue(inst.data.invoiceNumber).trim() === invoiceNumber;
   });
   return {
     duplicate: matches.length > 0,

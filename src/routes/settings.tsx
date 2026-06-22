@@ -198,7 +198,7 @@ function SettingsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="platform-organization">الجهة</Label>
-                <Input id="platform-organization" defaultValue="البنك المركزي اليمني" />
+                <Input id="platform-organization" defaultValue="اللجنة الوطنية لتمويل الواردات" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="platform-language">اللغة الافتراضية</Label>

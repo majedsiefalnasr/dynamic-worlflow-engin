@@ -274,7 +274,7 @@ export function getStageFields(versionId: string, stageId: string) {
       def,
       visible: rule?.visible ?? true,
       editable: rule?.editable ?? true,
-      required: rule?.required ?? false,
+      required: false,
       groupId: def.groupId,
     };
   });
@@ -292,12 +292,13 @@ export function createInstance(opts: {
   const initial = getInitialStage(opts.workflowVersionId);
   if (!initial) throw new Error("Workflow version has no stages");
   const now = new Date().toISOString();
+  const requestIdentifier = nextRequestIdentifier(now);
   const inst: WorkflowInstance = {
     id: uid("inst"),
     workflowVersionId: opts.workflowVersionId,
     currentStageId: initial.id,
     status: "active",
-    data: opts.data ?? {},
+    data: { requestIdentifier, ...(opts.data ?? {}) },
     createdBy: opts.user.id,
     createdAt: now,
     updatedAt: now,
@@ -317,6 +318,16 @@ export function createInstance(opts: {
     ...arr,
   ]);
   return inst;
+}
+
+function nextRequestIdentifier(isoDate: string): string {
+  const year = new Date(isoDate).getFullYear();
+  const sequence = store.instances.get().reduce((highest, instance) => {
+    const identifier = String(instance.data.requestIdentifier ?? "");
+    const match = identifier.match(/^IMP-\d{4}-(\d+)$/);
+    return match ? Math.max(highest, Number(match[1])) : highest;
+  }, 2000);
+  return `IMP-${year}-${sequence + 1}`;
 }
 
 export function saveDraftData(instanceId: string, data: Record<string, unknown>, user: WfUser) {

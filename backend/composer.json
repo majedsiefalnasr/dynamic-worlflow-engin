@@ -1,7 +1,7 @@
 {
     "name": "cby/imports-api",
     "type": "project",
-    "description": "Central Bank of Yemen - Imports Management & Financing Platform API",
+    "description": "National Committee for Import Financing - Imports Management & Financing Platform API",
     "keywords": ["laravel", "cby", "imports", "yemen"],
     "license": "MIT",
     "require": {

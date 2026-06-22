@@ -13,7 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import type { FieldDefinition, FieldGroup } from "@/lib/workflow-engine";
 import { MERCHANTS } from "@/lib/mock";
 import { referenceLabels, referenceTablesCell } from "@/lib/governance";
-import { toast } from "sonner";
 
 /** Options for a `dynamic_select` field sourced from a reference table. */
 function merchantByTax(tax: unknown) {
@@ -122,7 +121,7 @@ export function DynamicForm({ fields, value, onChange, groups, readOnly = false 
         next.owners = (merchant.owners ?? []).map((o) => `${o.name} - ${o.share}%`).join("\n");
       }
     }
-    if (key === "coverageType" && v === "كلي") {
+    if (key === "paymentTerms" && v === "كلي") {
       next.requestPercentage = 100;
     }
     if (key === "linkedCompany") {
@@ -172,22 +171,11 @@ export function DynamicForm({ fields, value, onChange, groups, readOnly = false 
   const isLast = idx === wizardIds.length - 1;
   const currentStep = wizardSteps[idx];
   const currentItems = currentStep.id === "__review" ? [] : currentStep.items;
-  const missingCurrent = requiredMissing(currentItems, value);
-
   const goNext = () => {
-    if (missingCurrent.length > 0) {
-      toast.error(`أكمل الحقول الإلزامية: ${missingCurrent.join("، ")}`);
-      return;
-    }
     setActiveTab(wizardIds[Math.min(wizardIds.length - 1, idx + 1)]);
   };
 
   const changeStep = (target: string) => {
-    const targetIdx = wizardIds.indexOf(target);
-    if (targetIdx > idx && missingCurrent.length > 0) {
-      toast.error(`أكمل الحقول الإلزامية: ${missingCurrent.join("، ")}`);
-      return;
-    }
     setActiveTab(target);
   };
 
@@ -341,7 +329,7 @@ function FieldControl({
   field, formValue, value, onSet,
 }: { field: DynamicField; formValue: Record<string, unknown>; value: unknown; onSet: (v: unknown) => void }) {
   const { def, editable, required } = field;
-  const lockedByFullCoverage = def.key === "requestPercentage" && formValue.coverageType === "كلي";
+  const lockedByFullCoverage = def.key === "requestPercentage" && formValue.paymentTerms === "كلي";
   const disabled = !editable || LOCKED_MERCHANT_FIELDS.has(def.key) || lockedByFullCoverage;
   const id = `field-${def.key}`;
   const label = (
@@ -528,20 +516,6 @@ function formatReviewValue(v: unknown): string {
   if (typeof v === "number") return v.toLocaleString("en-US");
   if (typeof v === "boolean") return v ? "نعم" : "لا";
   return String(v);
-}
-
-export function validateRequired(fields: DynamicField[], value: Record<string, unknown>): string[] {
-  return requiredMissing(fields, value);
-}
-
-function requiredMissing(fields: DynamicField[], value: Record<string, unknown>): string[] {
-  return fields
-    .filter((f) => f.visible && f.required)
-    .filter((f) => {
-      const v = value[f.def.key];
-      return v === undefined || v === null || v === "";
-    })
-    .map((f) => f.def.label);
 }
 
 export function useFormState(initial: Record<string, unknown>) {

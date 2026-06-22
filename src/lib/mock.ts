@@ -17,7 +17,7 @@ export type RoleId =
   | (string & {});
 
 export const ROLE_LABELS: Record<string, string> = {
-  rc_platform_admin: "مسؤول النظام (CBY)",
+  rc_platform_admin: "مسؤول نظام اللجنة",
   rc_bank_admin: "مسؤول البنك التجاري",
   rc_bank_intake: "موظف إدخال البنك التجاري",
   rc_bank_reviewer: "مراجع داخلي بالبنك التجاري",
@@ -114,7 +114,7 @@ export type User = {
 };
 
 export const DEMO_USERS: User[] = [
-  { id: "u1", name: "ياسر الحضرمي", email: "admin@cby.gov.ye", roleId: "rc_platform_admin", entityId: null, org: "البنك المركزي – إدارة الأنظمة", avatar: "يح", orgKind: "platform", teamId: "team_platform_admin" },
+  { id: "u1", name: "ياسر الحضرمي", email: "admin@cby.gov.ye", roleId: "rc_platform_admin", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — إدارة الأنظمة", avatar: "يح", orgKind: "platform", teamId: "team_platform_admin" },
   { id: "u4", name: "أحمد المقطري", email: "admin@ybank.ye", roleId: "rc_bank_admin", entityId: "e1", org: "البنك اليمني للإنشاء والتعمير — فريق الإدارة (البنك)", avatar: "أم", orgKind: "bank", teamId: "team_admin_bank" },
   { id: "u5", name: "علي القاضي", email: "intake@ybank.ye", roleId: "rc_bank_intake", entityId: "e1", org: "البنك اليمني للإنشاء والتعمير — فريق الإدخال", avatar: "عق", orgKind: "bank", teamId: "team_entry" },
   { id: "u6", name: "نوال الحاج", email: "reviewer@ybank.ye", roleId: "rc_bank_reviewer", entityId: "e1", org: "البنك اليمني للإنشاء والتعمير — فريق المراجعة الداخلية", avatar: "نح", orgKind: "bank", teamId: "team_internal" },

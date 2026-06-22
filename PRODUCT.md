@@ -6,13 +6,13 @@ product
 
 ## Users
 
-Central Bank of Yemen administrators, bank and exchange institution staff, support reviewers, executive committee members, committee managers, and system operators using an Arabic RTL workflow tool during import-financing review work.
+National Committee for Import Financing administrators, bank and exchange institution staff, support reviewers, executive committee members, committee managers, and system operators using an Arabic RTL workflow tool during import-financing review work.
 
 Users need to create, inspect, route, approve, reject, vote on, audit, and report import-financing requests with enough role and organization context to avoid acting on the wrong request.
 
 ## Product Purpose
 
-The product manages import-financing request workflows for the Central Bank of Yemen. The current root `src/` app is the interactive TanStack prototype, while the production direction documented in the repository is a Laravel API plus Nuxt frontend.
+The product manages import-financing request workflows for the National Committee for Import Financing. The current root `src/` app is the interactive TanStack prototype, while the production direction documented in the repository is a Laravel API plus Nuxt frontend.
 
 Success means users can see only the work in their scope, understand the current workflow stage, complete the next valid action, and audit what happened without relying on hard-coded demo paths.
 

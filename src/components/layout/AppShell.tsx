@@ -121,7 +121,7 @@ export function AppShell() {
         {!isCollapsed && (
           <div className="leading-tight">
             <div className="font-bold">منصة الواردات</div>
-            <div className="text-xs text-sidebar-foreground/60">البنك المركزي اليمني</div>
+            <div className="text-xs text-sidebar-foreground/60">اللجنة الوطنية لتمويل الواردات</div>
           </div>
         )}
       </div>
@@ -336,7 +336,7 @@ export function AppShell() {
         </main>
 
         <footer className="px-4 lg:px-6 py-4 text-xs text-muted-foreground border-t flex flex-col sm:flex-row items-center gap-2 sm:justify-between text-center">
-          <div>© 2026 البنك المركزي اليمني، جميع الحقوق محفوظة</div>
+          <div>© 2026 اللجنة الوطنية لتمويل الواردات، جميع الحقوق محفوظة</div>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-3.5 w-3.5" />
             نسخة تجريبية للاختبار

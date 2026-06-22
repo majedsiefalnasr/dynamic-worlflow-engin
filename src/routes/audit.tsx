@@ -228,13 +228,10 @@ function duplicateInvoices(instances: WorkflowInstance[]) {
   const groups = new Map<string, string[]>();
   instances.forEach((inst) => {
     const invoice = stringValue(inst.data.invoiceNumber).trim();
-    const tax = stringValue(inst.data.taxNumber).trim();
-    const coverage = stringValue(inst.data.coverageType).trim();
-    if (!invoice || !tax || coverage !== "كلي") return;
-    const key = `${tax}::${invoice}`;
-    groups.set(key, [...(groups.get(key) ?? []), instanceRef(inst)]);
+    if (!invoice) return;
+    groups.set(invoice, [...(groups.get(invoice) ?? []), instanceRef(inst)]);
   });
   return [...groups.entries()]
     .filter(([, refs]) => refs.length > 1)
-    .map(([key, refs]) => ({ invoice: key.split("::")[1], refs }));
+    .map(([invoice, refs]) => ({ invoice, refs }));
 }

@@ -43,7 +43,7 @@ function Login() {
               ب.م
             </div>
             <div>
-              <div className="font-semibold">البنك المركزي اليمني</div>
+              <div className="font-semibold">اللجنة الوطنية لتمويل الواردات</div>
               <div className="text-sm text-white/70">منصة تمويل الواردات</div>
             </div>
           </div>
@@ -180,7 +180,7 @@ function Login() {
 
           <div className="mt-12 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
             <Building2 className="h-3.5 w-3.5" />
-            البنك المركزي اليمني · منصة الواردات v3.0
+            اللجنة الوطنية لتمويل الواردات · منصة الواردات v3.0
           </div>
         </div>
       </div>

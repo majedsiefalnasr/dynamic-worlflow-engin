@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { FilePlus2, Search, Workflow } from "lucide-react";
+import { AlertTriangle, FilePlus2, Search, Workflow } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,10 +22,12 @@ import {
   instanceAmount,
   instanceCurrency,
   instanceGoodsType,
+  instanceInvoiceNumber,
   instanceRef,
   instanceTitle,
   progressForInstance,
   roleCanCreateRequest,
+  isDuplicateInvoice,
   stageLabel,
   visibleInstancesFor,
 } from "@/lib/workflow-bridge";
@@ -146,7 +148,8 @@ function WorkflowsHome() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>المرجع</TableHead>
+                <TableHead>رقم المعرّف</TableHead>
+                <TableHead>رقم الفاتورة</TableHead>
                 <TableHead>مقدم الطلب</TableHead>
                 <TableHead>النوع</TableHead>
                 <TableHead>المبلغ</TableHead>
@@ -159,7 +162,18 @@ function WorkflowsHome() {
             <TableBody>
               {data.map((inst) => (
                 <TableRow key={inst.id}>
-                  <TableCell className="font-mono text-xs">{instanceRef(inst)}</TableCell>
+                  <TableCell className="font-mono text-xs font-semibold text-primary">{instanceRef(inst)}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs">{instanceInvoiceNumber(inst)}</span>
+                      {isDuplicateInvoice(inst.data, inst.id).duplicate && (
+                        <Badge variant="destructive" className="gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          مكرر
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>{instanceTitle(inst)}</TableCell>
                   <TableCell className="text-xs">{instanceGoodsType(inst)}</TableCell>
                   <TableCell className="font-semibold tabular-nums">

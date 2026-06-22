@@ -11,7 +11,7 @@ import type {
 // Runs once on first load (if no workflow definitions exist).
 // ------------------------------------------------------------
 
-const SEED_VERSION = "2026-06-17-reference-data-dynamic-selects";
+const SEED_VERSION = "2026-06-22-request-identifiers-and-duplicate-warning";
 const SEED_VERSION_KEY = "wfe:seedVersion";
 
 export function seedIfEmpty() {
@@ -197,9 +197,9 @@ function seed() {
     fd(version.id, "owners", "الملاك والمساهمون (25% فأكثر)", "textarea", undefined, "fg_basic", undefined, true),
 
     fd(version.id, "requestType", "نوع الطلب", "select", ["طلب مصارفة وتحويل خارجي", "طلب تمويل واردات", "طلب اعتماد مستندي"], "fg_invoice", undefined, true),
-    fd(version.id, "coverageType", "نوع التغطية", "select", ["كلي", "جزئي"], "fg_invoice", undefined, true),
+    fd(version.id, "coverageType", "نوع التغطية", "select", ["اعتماد مستندي", "تحويل مباشر", "دفعة مقدمة"], "fg_invoice", undefined, true),
     fd(version.id, "foreignCurrencySource", "مصادر العملة الأجنبية", "select", ["حساب العميل", "موارد البنك", "مصدر خارجي"], "fg_invoice", undefined, true),
-    fd(version.id, "paymentTerms", "شروط الدفع", "select", ["اعتماد مستندي", "تحويل مباشر", "دفعة مقدمة"], "fg_invoice", undefined, true),
+    fd(version.id, "paymentTerms", "شروط الدفع", "select", ["كلي", "جزئي"], "fg_invoice", undefined, true),
     fd(version.id, "requestCurrency", "عملة الطلب", "select", ["دولار أمريكي", "يورو", "ريال سعودي"], "fg_invoice", undefined, true),
     fd(version.id, "requestPercentage", "نسبة الطلب %", "number", undefined, "fg_invoice", undefined, true),
     fd(version.id, "invoiceType", "نوع الفاتورة", "select", ["فاتورة تجارية", "فاتورة أولية"], "fg_invoice", undefined, true),
@@ -342,7 +342,7 @@ const SAMPLE_REQUESTS: InstanceSeed[] = [
   inst("stg_fx_confirm", "active", { importType: "مشتقات نفطية", importerName: "مجموعة الشيباني", financeAmount: 1100000, currency: "دولار أمريكي", paymentTerms: "اعتماد مستندي", supplierName: "Saudi Aramco Trading", originCountry: "السعودية", invoiceNumber: "INV-2026-10121", arrivalPort: "ميناء عدن" }),
 
   // ─── stg_final (الاعتماد النهائي) ───────────────────────────────────
-  inst("stg_final", "active", { importType: "إلكترونيات", importerName: "شركة ثابت إخوان", financeAmount: 420000, currency: "يورو", paymentTerms: "تحويل مباشر", supplierName: "Bayer AG", originCountry: "ألمانيا", invoiceNumber: "INV-2026-10132", arrivalPort: "منفذ الوديعة" }),
+  inst("stg_final", "active", { importType: "إلكترونيات", importerName: "شركة ثابت إخوان", financeAmount: 420000, currency: "يورو", paymentTerms: "تحويل مباشر", supplierName: "Bayer AG", originCountry: "ألمانيا", invoiceNumber: "INV-2026-10022", arrivalPort: "منفذ الوديعة" }),
 
   // ─── stg_closed (مكتمل — اعتماد نهائي) ──────────────────────────────
   inst("stg_closed", "closed", { importType: "مواد غذائية", importerName: "مجموعة الأهدل", financeAmount: 540000, currency: "دولار أمريكي", paymentTerms: "اعتماد مستندي", supplierName: "Cargill Inc.", originCountry: "الولايات المتحدة", invoiceNumber: "INV-2026-10143", arrivalPort: "ميناء عدن" }),
@@ -370,7 +370,10 @@ function seedInstances(versionId: string) {
       workflowVersionId: versionId,
       currentStageId: finalStageCode,
       status: seed.status,
-      data: seed.data,
+      data: {
+        ...seed.data,
+        requestIdentifier: `IMP-2026-${String(2001 + idx).padStart(4, "0")}`,
+      },
       createdBy: "wu_entry",
       createdAt: created.toISOString(),
       updatedAt: last.timestamp,
@@ -434,7 +437,16 @@ function buildHistory(seed: InstanceSeed, instanceId: string, created: Date) {
 // ---------- instance helpers ----------
 
 function inst(stage: string, status: WorkflowInstance["status"], data: Record<string, unknown>): InstanceSeed {
-  return { stage, status, data: enrichRequestData(data) };
+  const { paymentTerms, ...requestData } = data;
+  return {
+    stage,
+    status,
+    data: enrichRequestData({
+      ...requestData,
+      coverageType: paymentTerms ?? "اعتماد مستندي",
+      paymentTerms: "كلي",
+    }),
+  };
 }
 
 function hop(
@@ -525,9 +537,9 @@ function enrichRequestData(data: Record<string, unknown>): Record<string, unknow
   const merchant = merchantFixture(importerName);
   return {
     requestType: "طلب مصارفة وتحويل خارجي",
-    coverageType: "كلي",
+    coverageType: "اعتماد مستندي",
     foreignCurrencySource: "حساب العميل",
-    paymentTerms: "اعتماد مستندي",
+    paymentTerms: "كلي",
     requestCurrency: data.currency ?? "دولار أمريكي",
     requestPercentage: 100,
     invoiceType: "فاتورة تجارية",

@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   ArrowLeft, ShieldCheck, Lock, MessageSquare, Download,
-  User as UserIcon, Building2, MapPin, CalendarDays, Activity,
+  User as UserIcon, Building2, MapPin, CalendarDays, Activity, AlertTriangle,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/card";
@@ -20,10 +20,9 @@ import {
 } from "@/lib/workflow-engine";
 import { useWfUser } from "@/lib/workflow-engine/wfAuth";
 import { useAuth } from "@/lib/mock";
-import { getOrgCategory } from "@/lib/governance";
 import {
   canScreen, progressForInstance, instanceRef, instanceTitle,
-  instanceGoodsType, instanceAmount, instanceCurrency, isDuplicateInvoice,
+  instanceGoodsType, instanceAmount, instanceCurrency, instanceInvoiceNumber, isDuplicateInvoice,
   stageLabel,
 } from "@/lib/workflow-bridge";
 import { ScreenGuard } from "@/components/workflow/ScreenGuard";
@@ -63,7 +62,7 @@ function InstancePage() {
     if (!instance) return [];
     if (isExecutor || isAdmin) return getStageFields(instance.workflowVersionId, instance.currentStageId);
     return getViewerFields(instance.workflowVersionId, user);
-  }, [instance, stages, isExecutor, isAdmin, user]);
+  }, [instance, isExecutor, isAdmin, user]);
 
   const fieldGroups = useMemo(() => {
     if (!instance) return [];
@@ -98,26 +97,16 @@ function InstancePage() {
     setDraftData(instance.data);
   }
 
-  const checkDuplicate = () => {
-    if (getOrgCategory(legacyUser?.orgKind) !== "committee") return false;
-    const { duplicate, refs } = isDuplicateInvoice(draftData, instance.id);
-    if (duplicate) {
-      toast.error(`فاتورة مكررة (كلي) — نفس الرقم الضريبي ورقم الفاتورة موجود في: ${refs.join("، ")}`);
-      return true;
-    }
-    return false;
-  };
+  const duplicateInvoice = isDuplicateInvoice(draftData, instance.id);
 
   const onSaveDraft = () => {
     if (!user) return;
-    if (checkDuplicate()) return;
     saveDraftData(instance.id, draftData, user);
     toast.success("تم حفظ المسودة");
   };
 
   const onAction = (transitionId: string, actionName: string) => {
     if (!user) return toast.error("اختر مستخدمًا");
-    if (checkDuplicate()) return;
     const res = applyAction({ instanceId: instance.id, transitionId, user, comments, data: draftData });
     if (!res.ok) return toast.error(res.error);
     toast.success(`تم تنفيذ: ${actionName}`);
@@ -158,8 +147,8 @@ function InstancePage() {
   return (
     <div>
       <PageHeader
-        title={instanceTitle(instance)}
-        subtitle={`${instanceGoodsType(instance)} · ${instanceRef(instance)}`}
+        title={instanceRef(instance)}
+        subtitle={`${instanceTitle(instance)} · ${instanceGoodsType(instance)}`}
         breadcrumbs={[
           { label: "الرئيسية", to: "/" },
           { label: "الطلبات", to: "/workflows" },
@@ -176,6 +165,22 @@ function InstancePage() {
           </div>
         }
       />
+
+      {duplicateInvoice.duplicate && (
+        <div
+          role="alert"
+          className="mb-6 flex items-start gap-3 rounded-xl border border-destructive/35 bg-destructive/5 p-4 text-destructive"
+        >
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <div className="font-semibold">تنبيه: فاتورة مكررة محتملة</div>
+            <p className="mt-1 text-sm leading-6 text-foreground">
+              رقم الفاتورة <span className="font-mono font-semibold">{instanceInvoiceNumber(instance)}</span>
+              {" "}ظهر في طلبات سابقة: {duplicateInvoice.refs.join("، ")}.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">

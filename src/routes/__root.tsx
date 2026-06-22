@@ -20,20 +20,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: "منصة إدارة وتمويل الواردات | البنك المركزي اليمني" },
+      { title: "منصة إدارة وتمويل الواردات | اللجنة الوطنية لتمويل الواردات" },
       {
         name: "description",
-        content: "منصة رقمية لإدارة ومراجعة طلبات تمويل الواردات للبنك المركزي اليمني",
+        content: "منصة رقمية لإدارة ومراجعة طلبات تمويل الواردات للجنة الوطنية لتمويل الواردات",
       },
-      { property: "og:title", content: "منصة إدارة وتمويل الواردات | البنك المركزي اليمني" },
-      { name: "twitter:title", content: "منصة إدارة وتمويل الواردات | البنك المركزي اليمني" },
+      { property: "og:title", content: "منصة إدارة وتمويل الواردات | اللجنة الوطنية لتمويل الواردات" },
+      { name: "twitter:title", content: "منصة إدارة وتمويل الواردات | اللجنة الوطنية لتمويل الواردات" },
       {
         property: "og:description",
-        content: "منصة رقمية لإدارة ومراجعة طلبات تمويل الواردات للبنك المركزي اليمني",
+        content: "منصة رقمية لإدارة ومراجعة طلبات تمويل الواردات للجنة الوطنية لتمويل الواردات",
       },
       {
         name: "twitter:description",
-        content: "منصة رقمية لإدارة ومراجعة طلبات تمويل الواردات للبنك المركزي اليمني",
+        content: "منصة رقمية لإدارة ومراجعة طلبات تمويل الواردات للجنة الوطنية لتمويل الواردات",
       },
       {
         property: "og:image",

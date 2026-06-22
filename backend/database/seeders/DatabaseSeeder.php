@@ -27,8 +27,8 @@ class DatabaseSeeder extends Seeder
         $users = [
             ['أحمد المقطري', 'ahmed@ybank.ye', 'البنك اليمني للإنشاء والتعمير', 'commercial_bank'],
             ['سارة العمري', 'sara@alkuraimi.ye', 'صرافة الكريمي', 'exchange'],
-            ['محمد الشامي', 'm.shami@cby.gov.ye', 'البنك المركزي – لجنة مساندة', 'support_member'],
-            ['د. هدى الإرياني', 'huda@cby.gov.ye', 'البنك المركزي – لجنة تنفيذية', 'executive_member'],
+            ['محمد الشامي', 'm.shami@cby.gov.ye', 'اللجنة الوطنية لتمويل الواردات – لجنة مساندة', 'support_member'],
+            ['د. هدى الإرياني', 'huda@cby.gov.ye', 'اللجنة الوطنية لتمويل الواردات – لجنة تنفيذية', 'executive_member'],
             ['أ. خالد العنسي', 'kh.ansi@cby.gov.ye', 'مدير لجنة تنظيم وتمويل الواردات', 'committee_manager'],
             ['ياسر الحضرمي', 'admin@cby.gov.ye', 'إدارة الأنظمة', 'admin'],
         ];
