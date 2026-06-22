@@ -1,0 +1,511 @@
+openapi: 3.0.3
+info:
+  title: Import Financing Platform API
+  version: 1.0.0
+  description: Baseline contract. The owning delivery phase must complete operation schemas and examples before implementation starts.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+  - name: Organizations
+  - name: Teams
+  - name: Roles
+  - name: Banks
+  - name: Users
+  - name: Merchants
+  - name: Workflows
+  - name: Requests
+  - name: Audit
+  - name: Reports
+  - name: ReferenceData
+  - name: ScreenPermissions
+  - name: Notifications
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Authenticate with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Access token or MFA challenge
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Return current user and computed permissions
+      responses:
+        '200':
+          description: Current identity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /organizations:
+    get:
+      tags: [Organizations]
+      summary: List organizations
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Paginated organizations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationList'
+    post:
+      tags: [Organizations]
+      summary: Create organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationWrite'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /teams:
+    get:
+      tags: [Teams]
+      summary: List teams
+      responses:
+        '200':
+          $ref: '#/components/responses/GenericPaginatedResources'
+    post:
+      tags: [Teams]
+      summary: Create team
+      responses:
+        '201':
+          $ref: '#/components/responses/GenericResource'
+  /roles:
+    get:
+      tags: [Roles]
+      summary: List roles
+      responses:
+        '200':
+          $ref: '#/components/responses/GenericPaginatedResources'
+    post:
+      tags: [Roles]
+      summary: Create role
+      responses:
+        '201':
+          $ref: '#/components/responses/GenericResource'
+  /banks:
+    get:
+      tags: [Banks]
+      summary: List banks
+      responses:
+        '200':
+          $ref: '#/components/responses/GenericPaginatedResources'
+    post:
+      tags: [Banks]
+      summary: Create bank
+      responses:
+        '201':
+          $ref: '#/components/responses/GenericResource'
+  /users:
+    get:
+      tags: [Users]
+      summary: List users in caller scope
+      responses:
+        '200':
+          $ref: '#/components/responses/GenericPaginatedResources'
+    post:
+      tags: [Users]
+      summary: Create user
+      responses:
+        '201':
+          $ref: '#/components/responses/GenericResource'
+  /merchants:
+    get:
+      tags: [Merchants]
+      summary: List merchants in caller scope
+      responses:
+        '200':
+          $ref: '#/components/responses/GenericPaginatedResources'
+    post:
+      tags: [Merchants]
+      summary: Create merchant with owners and companies
+      responses:
+        '201':
+          $ref: '#/components/responses/GenericResource'
+  /workflows:
+    get:
+      tags: [Workflows]
+      summary: List workflow definitions
+      responses:
+        '200':
+          $ref: '#/components/responses/GenericPaginatedResources'
+    post:
+      tags: [Workflows]
+      summary: Create workflow definition
+      responses:
+        '201':
+          $ref: '#/components/responses/GenericResource'
+  /workflow-versions/{id}/validate:
+    post:
+      tags: [Workflows]
+      summary: Validate a draft workflow version
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [valid, errors]
+                properties:
+                  valid:
+                    type: boolean
+                  errors:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WorkflowValidationError'
+  /workflow-versions/{id}/publish:
+    post:
+      tags: [Workflows]
+      summary: Publish a valid draft workflow version
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/GenericResource'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /requests:
+    get:
+      tags: [Requests]
+      summary: List visible requests
+      responses:
+        '200':
+          $ref: '#/components/responses/GenericPaginatedResources'
+    post:
+      tags: [Requests]
+      summary: Create request using the active workflow version
+      responses:
+        '201':
+          $ref: '#/components/responses/GenericResource'
+  /requests/my-queue:
+    get:
+      tags: [Requests]
+      summary: List active requests executable by current user
+      responses:
+        '200':
+          $ref: '#/components/responses/GenericPaginatedResources'
+  /requests/{id}/actions:
+    post:
+      tags: [Requests]
+      summary: Execute a transition atomically
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/GenericResource'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /audit-logs:
+    get:
+      tags: [Audit]
+      summary: Search immutable audit logs
+      responses:
+        '200':
+          $ref: '#/components/responses/GenericPaginatedResources'
+  /reports/summary:
+    get:
+      tags: [Reports]
+      summary: Return scoped report summary
+      responses:
+        '200':
+          $ref: '#/components/responses/GenericResource'
+  /reference-tables:
+    get:
+      tags: [ReferenceData]
+      summary: List reference tables and values
+      responses:
+        '200':
+          $ref: '#/components/responses/GenericPaginatedResources'
+  /screens:
+    get:
+      tags: [ScreenPermissions]
+      summary: List registered screens and capabilities
+      responses:
+        '200':
+          $ref: '#/components/responses/GenericPaginatedResources'
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications for current user
+      responses:
+        '200':
+          $ref: '#/components/responses/GenericPaginatedResources'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PerPage:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    Search:
+      name: search
+      in: query
+      schema:
+        type: string
+  responses:
+    Unauthorized:
+      description: Authentication failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Conflict:
+      description: Business state or optimistic locking conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    RateLimited:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    GenericPaginatedResources:
+      description: Paginated generic resources used only until the owning delivery phase finalizes its schema
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GenericPaginatedResources'
+    GenericResource:
+      description: Generic resource used only until the owning delivery phase finalizes its schema
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GenericResource'
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+        mfa_required:
+          type: boolean
+        challenge_token:
+          type: string
+          nullable: true
+    CurrentUser:
+      type: object
+      required: [id, name, email, permissions]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        organization:
+          $ref: '#/components/schemas/Organization'
+        team:
+          type: object
+          additionalProperties: true
+        role:
+          type: object
+          additionalProperties: true
+        bank:
+          type: object
+          nullable: true
+          additionalProperties: true
+        permissions:
+          type: array
+          items:
+            type: string
+    Organization:
+      type: object
+      required: [id, code, name, is_system, is_active, version, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        code:
+          type: string
+        name:
+          type: string
+        is_system:
+          type: boolean
+        is_active:
+          type: boolean
+        version:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    OrganizationWrite:
+      type: object
+      required: [code, name]
+      properties:
+        code:
+          type: string
+          pattern: '^[a-z][a-z0-9_]*$'
+        name:
+          type: string
+          maxLength: 200
+    OrganizationList:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Organization'
+    PaginationEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: {}
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    GenericPaginatedResources:
+      allOf:
+        - $ref: '#/components/schemas/PaginationEnvelope'
+    GenericResource:
+      type: object
+      required: [id, version, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        version:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      additionalProperties: true
+    PaginationMeta:
+      type: object
+      required: [page, per_page, total, last_page]
+      properties:
+        page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+        last_page:
+          type: integer
+    WorkflowValidationError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        path:
+          type: string
+          nullable: true
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+            request_id:
+              type: string
