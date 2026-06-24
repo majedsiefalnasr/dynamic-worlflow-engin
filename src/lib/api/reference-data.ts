@@ -76,7 +76,7 @@ export function useReferenceMutations() {
     onSuccess: invalidate,
   });
   // No hard delete — "remove" deactivates. POST /{id}/deactivate returns 406
-  // (CR-12), so deactivate via PATCH is_active.
+  // (CR-03), so deactivate via PATCH is_active.
   const deactivateTable = useMutation({
     mutationFn: (id: string) => api.patch(`/reference-tables/${id}`, { is_active: false }),
     onSuccess: invalidate,

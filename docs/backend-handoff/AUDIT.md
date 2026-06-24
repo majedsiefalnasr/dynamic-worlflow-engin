@@ -24,6 +24,8 @@ The app's behavior was confirmed from its state at commit `5e91b6b` (before the 
 
 > **Key point:** wiring a resource to the live API never deletes the mock — it stays as a fallback behind the flag. Running the whole project on the real database = set `VITE_API_RESOURCES=*` once the blocking items below are closed.
 
+> **Currently enabled (`.env`, 11 resources):** `reference-data, organizations, teams, roles, banks, merchants, reports, audit, notifications, requests, workflows`. The last three (notifications, requests, workflows) are read-ready: their controllers branch per-operation and fall back to mock for any blocked write, so enabling them is safe and changes no behavior beyond swapping the read source. See §9 for why `*` is **not** used.
+
 ---
 
 ## 1. Overall verdict
@@ -57,16 +59,22 @@ Status: 🟢 **uses the real API fully** · 🟡 **uses it partially** · 🔴 *
 | Auth (login) | `hasApiBase()` | `auth.ts` | 🟢 login/me/logout | 🟡 | 🟡 | Login is live. **Missing: MFA verify, refresh, forgot/reset/change-password** (CR-05). |
 | Audit | `audit` | `audit.ts` | 🟢 200 | read-only (server logs) | 🟢 | Full for reads. Client-side logging is off in API mode. |
 | Reports | `reports` | `reports.ts` | 🟢 200 (summary + aggregates) | exports | 🟢 | Full. |
-| Notifications | `notifications` | `notifications.ts` | 🟢 200 | read/unread/archive/read-all ✅ | 🟢 | Full. Client-side sending is off in API mode. |
+| Notifications | `notifications` | `notifications.ts` | 🟢 200 | **read-only** — mark-read/archive/read-all POST return 406 (CR-03) | 🟡 | Live reads; actions 406-blocked → buttons disabled in API mode. Client-side sending off. |
 | Workflow — view | `workflows` | `workflow-designer.ts` | 🟢 syncs published → `wfStore` | 🔴 no writes | 🟡 | View is live; **authoring fully blocked** (CR-01) and stays mock. |
 | Requests — list/queue | `requests` | `requests.ts` | 🟢 list + stages | 🔴 create/draft/actions/documents | 🟡 | List is live but **not enriched** (CR-06). Runtime (create/actions) stays mock. |
-| Screen permissions | — | — | 🟡 `screens` + `me/permissions` return 200 | — | 🔴 | `screen_permissions` returns `[]`, shape undocumented (CR-04) → gate stays on the manual model. |
+| Screen permissions (`admin.screen-permissions`) | — | — | 🟡 `screens` + `me/permissions` return 200 | — | 🔴 | `screen_permissions` returns `[]`, shape undocumented (CR-04) → gate stays on the manual model. |
+| Bank users (`bank.users`) | — (no client) | — | 🔴 | 🔴 | 🔴 | Reads `roleCatalog`/`teams` mock cells. Creation blocked by `role` (CR-02). |
+| CBY staff (`admin.cby-staff`) | — (no client) | — | 🔴 | 🔴 | 🔴 | Reads governance mock cells (banks/teams/orgs/roles). Same users blocker (CR-02). |
+| Requests — runtime (`requests.new`, `customs`) | — | — | 🔴 | 🔴 create/draft/actions/documents | 🔴 | Runs on `wfStore`. No live create/actions wiring; list under-enriched (CR-06). |
+| Workflow instance (`workflows.instances.$id`) | — | — | 🔴 | 🔴 | 🔴 | Pure `wfStore` runtime (fields/history/actions). Stays mock until CR-06. |
+| Requests — index (`requests.index`) | — | — | n/a | n/a | ⚪ | Redirect-only route (`Navigate`). No data, no API. |
 
 ### Count summary
 
-- 🟢 **Full real-API use (7):** reference data, organizations, roles, banks, audit, reports, notifications.
-- 🟡 **Partial (5):** teams (no hard delete), merchants (no status toggle), auth (no MFA/refresh/password), workflow view (no authoring), requests (list only).
-- 🔴 **Mock only (2):** users (blocked by CR-02), screen-permission gate (CR-04).
+- 🟢 **Full real-API use (6):** reference data, organizations, roles, banks, audit, reports.
+- 🟡 **Partial (6):** teams (no hard delete), merchants (no status toggle), auth (no MFA/refresh/password), workflow view (no authoring), requests (list only), notifications (read-only — actions 406).
+- 🔴 **Mock only (6):** users / bank-users / CBY-staff (blocked by CR-02), screen-permission gate (CR-04), requests runtime + workflow instance (CR-06 / no runtime wiring).
+- ⚪ **N/A (1):** `requests.index` redirect route.
 
 ---
 
@@ -147,14 +155,31 @@ POST /merchants/5/activate       -> 406
 | Workflow Designer (view) | ✅ Ready | Read + graph + lifecycle. |
 | Requests (list/view) | ⚠️ Partial (CR-06) | Missing enrichment. |
 | Requests (runtime) | ⛔ On mock | Create/actions not wired yet. |
-| Audit / reports / notifications | ✅ Ready | Full. |
+| Audit / reports | ✅ Ready | Full. |
+| Notifications | ⚠️ Partial | Reads live; mark-read/archive/read-all return 406 (CR-03) → read-only. |
 | Screen-permission gate | ⛔ Blocked (CR-04) | `screen_permissions` empty/undocumented. |
+| Users / bank-users / CBY-staff | ⛔ Blocked (CR-02) | No `users.ts` client; creation blocked by required `role`. |
+| Requests runtime / workflow instance | ⛔ On mock | `wfStore`-driven; no live create/actions wiring (CR-06). |
 
 ---
 
 ## 8. Path recommendation (does not change behavior)
 
-1. **Run on the real database now** for the 🟢 resources (reference data, organizations, banks, roles, audit, reports, notifications) by adding their keys to `VITE_API_RESOURCES`.
-2. **Run partially** teams, merchants, requests-view, and workflow-view, keeping the blocked operations on mock (the controller branch keeps app behavior unchanged).
-3. **Keep on mock** users, authoring, and the screen gate until CR-01/CR-02/CR-04 are closed.
-4. **Backend steps** to reach `VITE_API_RESOURCES=*` are in [BACKEND-CHANGE-REQUESTS.md](BACKEND-CHANGE-REQUESTS.md).
+1. **Already on the real database** (in `.env`, 11 keys): reference data, organizations, teams, roles, banks, merchants, reports, audit, **notifications, requests, workflows**. Full for the 🟢 set; partial for the 🟡 set (the controller branch keeps the blocked operations on mock so app behavior is unchanged).
+2. **Keep on mock** users / bank-users / CBY-staff, workflow authoring, the screen gate, and the request runtime until CR-01 / CR-02 / CR-04 / CR-06 are closed.
+3. **Backend steps** to reach `VITE_API_RESOURCES=*` are in [BACKEND-CHANGE-REQUESTS.md](BACKEND-CHANGE-REQUESTS.md).
+
+---
+
+## 9. Why `VITE_API_RESOURCES=*` is intentionally not used
+
+The enabled list is an **explicit 11-key allow-list**, not `*`. `*` would resolve **every** resource to the live API, including ones that have no live path:
+
+| Excluded from live | Why `*` would break it | Blocking CR |
+|---|---|---|
+| **Users** (`bank.users`, `admin.cby-staff`) | No `users.ts` client exists; `POST /users` creation is blocked by the required `role` string. | CR-02 |
+| **Screen-permission gate** (`admin.screen-permissions`) | `GET /auth/me/permissions` returns `screen_permissions: []` with an undocumented element shape — nothing to gate off. | CR-04 |
+| **Workflow authoring** (`admin.workflows` writes) | No `POST/PATCH/DELETE` write endpoints for any workflow component. | CR-01 |
+| **Request runtime** (`requests.new`, `customs`, `workflows.instances.$id`) | No live create/draft/actions/documents wiring; the list row is under-enriched. | CR-06 |
+
+Each key in the enabled list has a real consumer with a verified mock fallback. `*` becomes the correct setting only once CR-01, CR-02, CR-04, and CR-06 are closed.

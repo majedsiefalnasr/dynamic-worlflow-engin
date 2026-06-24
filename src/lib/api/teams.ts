@@ -73,7 +73,7 @@ export function useTeamMutations() {
         api.patch(`/teams/${input.id}`, { name: input.name }),
       onSuccess: invalidate,
     }),
-    // POST /{id}/activate|deactivate return 406 (CR-12); toggle via PATCH is_active.
+    // POST /{id}/activate|deactivate return 406 (CR-03); toggle via PATCH is_active.
     activate: useMutation({
       mutationFn: (id: string) => api.patch(`/teams/${id}`, { is_active: true }),
       onSuccess: invalidate,

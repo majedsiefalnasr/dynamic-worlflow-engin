@@ -1,7 +1,7 @@
 // ============================================================
 // Workflow Designer — READ-ONLY sync. The designer's 8 tabs all read wfStore,
 // so instead of rewriting them we load the live published workflow from the API
-// into wfStore once on mount. Editing is still write-blocked (CR-14): any local
+// into wfStore once on mount. Editing is still write-blocked (CR-01): any local
 // edits do NOT persist and are overwritten on the next sync — the screen shows a
 // read-only banner.
 // ============================================================

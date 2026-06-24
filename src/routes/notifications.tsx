@@ -126,7 +126,7 @@ function Notifications() {
   const apiEnabled = isApiEnabled("notifications");
   const cellItems = notificationsCell.use();
   const apiQuery = useNotificationsQuery(apiEnabled);
-  // Notification actions (read/archive) are 406-blocked (CR-12) → read-only in API mode.
+  // Notification actions (read/archive) are 406-blocked (CR-03) → read-only in API mode.
   const items = useMemo(
     () => (apiEnabled ? (apiQuery.data ?? EMPTY_NOTIFS) : cellItems),
     [apiEnabled, apiQuery.data, cellItems],

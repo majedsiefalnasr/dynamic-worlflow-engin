@@ -1,7 +1,7 @@
 // ============================================================
 // Notifications (read-only). GET /notifications (+ unread-count).
 // Mark-read / archive / read-all are POST action endpoints that return 406
-// (CR-12), so the screen is read-only in API mode (action buttons disabled).
+// (CR-03), so the screen is read-only in API mode (action buttons disabled).
 // ============================================================
 
 import { useQuery } from "@tanstack/react-query";

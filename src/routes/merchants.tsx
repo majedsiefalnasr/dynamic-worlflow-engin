@@ -115,7 +115,7 @@ function useMerchantsController(): MerchantsController {
       getDetail: (id) => fetchMerchantDetail(id, sectors),
       create: async (mer) => void (await m.create.mutateAsync({ merchant: mer, sectors })),
       update: async (id, mer) => void (await m.update.mutateAsync({ id, merchant: mer, sectors })),
-      // Status change is blocked server-side (CR-12) — surfaces an error until fixed.
+      // Status change is blocked server-side (CR-03) — surfaces an error until fixed.
       toggle: async (mer) =>
         void (await m.setStatus.mutateAsync({ id: mer.id, suspend: mer.status === "active" })),
       remove: async (mer) => void (await m.setStatus.mutateAsync({ id: mer.id, suspend: true })),

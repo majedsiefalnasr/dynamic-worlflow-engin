@@ -6,7 +6,7 @@
 // reference value: stored as sector_reference_value_id, shown/edited as a label,
 // so we resolve label <-> id via the sector_activity reference values.
 //
-// NOTE: activate/suspend POST endpoints return 406 (CR-12) and merchant PATCH
+// NOTE: activate/suspend POST endpoints return 406 (CR-03) and merchant PATCH
 // rejects status/is_active, so the status toggle is currently blocked server-side.
 // ============================================================
 
@@ -173,7 +173,7 @@ export function useMerchantMutations() {
         api.patch(`/merchants/${input.id}`, toWriteBody(input.merchant, input.sectors)),
       onSuccess: invalidate,
     }),
-    // Blocked server-side (CR-12) — kept so it works once the 406 is fixed.
+    // Blocked server-side (CR-03) — kept so it works once the 406 is fixed.
     setStatus: useMutation({
       mutationFn: (input: { id: string; suspend: boolean }) =>
         api.post(`/merchants/${input.id}/${input.suspend ? "suspend" : "activate"}`),

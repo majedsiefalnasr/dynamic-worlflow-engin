@@ -273,8 +273,8 @@ trait ChecksVersion {
 | CR-10 | OpenAPI accuracy | P2 | typed client |
 | CR-11 | Seed non-admin permissions | P1 | testing non-admin roles |
 
-**What the frontend can run on the live DB today:** reference data, organizations, roles, banks, audit, reports, notifications (full); teams, merchants, requests-list, workflow-view (partial).
+**What the frontend runs on the live DB today** (`.env`, 11 keys): reference data, organizations, roles, banks, audit, reports (full); teams, merchants, requests-list, workflow-view, notifications (partial — notifications read-only, actions 406 per CR-03).
 
-**Blocked:** user management (CR-02), workflow authoring (CR-01), screen-permission gating (CR-04), merchant/user status toggle (CR-03).
+**Blocked / on mock:** user management incl. bank-users + CBY-staff (CR-02), workflow authoring (CR-01), screen-permission gating (CR-04), request runtime (CR-06), merchant/user status toggle (CR-03). These keep `VITE_API_RESOURCES=*` off until their CRs close.
 
 **Order of work to reach `VITE_API_RESOURCES=*`:** CR-02 → CR-03 → CR-04 / CR-11 → CR-06 → CR-01 → CR-05, with CR-07 / CR-08 / CR-09 / CR-10 as quality passes.

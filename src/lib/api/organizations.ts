@@ -87,7 +87,7 @@ export function useOrganizationMutations() {
         }),
       onSuccess: invalidate,
     }),
-    // Backend POST /{id}/activate|deactivate return 406 (CR-12); toggle via PATCH is_active.
+    // Backend POST /{id}/activate|deactivate return 406 (CR-03); toggle via PATCH is_active.
     activate: useMutation({
       mutationFn: (id: string) => api.patch(`/organizations/${id}`, { is_active: true }),
       onSuccess: invalidate,
