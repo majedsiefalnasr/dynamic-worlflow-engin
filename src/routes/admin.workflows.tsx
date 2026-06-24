@@ -13,6 +13,7 @@ import {
   FolderTree,
   ChevronUp,
   ChevronDown,
+  Loader2,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/card";
@@ -67,6 +68,8 @@ import {
 import { orgsCell, teamsCell, roleCatalogCell, referenceTablesCell } from "@/lib/governance";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
 import { toast } from "sonner";
+import { isApiEnabled } from "@/lib/api/client";
+import { useWorkflowSync } from "@/lib/api/workflow-designer";
 
 export const Route = createFileRoute("/admin/workflows")({
   component: () => (
@@ -125,6 +128,8 @@ const referenceKeyFromSourceValue = (value: DynamicSourceOption) =>
   value.slice("reference:".length);
 
 function DesignerPage() {
+  const wfApi = isApiEnabled("workflows");
+  const sync = useWorkflowSync(wfApi);
   const defs = wfStore.definitions.use();
   const versions = wfStore.versions.use();
   const [defId, setDefId] = useState<string>(defs[0]?.id ?? "");
@@ -168,6 +173,14 @@ function DesignerPage() {
     }
   };
 
+  if (wfApi && sync.isLoading) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> جارٍ تحميل سير العمل من الخادم…
+      </div>
+    );
+  }
+
   return (
     <div>
       <PageHeader
@@ -175,11 +188,20 @@ function DesignerPage() {
         subtitle="إعداد المراحل، الانتقالات، الصلاحيات، الحقول، وقواعد الرؤية — بدون كود."
         breadcrumbs={[{ label: "الرئيسية", to: "/" }, { label: "مصمم سير العمل" }]}
         actions={
-          <Button variant="outline" onClick={onReseed}>
-            <RefreshCw className="ms-1 h-4 w-4" /> إعادة البناء
-          </Button>
+          !wfApi && (
+            <Button variant="outline" onClick={onReseed}>
+              <RefreshCw className="ms-1 h-4 w-4" /> إعادة البناء
+            </Button>
+          )
         }
       />
+
+      {wfApi && (
+        <Card className="mb-4 border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          عرض فقط — سير العمل من القاعدة الحقيقية. تأليف/تعديل سير العمل غير متاح بعد (CR-14)؛ أي
+          تغييرات هنا لا تُحفظ في الخادم.
+        </Card>
+      )}
 
       {/* Workflow + Version picker */}
       <Card className="p-5 mb-6">
@@ -215,10 +237,10 @@ function DesignerPage() {
             </Select>
           </div>
           <div className="flex items-end gap-2">
-            <Button variant="secondary" onClick={onClone}>
+            <Button variant="secondary" onClick={onClone} disabled={wfApi}>
               <Plus className="ms-1 h-4 w-4" /> نسخة جديدة
             </Button>
-            <Button onClick={onPublish}>
+            <Button onClick={onPublish} disabled={wfApi}>
               <Tag className="ms-1 h-4 w-4" /> نشر
             </Button>
           </div>
@@ -694,9 +716,7 @@ function StageGroupsManager({ versionId }: { versionId: string }) {
               </Badge>
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-sm">{g.name}</div>
-                <div className="text-xs text-muted-foreground truncate">
-                  {audienceSummary(g)}
-                </div>
+                <div className="text-xs text-muted-foreground truncate">{audienceSummary(g)}</div>
               </div>
               <span className="text-xs text-muted-foreground">
                 {stages.filter((s) => s.groupId === g.id).length} مرحلة
@@ -1185,8 +1205,8 @@ function FieldsTab({ versionId }: { versionId: string }) {
   const [label, setLabel] = useState("");
   const [type, setType] = useState<FieldDefinition["type"]>("text");
   const [options, setOptions] = useState("");
-  const [sourceValue, setSourceValue] = useState<DynamicSourceOption>(
-    () => (referenceTables[0] ? referenceSourceValue(referenceTables[0].key) : ("" as DynamicSourceOption)),
+  const [sourceValue, setSourceValue] = useState<DynamicSourceOption>(() =>
+    referenceTables[0] ? referenceSourceValue(referenceTables[0].key) : ("" as DynamicSourceOption),
   );
   const [groupId, setGroupId] = useState<string>(NO_GROUP);
   const [groupName, setGroupName] = useState("");
@@ -1236,7 +1256,11 @@ function FieldsTab({ versionId }: { versionId: string }) {
     setKey("");
     setLabel("");
     setOptions("");
-    setSourceValue(referenceTables[0] ? referenceSourceValue(referenceTables[0].key) : ("" as DynamicSourceOption));
+    setSourceValue(
+      referenceTables[0]
+        ? referenceSourceValue(referenceTables[0].key)
+        : ("" as DynamicSourceOption),
+    );
   };
   const remove = (id: string) => {
     const f = fields.find((x) => x.id === id);

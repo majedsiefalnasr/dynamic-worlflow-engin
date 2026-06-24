@@ -10,6 +10,8 @@ import { wfStore, type WorkflowInstance } from "@/lib/workflow-engine";
 import { instanceRef, stringValue } from "@/lib/workflow-bridge";
 import { useState } from "react";
 import { ScreenGuard } from "@/components/workflow/ScreenGuard";
+import { isApiEnabled } from "@/lib/api/client";
+import { useAuditLogsQuery } from "@/lib/api/audit";
 
 export const Route = createFileRoute("/audit")({
   component: () => (
@@ -20,7 +22,10 @@ export const Route = createFileRoute("/audit")({
 });
 
 function Audit() {
-  const AUDIT = auditCell.use();
+  const apiEnabled = isApiEnabled("audit");
+  const cellAudit = auditCell.use();
+  const apiQuery = useAuditLogsQuery(apiEnabled);
+  const AUDIT = apiEnabled ? (apiQuery.data ?? []) : cellAudit;
   const instances = wfStore.instances.use();
   const [q, setQ] = useState("");
   const filtered = AUDIT.filter(

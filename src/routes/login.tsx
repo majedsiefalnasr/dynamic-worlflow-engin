@@ -5,31 +5,61 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { auth, DEMO_USERS, ROLE_LABELS } from "@/lib/mock";
+import { auth, DEMO_USERS, ROLE_LABELS, type User } from "@/lib/mock";
 import { syncWorkflowUser } from "@/lib/workflow-bridge";
+import { hasApiBase, ApiError } from "@/lib/api/client";
+import { useLogin } from "@/lib/api/auth";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/login")({ component: Login });
 
 function Login() {
   const nav = useNavigate();
+  const apiMode = hasApiBase();
+  const loginMut = useLogin();
   const [step, setStep] = useState<"login" | "otp">("login");
   const [selectedUserId, setSelectedUserId] = useState<string>(DEMO_USERS[0].id);
+  const [email, setEmail] = useState<string>(DEMO_USERS[0].email);
+  const [password, setPassword] = useState<string>("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const selected = DEMO_USERS.find((u) => u.id === selectedUserId)!;
+
+  const pickUser = (u: User) => {
+    setSelectedUserId(u.id);
+    setEmail(u.email);
+    // Prefill the seeded dev password so a tester can sign in with one click.
+    if (apiMode) setPassword("Password@123");
+  };
+
+  const finishLogin = (user: User) => {
+    auth.login(user);
+    syncWorkflowUser(user);
+    nav({ to: "/" });
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStep("otp");
+    if (!apiMode) {
+      setStep("otp");
+      return;
+    }
+    try {
+      const result = await loginMut.mutateAsync({ email: email.trim(), password });
+      if (result.mfaRequired) {
+        toast.message("هذا الحساب يتطلب MFA — تحقق MFA غير مدعوم في الواجهة بعد.");
+        return;
+      }
+      finishLogin(result.user);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "تعذّر تسجيل الدخول");
+    }
   };
 
   const handleOtp = (e: React.FormEvent) => {
     e.preventDefault();
-    const u = DEMO_USERS.find((u) => u.id === selectedUserId)!;
-    auth.login(u);
-    syncWorkflowUser(u);
-    nav({ to: "/" });
+    finishLogin(DEMO_USERS.find((u) => u.id === selectedUserId)!);
   };
-
-  const selected = DEMO_USERS.find((u) => u.id === selectedUserId)!;
 
   return (
     <div
@@ -66,7 +96,9 @@ function Login() {
               <div>
                 <h2 className="text-2xl font-semibold">تسجيل الدخول</h2>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  أدخل بيانات الحساب المؤسسي، ثم أكمل التحقق بخطوتين.
+                  {apiMode
+                    ? "أدخل بيانات الحساب المؤسسي للدخول إلى النظام."
+                    : "أدخل بيانات الحساب المؤسسي، ثم أكمل التحقق بخطوتين."}
                 </p>
               </div>
 
@@ -75,8 +107,10 @@ function Login() {
                 <Input
                   id="login-email"
                   type="email"
-                  defaultValue={selected.email}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   autoComplete="username"
+                  dir="ltr"
                   required
                 />
               </div>
@@ -85,7 +119,8 @@ function Login() {
                 <Input
                   id="login-password"
                   type="password"
-                  defaultValue="••••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
                   required
                 />
@@ -95,7 +130,9 @@ function Login() {
                 <div className="space-y-1">
                   <Label>الحساب التجريبي</Label>
                   <p className="text-xs leading-5 text-muted-foreground">
-                    اختر الحساب الذي تريد اختبار صلاحياته في هذه النسخة.
+                    {apiMode
+                      ? "اختر حسابًا لتعبئة بريده وكلمة المرور التجريبية تلقائيًا."
+                      : "اختر الحساب الذي تريد اختبار صلاحياته في هذه النسخة."}
                   </p>
                 </div>
                 <div className="grid gap-1.5 max-h-72 overflow-y-auto pr-1">
@@ -103,7 +140,7 @@ function Login() {
                     <button
                       type="button"
                       key={u.id}
-                      onClick={() => setSelectedUserId(u.id)}
+                      onClick={() => pickUser(u)}
                       className={cn(
                         "flex min-h-11 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-right text-xs transition-colors",
                         "min-h-11",
@@ -124,14 +161,28 @@ function Login() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full h-11 text-base">
-                متابعة إلى التحقق <ChevronLeft className="h-4 w-4 mr-1" />
+              <Button type="submit" className="w-full h-11 text-base" disabled={loginMut.isPending}>
+                {apiMode ? (
+                  loginMut.isPending ? (
+                    "جارٍ الدخول…"
+                  ) : (
+                    <>
+                      تسجيل الدخول <ChevronLeft className="h-4 w-4 mr-1" />
+                    </>
+                  )
+                ) : (
+                  <>
+                    متابعة إلى التحقق <ChevronLeft className="h-4 w-4 mr-1" />
+                  </>
+                )}
               </Button>
 
-              <div className="text-xs text-muted-foreground text-center flex items-center justify-center gap-2">
-                <ShieldCheck className="h-3.5 w-3.5" />
-                مصادقة متعددة العوامل (MFA) مفعّلة
-              </div>
+              {!apiMode && (
+                <div className="text-xs text-muted-foreground text-center flex items-center justify-center gap-2">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  مصادقة متعددة العوامل (MFA) مفعّلة
+                </div>
+              )}
             </form>
           ) : (
             <form onSubmit={handleOtp} className="space-y-6">

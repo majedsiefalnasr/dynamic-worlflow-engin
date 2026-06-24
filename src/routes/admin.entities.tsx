@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Building2, Edit, Eye, Search, Power } from "lucide-react";
+import { Plus, Building2, Edit, Eye, Search, Power, Loader2, AlertCircle } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,9 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
+import { isApiEnabled, ApiError } from "@/lib/api/client";
+import { useBanksQuery, useBankMutations } from "@/lib/api/banks";
+import { useOrganizationsQuery } from "@/lib/api/organizations";
 
 export const Route = createFileRoute("/admin/entities")({
   component: () => (
@@ -38,9 +41,80 @@ type EntityPayload = {
   adminEmail?: string;
 };
 
+function bankErr(error: unknown, fallback: string): string {
+  return error instanceof ApiError ? error.message : fallback;
+}
+
+interface BanksController {
+  apiEnabled: boolean;
+  banks: Entity[];
+  isLoading: boolean;
+  error: unknown;
+  busy: boolean;
+  refetch: () => void;
+  add: (p: EntityPayload) => Promise<void>;
+  update: (id: string, p: EntityPayload) => Promise<void>;
+  toggle: (e: Entity) => Promise<void>;
+}
+
+function useBanksController(): BanksController {
+  const banksApi = isApiEnabled("banks");
+  const orgsApi = isApiEnabled("organizations");
+  const cellBanks = entitiesCell.use();
+  const banksQuery = useBanksQuery(banksApi);
+  // Banks need the commercial-banks org id for create, so query orgs whenever banks is live.
+  const orgsQuery = useOrganizationsQuery(orgsApi || banksApi);
+  const m = useBankMutations();
+
+  if (banksApi) {
+    const banksOrgId = (orgsQuery.data ?? []).find((o) => o.category === "bank")?.id ?? "";
+    return {
+      apiEnabled: true,
+      banks: banksQuery.data ?? [],
+      isLoading: banksQuery.isLoading,
+      error: banksQuery.error,
+      busy:
+        m.create.isPending || m.update.isPending || m.activate.isPending || m.deactivate.isPending,
+      refetch: () => void banksQuery.refetch(),
+      add: async (p) =>
+        void (await m.create.mutateAsync({
+          organizationId: banksOrgId,
+          name: p.name,
+          swiftCode: p.swiftCode,
+          licenseNo: p.licenseNo,
+          status: p.status,
+        })),
+      update: async (id, p) => void (await m.update.mutateAsync({ id, name: p.name })),
+      toggle: async (e) =>
+        void (await (e.status === "active" ? m.deactivate : m.activate).mutateAsync(e.id)),
+    };
+  }
+
+  return {
+    apiEnabled: false,
+    banks: cellBanks,
+    isLoading: false,
+    error: null,
+    busy: false,
+    refetch: () => {},
+    add: async (p) => {
+      const e: Entity = { id: `e_${Date.now()}`, type: "bank", ...p };
+      entitiesCell.set((prev) => [...prev, e]);
+    },
+    update: async (id, p) => {
+      entitiesCell.set((prev) => prev.map((x) => (x.id === id ? { ...x, ...p } : x)));
+    },
+    toggle: async (e) => {
+      const next: Entity["status"] = e.status === "active" ? "suspended" : "active";
+      entitiesCell.set((prev) => prev.map((x) => (x.id === e.id ? { ...x, status: next } : x)));
+    },
+  };
+}
+
 function EntitiesAdmin() {
   const { user } = useAuth();
-  const list = entitiesCell.use();
+  const ctrl = useBanksController();
+  const list = ctrl.banks;
   const [openAdd, setOpenAdd] = useState(false);
   const [editing, setEditing] = useState<Entity | null>(null);
   const [viewing, setViewing] = useState<Entity | null>(null);
@@ -57,50 +131,42 @@ function EntitiesAdmin() {
     );
   }, [list, q]);
 
-  function add(p: EntityPayload) {
-    const e: Entity = { id: `e_${Date.now()}`, type: "bank", ...p };
-    entitiesCell.set((prev) => [...prev, e]);
-    if (user)
-      logAudit({
-        userId: user.id,
-        userName: user.name,
-        role: user.roleId,
-        action: "إضافة بنك جديد",
-        ref: e.id,
-        notes: e.name,
-      });
-    toast.success(`تم إضافة "${p.name}"`);
-    setOpenAdd(false);
+  function audit(action: string, ref: string, notes?: string) {
+    if (!ctrl.apiEnabled && user)
+      logAudit({ userId: user.id, userName: user.name, role: user.roleId, action, ref, notes });
   }
 
-  function update(id: string, p: EntityPayload) {
-    entitiesCell.set((prev) => prev.map((x) => (x.id === id ? { ...x, ...p } : x)));
-    if (user)
-      logAudit({
-        userId: user.id,
-        userName: user.name,
-        role: user.roleId,
-        action: "تعديل بيانات بنك",
-        ref: id,
-        notes: p.name,
-      });
-    toast.success("تم حفظ التعديلات");
-    setEditing(null);
+  async function add(p: EntityPayload) {
+    try {
+      await ctrl.add(p);
+      audit("إضافة بنك جديد", p.name, p.name);
+      toast.success(`تم إضافة "${p.name}"`);
+      setOpenAdd(false);
+    } catch (error) {
+      toast.error(bankErr(error, "تعذّرت إضافة البنك"));
+    }
   }
 
-  function toggleStatus(e: Entity) {
-    const next: Entity["status"] = e.status === "active" ? "suspended" : "active";
-    entitiesCell.set((prev) => prev.map((x) => (x.id === e.id ? { ...x, status: next } : x)));
-    if (user)
-      logAudit({
-        userId: user.id,
-        userName: user.name,
-        role: user.roleId,
-        action: next === "active" ? "تفعيل بنك" : "إيقاف بنك",
-        ref: e.id,
-        notes: e.name,
-      });
-    toast.success(next === "active" ? `تم تفعيل ${e.name}` : `تم إيقاف ${e.name}`);
+  async function update(id: string, p: EntityPayload) {
+    try {
+      await ctrl.update(id, p);
+      audit("تعديل بيانات بنك", id, p.name);
+      toast.success("تم حفظ التعديلات");
+      setEditing(null);
+    } catch (error) {
+      toast.error(bankErr(error, "تعذّر حفظ التعديلات"));
+    }
+  }
+
+  async function toggleStatus(e: Entity) {
+    try {
+      await ctrl.toggle(e);
+      const next = e.status === "active" ? "suspended" : "active";
+      audit(next === "active" ? "تفعيل بنك" : "إيقاف بنك", e.id, e.name);
+      toast.success(next === "active" ? `تم تفعيل ${e.name}` : `تم إيقاف ${e.name}`);
+    } catch (error) {
+      toast.error(bankErr(error, "تعذّر تغيير الحالة"));
+    }
   }
 
   return (
@@ -116,7 +182,7 @@ function EntitiesAdmin() {
                 <Plus className="h-4 w-4 ml-1" /> بنك جديد
               </Button>
             </DialogTrigger>
-            <EntityDialog title="إضافة بنك جديد" onSave={add} />
+            <EntityDialog title="إضافة بنك جديد" hideAdmin={ctrl.apiEnabled} onSave={add} />
           </Dialog>
         }
       />
@@ -134,109 +200,130 @@ function EntitiesAdmin() {
         </div>
       </Card>
 
-      <Card className="shadow-card border-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[680px] text-sm">
-            <thead className="bg-muted/40 text-xs text-muted-foreground">
-              <tr className="text-right">
-                <th scope="col" className="px-4 py-3">
-                  الجهة
-                </th>
-                <th scope="col" className="px-4 py-3">
-                  رقم الترخيص
-                </th>
-                <th scope="col" className="px-4 py-3">
-                  SWIFT
-                </th>
-                <th scope="col" className="px-4 py-3">
-                  الحالة
-                </th>
-                <th scope="col" className="px-4 py-3 text-left">
-                  إجراءات
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((e) => (
-                <tr key={e.id} className="border-t hover:bg-muted/30">
-                  <td className="px-4 py-3 font-medium">
-                    <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary grid place-items-center">
-                        <Building2 className="h-4 w-4" />
-                      </div>
-                      {e.name}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs">{e.licenseNo}</td>
-                  <td className="px-4 py-3 font-mono text-xs">{e.swiftCode ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    <Badge
-                      className={
-                        e.status === "active"
-                          ? "bg-success/15 text-success border-0"
-                          : "bg-destructive/15 text-destructive border-0"
-                      }
-                    >
-                      {e.status === "active" ? "نشط" : "موقوف"}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1 justify-end">
-                      <Button size="sm" variant="ghost" onClick={() => setViewing(e)}>
-                        <Eye className="h-3.5 w-3.5 ml-1" />
-                        عرض
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setEditing(e)}>
-                        <Edit className="h-3.5 w-3.5 ml-1" />
-                        تعديل
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className={e.status === "active" ? "text-destructive" : "text-success"}
-                        onClick={() => toggleStatus(e)}
-                      >
-                        <Power className="h-3.5 w-3.5 ml-1" />
-                        {e.status === "active" ? "إيقاف" : "تفعيل"}
-                      </Button>
-                    </div>
-                  </td>
+      {ctrl.isLoading && (
+        <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> جارٍ التحميل…
+        </div>
+      )}
+
+      {!!ctrl.error && (
+        <Card className="mb-4 flex flex-col items-center gap-2 border-0 p-6 text-center shadow-card">
+          <AlertCircle className="h-5 w-5 text-destructive" />
+          <p className="text-sm text-muted-foreground">
+            {bankErr(ctrl.error, "تعذّر تحميل البنوك")}
+          </p>
+          <Button variant="outline" size="sm" onClick={ctrl.refetch}>
+            إعادة المحاولة
+          </Button>
+        </Card>
+      )}
+
+      {!ctrl.isLoading && !ctrl.error && (
+        <Card className="shadow-card border-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[680px] text-sm">
+              <thead className="bg-muted/40 text-xs text-muted-foreground">
+                <tr className="text-right">
+                  <th scope="col" className="px-4 py-3">
+                    الجهة
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    رقم الترخيص
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    SWIFT
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    الحالة
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left">
+                    إجراءات
+                  </th>
                 </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center">
-                    {list.length === 0 ? (
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary grid place-items-center">
-                          <Building2 className="h-5 w-5" />
+              </thead>
+              <tbody>
+                {filtered.map((e) => (
+                  <tr key={e.id} className="border-t hover:bg-muted/30">
+                    <td className="px-4 py-3 font-medium">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary grid place-items-center">
+                          <Building2 className="h-4 w-4" />
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          لا توجد بنوك بعد. أضف أول بنك تجاري ليتمكن مستخدموه من الدخول وتقديم
-                          الطلبات.
-                        </p>
-                        <Button size="sm" onClick={() => setOpenAdd(true)}>
-                          <Plus className="h-4 w-4 ml-1" /> بنك جديد
+                        {e.name}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs">{e.licenseNo}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{e.swiftCode ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      <Badge
+                        className={
+                          e.status === "active"
+                            ? "bg-success/15 text-success border-0"
+                            : "bg-destructive/15 text-destructive border-0"
+                        }
+                      >
+                        {e.status === "active" ? "نشط" : "موقوف"}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1 justify-end">
+                        <Button size="sm" variant="ghost" onClick={() => setViewing(e)}>
+                          <Eye className="h-3.5 w-3.5 ml-1" />
+                          عرض
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditing(e)}>
+                          <Edit className="h-3.5 w-3.5 ml-1" />
+                          تعديل
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className={e.status === "active" ? "text-destructive" : "text-success"}
+                          onClick={() => toggleStatus(e)}
+                        >
+                          <Power className="h-3.5 w-3.5 ml-1" />
+                          {e.status === "active" ? "إيقاف" : "تفعيل"}
                         </Button>
                       </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">
-                        لا توجد بنوك مطابقة لبحثك.
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center">
+                      {list.length === 0 ? (
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary grid place-items-center">
+                            <Building2 className="h-5 w-5" />
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            لا توجد بنوك بعد. أضف أول بنك تجاري ليتمكن مستخدموه من الدخول وتقديم
+                            الطلبات.
+                          </p>
+                          <Button size="sm" onClick={() => setOpenAdd(true)}>
+                            <Plus className="h-4 w-4 ml-1" /> بنك جديد
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">
+                          لا توجد بنوك مطابقة لبحثك.
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       <Dialog open={!!editing} onOpenChange={(v) => !v && setEditing(null)}>
         {editing && (
           <EntityDialog
             title="تعديل بيانات البنك"
             initial={editing}
+            hideAdmin={ctrl.apiEnabled}
             onSave={(p) => update(editing.id, p)}
           />
         )}
@@ -276,10 +363,12 @@ function Row({ label, value }: { label: string; value: string }) {
 function EntityDialog({
   title,
   initial,
+  hideAdmin,
   onSave,
 }: {
   title: string;
   initial?: Entity;
+  hideAdmin?: boolean;
   onSave: (p: EntityPayload) => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -290,9 +379,11 @@ function EntityDialog({
   const [adminEmail, setAdminEmail] = useState(initial?.adminEmail ?? "");
   const isNew = !initial;
   const emailOk = !adminEmail.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim());
-  const adminOk = isNew
-    ? adminName.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim())
-    : emailOk;
+  const adminOk = hideAdmin
+    ? true
+    : isNew
+      ? adminName.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim())
+      : emailOk;
   const valid = name.trim() && licenseNo.trim() && adminOk;
   return (
     <DialogContent dir="rtl" className="sm:max-w-md">
@@ -342,37 +433,39 @@ function EntityDialog({
           </div>
         </div>
 
-        <div className="pt-3 mt-2 border-t">
-          <div className="text-sm font-semibold mb-1">
-            حساب مدير البنك {isNew && <span className="text-destructive">*</span>}
-          </div>
-          <p className="text-xs text-muted-foreground mb-3">
-            {isNew
-              ? "يُنشأ حساب المدير الأول للبنك تلقائياً ويُستخدم لتسجيل الدخول وإضافة باقي المستخدمين."
-              : "بيانات المدير الأول للبنك."}
-          </p>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>اسم المدير {isNew && "*"}</Label>
-              <Input
-                value={adminName}
-                onChange={(e) => setAdminName(e.target.value)}
-                placeholder="مثال: محمد علي"
-              />
+        {!hideAdmin && (
+          <div className="pt-3 mt-2 border-t">
+            <div className="text-sm font-semibold mb-1">
+              حساب مدير البنك {isNew && <span className="text-destructive">*</span>}
             </div>
-            <div className="space-y-1.5">
-              <Label>البريد الإلكتروني للمدير {isNew && "*"}</Label>
-              <Input
-                type="email"
-                dir="ltr"
-                value={adminEmail}
-                onChange={(e) => setAdminEmail(e.target.value)}
-                placeholder="admin@bank.ye"
-              />
-              {!emailOk && <p className="text-xs text-destructive">صيغة البريد غير صحيحة</p>}
+            <p className="text-xs text-muted-foreground mb-3">
+              {isNew
+                ? "يُنشأ حساب المدير الأول للبنك تلقائياً ويُستخدم لتسجيل الدخول وإضافة باقي المستخدمين."
+                : "بيانات المدير الأول للبنك."}
+            </p>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>اسم المدير {isNew && "*"}</Label>
+                <Input
+                  value={adminName}
+                  onChange={(e) => setAdminName(e.target.value)}
+                  placeholder="مثال: محمد علي"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>البريد الإلكتروني للمدير {isNew && "*"}</Label>
+                <Input
+                  type="email"
+                  dir="ltr"
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  placeholder="admin@bank.ye"
+                />
+                {!emailOk && <p className="text-xs text-destructive">صيغة البريد غير صحيحة</p>}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
       <DialogFooter>
         <Button

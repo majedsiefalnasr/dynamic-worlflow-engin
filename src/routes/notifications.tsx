@@ -30,8 +30,12 @@ import {
 } from "@/lib/governance";
 import { useAuth } from "@/lib/mock";
 import { cn } from "@/lib/utils";
+import { isApiEnabled } from "@/lib/api/client";
+import { useNotificationsQuery } from "@/lib/api/notifications";
 
 export const Route = createFileRoute("/notifications")({ component: Notifications });
+
+const EMPTY_NOTIFS: Notif[] = [];
 
 type Filter = "all" | "unread" | "read";
 
@@ -119,7 +123,15 @@ function bucketLabel(time: string) {
 }
 
 function Notifications() {
-  const items = notificationsCell.use();
+  const apiEnabled = isApiEnabled("notifications");
+  const cellItems = notificationsCell.use();
+  const apiQuery = useNotificationsQuery(apiEnabled);
+  // Notification actions (read/archive) are 406-blocked (CR-12) → read-only in API mode.
+  const items = useMemo(
+    () => (apiEnabled ? (apiQuery.data ?? EMPTY_NOTIFS) : cellItems),
+    [apiEnabled, apiQuery.data, cellItems],
+  );
+  const readOnly = apiEnabled;
   const auth = useAuth();
   const role = auth?.user?.roleId;
 
@@ -167,7 +179,12 @@ function Notifications() {
         subtitle={`${unread} غير مقروء من ${items.length} إجمالاً`}
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={markAllRead} disabled={unread === 0}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={markAllRead}
+              disabled={unread === 0 || readOnly}
+            >
               <CheckCheck className="h-4 w-4 ml-1" /> تحديد الكل كمقروء
             </Button>
             <Button
@@ -176,7 +193,7 @@ function Notifications() {
               onClick={() => {
                 if (confirm("حذف جميع الإشعارات؟")) clearAllNotifs();
               }}
-              disabled={items.length === 0}
+              disabled={items.length === 0 || readOnly}
             >
               <Trash2 className="h-4 w-4 ml-1" /> مسح الكل
             </Button>
@@ -281,43 +298,45 @@ function Notifications() {
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">{n.time}</div>
                       </div>
-                      <div
-                        className="flex items-start gap-1 shrink-0"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        }}
-                      >
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-11 w-11"
-                          title={n.unread ? "تحديد كمقروء" : "تحديد كغير مقروء"}
-                          onClick={() => markNotifRead(n.id, !n.unread)}
+                      {!readOnly && (
+                        <div
+                          className="flex items-start gap-1 shrink-0"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
                         >
-                          {n.unread ? (
-                            <Check className="h-3.5 w-3.5" />
-                          ) : (
-                            <Undo2 className="h-3.5 w-3.5" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-11 w-11 text-rose-600 hover:text-rose-700"
-                          title="حذف"
-                          onClick={() => deleteNotif(n.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-11 w-11"
+                            title={n.unread ? "تحديد كمقروء" : "تحديد كغير مقروء"}
+                            onClick={() => markNotifRead(n.id, !n.unread)}
+                          >
+                            {n.unread ? (
+                              <Check className="h-3.5 w-3.5" />
+                            ) : (
+                              <Undo2 className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-11 w-11 text-rose-600 hover:text-rose-700"
+                            title="حذف"
+                            onClick={() => deleteNotif(n.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   );
                   return n.href ? (
                     <Link
                       key={n.id}
                       to={n.href}
-                      onClick={() => n.unread && markNotifRead(n.id, false)}
+                      onClick={() => !readOnly && n.unread && markNotifRead(n.id, false)}
                       className="block"
                     >
                       {Body}

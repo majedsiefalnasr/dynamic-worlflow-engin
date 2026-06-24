@@ -1,6 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Edit, Power, Search, Trash2, Building2, Network, Landmark } from "lucide-react";
+import {
+  Plus,
+  Edit,
+  Power,
+  Search,
+  Trash2,
+  Building2,
+  Network,
+  Landmark,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +40,8 @@ import {
 } from "@/lib/governance";
 import { DEMO_USERS, useAuth } from "@/lib/mock";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
+import { isApiEnabled, ApiError } from "@/lib/api/client";
+import { useOrganizationsQuery, useOrganizationMutations } from "@/lib/api/organizations";
 
 export const Route = createFileRoute("/admin/orgs")({
   component: () => (
@@ -61,9 +74,95 @@ const ORG_CATEGORIES: {
   },
 ];
 
+function orgError(error: unknown, fallback: string): string {
+  return error instanceof ApiError ? error.message : fallback;
+}
+
+function slug(s: string): string {
+  const base = s
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "");
+  return base || `org_${Date.now()}`;
+}
+
+interface OrgController {
+  apiEnabled: boolean;
+  orgs: OrgRecord[];
+  isLoading: boolean;
+  error: unknown;
+  busy: boolean;
+  refetch: () => void;
+  add: (p: Payload) => Promise<void>;
+  update: (target: OrgRecord, p: Payload) => Promise<void>;
+  toggle: (o: OrgRecord) => Promise<void>;
+  remove: (o: OrgRecord) => Promise<void>;
+}
+
+// Live backend when `organizations` is enabled, else the local mock cell.
+// All hooks run every render so hook order stays stable across both sources.
+function useOrgController(): OrgController {
+  const apiEnabled = isApiEnabled("organizations");
+  const cellOrgs = orgsCell.use();
+  const query = useOrganizationsQuery(apiEnabled);
+  const m = useOrganizationMutations();
+
+  if (apiEnabled) {
+    return {
+      apiEnabled: true,
+      orgs: query.data ?? [],
+      isLoading: query.isLoading,
+      error: query.error,
+      busy:
+        m.create.isPending ||
+        m.update.isPending ||
+        m.activate.isPending ||
+        m.deactivate.isPending ||
+        m.remove.isPending,
+      refetch: () => void query.refetch(),
+      add: async (p) => void (await m.create.mutateAsync({ name: p.label, category: p.category })),
+      update: async (target, p) =>
+        void (await m.update.mutateAsync({ id: target.id, name: p.label, category: p.category })),
+      toggle: async (o) => void (await (o.active ? m.deactivate : m.activate).mutateAsync(o.id)),
+      remove: async (o) => void (await m.remove.mutateAsync(o.id)),
+    };
+  }
+
+  return {
+    apiEnabled: false,
+    orgs: cellOrgs,
+    isLoading: false,
+    error: null,
+    busy: false,
+    refetch: () => {},
+    add: async (p) => {
+      let id = slug(p.label);
+      if (cellOrgs.some((o) => o.id === id)) id = `${id}_${Date.now().toString(36)}`;
+      orgsCell.set((prev) => [...prev, { id, label: p.label, active: true, category: p.category }]);
+    },
+    update: async (target, p) => {
+      orgsCell.set((prev) =>
+        prev.map((o) =>
+          o.id === target.id
+            ? { ...o, label: p.label, category: p.category, isBank: undefined }
+            : o,
+        ),
+      );
+    },
+    toggle: async (o) => {
+      orgsCell.set((prev) => prev.map((x) => (x.id === o.id ? { ...x, active: !x.active } : x)));
+    },
+    remove: async (o) => {
+      orgsCell.set((prev) => prev.filter((x) => x.id !== o.id));
+    },
+  };
+}
+
 function OrgsAdmin() {
   const { user } = useAuth();
-  const orgs = orgsCell.use();
+  const ctrl = useOrgController();
+  const orgs = ctrl.orgs;
   const teams = teamsCell.use();
   const roles = roleCatalogCell.use();
   const [q, setQ] = useState("");
@@ -78,55 +177,61 @@ function OrgsAdmin() {
   }, [orgs, q]);
 
   function audit(action: string, ref: string, notes?: string) {
-    if (user)
+    // In API mode the backend writes its own audit log.
+    if (!ctrl.apiEnabled && user)
       logAudit({ userId: user.id, userName: user.name, role: user.roleId, action, ref, notes });
   }
 
-  function slug(s: string) {
-    const base = s
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "_")
-      .replace(/[^a-z0-9_]/g, "");
-    return base || `org_${Date.now()}`;
-  }
-
-  function add(p: Payload) {
-    let id = slug(p.label);
-    if (orgs.some((o) => o.id === id)) id = `${id}_${Date.now().toString(36)}`;
-    orgsCell.set((prev) => [...prev, { id, label: p.label, active: true, category: p.category }]);
-    audit("إضافة جهة", id, p.label);
-    toast.success(`تمت إضافة الجهة "${p.label}"`);
-    setOpenAdd(false);
-  }
-
-  function update(target: OrgRecord, p: Payload) {
-    orgsCell.set((prev) =>
-      prev.map((o) =>
-        o.id === target.id ? { ...o, label: p.label, category: p.category, isBank: undefined } : o,
-      ),
-    );
-    audit("تعديل جهة", target.id, p.label);
-    toast.success("تم حفظ التعديلات");
-    setEditing(null);
-  }
-
-  function toggle(o: OrgRecord) {
-    orgsCell.set((prev) => prev.map((x) => (x.id === o.id ? { ...x, active: !x.active } : x)));
-    audit(o.active ? "إلغاء تفعيل جهة" : "تفعيل جهة", o.id, o.label);
-    toast.success(o.active ? `تم إلغاء تفعيل "${o.label}"` : `تم تفعيل "${o.label}"`);
-  }
-
-  function remove(o: OrgRecord) {
-    if (o.builtin) return toast.error("لا يمكن حذف جهة افتراضية.");
-    const usedByTeams = teams.filter((t) => t.orgKind === o.id).length;
-    const usedByRoles = roles.filter((r) => r.orgId === o.id).length;
-    if (usedByTeams || usedByRoles) {
-      return toast.error(`لا يمكن الحذف، الجهة مرتبطة بـ ${usedByTeams} فريق و${usedByRoles} دور.`);
+  async function add(p: Payload) {
+    try {
+      await ctrl.add(p);
+      audit("إضافة جهة", p.label, p.label);
+      toast.success(`تمت إضافة الجهة "${p.label}"`);
+      setOpenAdd(false);
+    } catch (error) {
+      toast.error(orgError(error, "تعذّرت إضافة الجهة"));
     }
-    orgsCell.set((prev) => prev.filter((x) => x.id !== o.id));
-    audit("حذف جهة", o.id, o.label);
-    toast.success(`تم حذف "${o.label}"`);
+  }
+
+  async function update(target: OrgRecord, p: Payload) {
+    try {
+      await ctrl.update(target, p);
+      audit("تعديل جهة", target.id, p.label);
+      toast.success("تم حفظ التعديلات");
+      setEditing(null);
+    } catch (error) {
+      toast.error(orgError(error, "تعذّر حفظ التعديلات"));
+    }
+  }
+
+  async function toggle(o: OrgRecord) {
+    try {
+      await ctrl.toggle(o);
+      audit(o.active ? "إلغاء تفعيل جهة" : "تفعيل جهة", o.id, o.label);
+      toast.success(o.active ? `تم إلغاء تفعيل "${o.label}"` : `تم تفعيل "${o.label}"`);
+    } catch (error) {
+      toast.error(orgError(error, "تعذّر تغيير الحالة"));
+    }
+  }
+
+  async function remove(o: OrgRecord) {
+    if (o.builtin) return toast.error("لا يمكن حذف جهة افتراضية.");
+    if (!ctrl.apiEnabled) {
+      const usedByTeams = teams.filter((t) => t.orgKind === o.id).length;
+      const usedByRoles = roles.filter((r) => r.orgId === o.id).length;
+      if (usedByTeams || usedByRoles) {
+        return toast.error(
+          `لا يمكن الحذف، الجهة مرتبطة بـ ${usedByTeams} فريق و${usedByRoles} دور.`,
+        );
+      }
+    }
+    try {
+      await ctrl.remove(o);
+      audit("حذف جهة", o.id, o.label);
+      toast.success(`تم حذف "${o.label}"`);
+    } catch (error) {
+      toast.error(orgError(error, "تعذّر حذف الجهة"));
+    }
   }
 
   return (
@@ -160,137 +265,163 @@ function OrgsAdmin() {
         </div>
       </Card>
 
-      <Card className="shadow-card border-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] text-sm">
-            <thead className="bg-muted/40 text-xs text-muted-foreground">
-              <tr className="text-right">
-                <th scope="col" className="px-4 py-3">
-                  الجهة
-                </th>
-                <th scope="col" className="px-4 py-3">
-                  الفرق
-                </th>
-                <th scope="col" className="px-4 py-3">
-                  الأدوار
-                </th>
-                <th scope="col" className="px-4 py-3">
-                  المستخدمون
-                </th>
-                <th scope="col" className="px-4 py-3">
-                  التصنيف
-                </th>
-                <th scope="col" className="px-4 py-3">
-                  النوع
-                </th>
-                <th scope="col" className="px-4 py-3">
-                  الحالة
-                </th>
-                <th scope="col" className="px-4 py-3 text-left">
-                  إجراءات
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((o) => {
-                const teamCount = teams.filter((t) => t.orgKind === o.id).length;
-                const roleCount = roles.filter((r) => r.orgId === o.id).length;
-                const userCount = DEMO_USERS.filter((u) => u.orgKind === o.id).length;
-                return (
-                  <tr key={o.id} className="border-t hover:bg-muted/30">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary grid place-items-center">
-                          <Network className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{o.label}</div>
-                          <div className="text-xs text-muted-foreground" dir="ltr">
-                            {o.id}
+      {ctrl.isLoading && (
+        <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> جارٍ التحميل…
+        </div>
+      )}
+
+      {!!ctrl.error && (
+        <Card className="mb-4 flex flex-col items-center gap-2 border-0 p-6 text-center shadow-card">
+          <AlertCircle className="h-5 w-5 text-destructive" />
+          <p className="text-sm text-muted-foreground">
+            {orgError(ctrl.error, "تعذّر تحميل الجهات")}
+          </p>
+          <Button variant="outline" size="sm" onClick={ctrl.refetch}>
+            إعادة المحاولة
+          </Button>
+        </Card>
+      )}
+
+      {!ctrl.isLoading && !ctrl.error && (
+        <Card className="shadow-card border-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] text-sm">
+              <thead className="bg-muted/40 text-xs text-muted-foreground">
+                <tr className="text-right">
+                  <th scope="col" className="px-4 py-3">
+                    الجهة
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    الفرق
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    الأدوار
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    المستخدمون
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    التصنيف
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    النوع
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    الحالة
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left">
+                    إجراءات
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((o) => {
+                  const teamCount = teams.filter((t) => t.orgKind === o.id).length;
+                  const roleCount = roles.filter((r) => r.orgId === o.id).length;
+                  const userCount = DEMO_USERS.filter((u) => u.orgKind === o.id).length;
+                  return (
+                    <tr key={o.id} className="border-t hover:bg-muted/30">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary grid place-items-center">
+                            <Network className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <div className="font-medium">{o.label}</div>
+                            <div className="text-xs text-muted-foreground" dir="ltr">
+                              {o.id}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs tabular-nums">{teamCount}</td>
-                    <td className="px-4 py-3 text-xs tabular-nums">{roleCount}</td>
-                    <td className="px-4 py-3 text-xs tabular-nums">{userCount}</td>
-                    <td className="px-4 py-3">
-                      <OrgCategoryBadge category={getOrgCategory(o)} />
-                    </td>
-                    <td className="px-4 py-3">
-                      {o.builtin ? (
-                        <Badge className="bg-info/15 text-info border-0">افتراضي</Badge>
-                      ) : (
-                        <Badge className="bg-muted text-muted-foreground border-0">مخصّص</Badge>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {o.active ? (
-                        <Badge className="bg-success/15 text-success border-0">نشط</Badge>
-                      ) : (
-                        <Badge className="bg-destructive/15 text-destructive border-0">
-                          غير نشط
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1 justify-end">
-                        <Button size="sm" variant="ghost" onClick={() => setEditing(o)}>
-                          <Edit className="h-3.5 w-3.5 ml-1" />
-                          تعديل
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className={o.active ? "text-destructive" : "text-success"}
-                          onClick={() => toggle(o)}
-                        >
-                          <Power className="h-3.5 w-3.5 ml-1" />
-                          {o.active ? "إلغاء تفعيل" : "تفعيل"}
-                        </Button>
-                        {!o.builtin && (
+                      </td>
+                      <td className="px-4 py-3 text-xs tabular-nums">
+                        {ctrl.apiEnabled ? "—" : teamCount}
+                      </td>
+                      <td className="px-4 py-3 text-xs tabular-nums">
+                        {ctrl.apiEnabled ? "—" : roleCount}
+                      </td>
+                      <td className="px-4 py-3 text-xs tabular-nums">
+                        {ctrl.apiEnabled ? "—" : userCount}
+                      </td>
+                      <td className="px-4 py-3">
+                        <OrgCategoryBadge category={getOrgCategory(o)} />
+                      </td>
+                      <td className="px-4 py-3">
+                        {o.builtin ? (
+                          <Badge className="bg-info/15 text-info border-0">افتراضي</Badge>
+                        ) : (
+                          <Badge className="bg-muted text-muted-foreground border-0">مخصّص</Badge>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {o.active ? (
+                          <Badge className="bg-success/15 text-success border-0">نشط</Badge>
+                        ) : (
+                          <Badge className="bg-destructive/15 text-destructive border-0">
+                            غير نشط
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1 justify-end">
+                          <Button size="sm" variant="ghost" onClick={() => setEditing(o)}>
+                            <Edit className="h-3.5 w-3.5 ml-1" />
+                            تعديل
+                          </Button>
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="text-destructive"
-                            onClick={() => remove(o)}
+                            className={o.active ? "text-destructive" : "text-success"}
+                            onClick={() => toggle(o)}
                           >
-                            <Trash2 className="h-3.5 w-3.5 ml-1" />
-                            حذف
+                            <Power className="h-3.5 w-3.5 ml-1" />
+                            {o.active ? "إلغاء تفعيل" : "تفعيل"}
                           </Button>
-                        )}
-                      </div>
+                          {!o.builtin && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive"
+                              onClick={() => remove(o)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 ml-1" />
+                              حذف
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {list.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-12 text-center">
+                      {orgs.length === 0 ? (
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary grid place-items-center">
+                            <Network className="h-5 w-5" />
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            لا توجد جهات بعد. أضف أول جهة لتصنيف الفرق والأدوار والمستخدمين تحتها.
+                          </p>
+                          <Button size="sm" onClick={() => setOpenAdd(true)}>
+                            <Plus className="h-4 w-4 ml-1" /> جهة جديدة
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">
+                          لا توجد جهات مطابقة لبحثك.
+                        </span>
+                      )}
                     </td>
                   </tr>
-                );
-              })}
-              {list.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center">
-                    {orgs.length === 0 ? (
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary grid place-items-center">
-                          <Network className="h-5 w-5" />
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          لا توجد جهات بعد. أضف أول جهة لتصنيف الفرق والأدوار والمستخدمين تحتها.
-                        </p>
-                        <Button size="sm" onClick={() => setOpenAdd(true)}>
-                          <Plus className="h-4 w-4 ml-1" /> جهة جديدة
-                        </Button>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">
-                        لا توجد جهات مطابقة لبحثك.
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       <Dialog open={!!editing} onOpenChange={(v) => !v && setEditing(null)}>
         {editing && (

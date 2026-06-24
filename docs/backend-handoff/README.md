@@ -30,6 +30,9 @@
 | [09-frontend-integration.md](09-frontend-integration.md) | استبدال mock وربط React Query |
 | [DELIVERY_STATUS.md](DELIVERY_STATUS.md) | حالة كل أولوية في Backend وUI والاختبارات |
 | [openapi.yaml](openapi.yaml) | baseline لعقد OpenAPI يتم استكماله مرحلة بمرحلة |
+| [AUDIT.md](AUDIT.md) | مراجعة الـBackend الحي مقابل العقد: مطابق/مختلف/ناقص وجاهزية الربط |
+| [BACKEND-CHANGE-REQUESTS.md](BACKEND-CHANGE-REQUESTS.md) | طلبات التعديل للـBackend مرتبة بالأولوية (P0/P1/P2) |
+| [seed/](seed/) | Laravel Seeder ببيانات الواجهة الافتراضية + الحسابات وكلمة المرور للتجربة |
 
 ## تعريف الاكتمال
 

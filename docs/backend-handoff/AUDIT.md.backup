@@ -1,0 +1,203 @@
+# مراجعة الـBackend مقابل العقد (Audit)
+
+تاريخ المراجعة: 2026-06-23
+المصدر الحي: `https://cby2.ultimate-dev2.com/api/documentation`
+ملف العقد (OpenAPI JSON): `https://cby2.ultimate-dev2.com/docs`
+العقد المرجعي: ملفات `docs/backend-handoff/00..09` و`openapi.yaml`.
+
+> هذا الملف يقيّم ما سلّمه فريق الـBackend مقابل العقد المتفق عليه فقط. الإجراءات المطلوبة من فريق الـBackend مفصلة في [BACKEND-CHANGE-REQUESTS.md](BACKEND-CHANGE-REQUESTS.md).
+
+## الحكم العام
+
+التغطية الوظيفية **عالية**: ١١ نطاقًا، ٩٢ مسارًا. معظم الموارد (الحوكمة، التجار، الطلبات، التدقيق، التقارير، البيانات الأساسية، الشاشات، الإشعارات) منفّذة بالكامل ومطابقة للعقد، والتقارير تتجاوز العقد.
+
+لكن **لا يصلح الربط الكامل بعد** بسبب أربعة بنود حاسمة:
+
+1. **مصمم سير العمل للقراءة فقط** — لا توجد endpoints لإنشاء أو تعديل أي مكوّن من المصمم.
+2. **مغلّف الاستجابة والخطأ مختلف عن العقد** — لا يوجد `error.code` ثابت ولا `request_id`.
+3. **آلية المصادقة مختلفة** (Sanctum بدل JWT المتفق عليه) وناقصة (لا MFA verify، لا refresh، لا تغيير كلمة مرور ذاتي).
+4. **لا توجد schemas مكتوبة لكل مورد** — كل `data` نوعه `object` عام، فلا يمكن توليد client مكتوب الأنواع من OpenAPI.
+
+البنود ١ و٢ و٤ تمنع تنفيذ خطة الربط في [09-frontend-integration.md](09-frontend-integration.md) كما هي. التفاصيل أدناه.
+
+دليل الشدة: 🟥 حاجز للربط · 🟧 يحتاج توافق قبل المرحلة · 🟨 تحسين/تأكيد · 🟩 مطابق.
+
+---
+
+## ١. مصفوفة تغطية المسارات (العقد ← الحي)
+
+| النطاق | الحالة | ملاحظة |
+|---|---|---|
+| Auth | 🟧 جزئي | login / logout / me / me-permissions موجودة. ناقص: mfa-verify، refresh، forgot/reset/change-password. |
+| Organizations | 🟩 كامل | CRUD + activate/deactivate + DELETE. |
+| Teams | 🟩 كامل | CRUD + activate/deactivate. |
+| Roles | 🟩 كامل | CRUD + activate/deactivate + screen-permissions. |
+| Banks | 🟩 كامل | CRUD + activate/deactivate + DELETE. |
+| Users | 🟩 كامل | CRUD + activate/deactivate + DELETE + reset-password + reset-mfa. |
+| Merchants | 🟩 كامل | list/create/get/update/activate/suspend/companies — مطابق حرفيًا. |
+| Workflow Designer | 🟥 ناقص جوهري | قراءة + lifecycle فقط. لا إنشاء/تعديل/حذف لأي مكوّن. التفصيل في §٤. |
+| Requests | 🟩 كامل | list/create/get/my-queue/actions/draft/documents(upload+download+delete)/history/graph. |
+| Audit | 🟩 كامل | list/get/export + compliance/duplicate-invoices. |
+| Reports | 🟩 يتجاوز | كل التقارير العشرة + exports(create/get/download). |
+| Reference Data | 🟩 كامل | tables + values + activate/deactivate. |
+| Screens / Permissions | 🟩 كامل+ | screens + roles/{id}/screen-permissions(GET/PUT) + me/permissions + admin/role-permissions matrix. |
+| Notifications | 🟩 كامل | list/unread-count/read/unread/archive/read-all. |
+
+---
+
+## ٢. ما تم على الوجه الصحيح 🟩
+
+- **Base path** `/api/v1` (server `/api` + مسارات `/v1/...`) مطابق.
+- **snake_case** في الحقول، و`page` / `per_page` في القوائم.
+- **مغلّف الترقيم** `meta: { page, per_page, total, last_page }` مطابق للعقد حرفيًا.
+- **فلاتر قائمة الطلبات** مطابقة للعقد بالكامل (`workflow_id`, `workflow_version_id`, `stage_id`, `bank_id`, `merchant_id`, `status`, `created_from`, `created_to`, `invoice_number`, `search`, `sla_status`).
+- **التزامن على تنفيذ الإجراء**: `POST /requests/{id}/actions` يتطلب `transition_id` و`version` — مطابق لعقد التزامن في [00-api-and-auth.md](00-api-and-auth.md).
+- **نمط activate/deactivate** متسق عبر كل موارد الحوكمة والبيانات الأساسية.
+- **الأمان**: `bearerAuth` مطبّق على المسارات المحمية، و`login` عام بلا security — صحيح.
+- **التجار**: نموذج الملاك والشركات والنطاق البنكي وأخطاء الأعمال موجودة كما في [02-merchants.md](02-merchants.md).
+- **التقارير والتدقيق**: التغطية كاملة وتتجاوز الحد الأدنى للمرحلة الأولى.
+
+---
+
+## ٣. ما تم بشكل مختلف عن العقد 🟧 / 🟥
+
+### ٣.١ مغلّف الاستجابة 🟧
+العقد ([00-api-and-auth.md](00-api-and-auth.md)) حدّد: المورد المفرد يُعاد ككائن مباشر يحمل `id, created_at, updated_at, version`، والقائمة تُعاد كـ`{ data, meta }`.
+
+الحي يستخدم مغلّفين:
+- `ApiSuccess`: `{ success: bool, message: string, data: object }` للموارد المفردة.
+- `PaginatedResponse`: `{ data: [], meta: {...} }` للقوائم (بدون `success`).
+
+عدم التماثل بين المفرد (مغلّف `success`) والقائمة (بلا `success`) يفرض على الواجهة طبقة normalize. **يلزم تثبيت القاعدة**: هل كل الاستجابات تُغلّف بـ`success/message/data`؟ هل القائمة داخل `data` أم في الجذر؟
+
+### ٣.٢ مغلّف الخطأ 🟥
+العقد:
+```json
+{ "error": { "code": "ROLE_IN_USE", "message": "...", "fields": { "name": ["..."] }, "request_id": "01J..." } }
+```
+الحي (`ApiError`):
+```json
+{ "success": false, "message": "...", "errors": { } }
+```
+الفروق المؤثرة:
+- **لا يوجد `code` ثابت قابل للقراءة آليًا.** أكواد الأعمال المعرّفة في العقد (`ROLE_IN_USE`, `REQUEST_STALE`, `TRANSITION_NOT_AVAILABLE`, `STAGE_EXECUTION_FORBIDDEN`, `MERCHANT_TAX_NUMBER_EXISTS`, `MERCHANT_BANK_IMMUTABLE` …) لا يمكن للواجهة التفرّع عليها. هذا يكسر متطلب [09-frontend-integration.md](09-frontend-integration.md): عرض أخطاء `409` والتفريق عن `422`.
+- **لا يوجد `request_id`** للتتبّع المطلوب في العقد.
+- تسمية خريطة التحقق `errors` بدل `fields`.
+
+### ٣.٣ آلية المصادقة 🟧
+العقد ([00-api-and-auth.md](00-api-and-auth.md)) نصّ على JWT عبر `php-open-source-saver/jwt-auth` مع: access قصير في الذاكرة، refresh في `HttpOnly Secure SameSite` cookie، blacklist، إبطال الجلسات عند التعطيل.
+
+الحي يستخدم **Laravel Sanctum** (`sanctumCookie` + `bearerAuth`، وحقل `device_name` في login). هذا تحوّل مقبول تقنيًا لكنه **يغيّر خطة الواجهة** في [09-frontend-integration.md](09-frontend-integration.md) (interceptor مع refresh-once، وفصل access/refresh). يلزم توثيق: نوع التوكن وعمره، استراتيجية التجديد، إبطال التوكنات عند التعطيل/تغيير الصلاحيات.
+
+### ٣.٤ التزامن غير مكتمل 🟧
+`version` مفروض فقط على `requests/{id}/actions`. أجسام PATCH للحوكمة (`organizations`, …) والتجار والبيانات الأساسية **لا تحتوي `version`** ولا تطلبه — فلا حماية `STALE_RESOURCE` على هذه الموارد رغم نص العقد على إرسال `version` في كل تعديل حسّاس.
+
+---
+
+## ٤. الناقص 🟥 — مصمم سير العمل بلا endpoints كتابة
+
+الموجود (قراءة + lifecycle فقط):
+`GET /workflows`, `GET /workflows/{id}`, `GET /workflows/{id}/versions`, `GET /workflow-versions/{id}` (+ `clone`, `validate`, `publish`, `archive`), `GET .../stages`, `GET .../transitions`, `GET .../fields`, `GET .../field-groups`, `GET .../graph`, `GET /workflow-actions`, و`GET/PUT` لـ`stages/{id}/permissions` و`stages/{id}/field-rules`.
+
+الناقص بالكامل (مطلوب في [03-workflow-designer.md](03-workflow-designer.md) و[08-delivery-plan.md](08-delivery-plan.md) §٧):
+
+| المكوّن | الناقص |
+|---|---|
+| Definitions | `POST /workflows` (إنشاء تعريف) |
+| Versions | `POST /workflows/{id}/versions` (إنشاء نسخة)، `PATCH /workflow-versions/{id}` (تعديل draft) |
+| Stages | `POST` / `PATCH` / `DELETE` للمرحلة |
+| Actions | `POST` / `PATCH` / activate/deactivate للإجراء |
+| Transitions | `POST` / `PATCH` / `DELETE` للانتقال |
+| Fields | `POST` / `PATCH` / `DELETE` للحقل |
+| Field groups | `POST` / `PATCH` / `DELETE` للمجموعة |
+
+**الأثر:** لا يمكن إنشاء أو تعديل سير عمل عبر API. شاشة `/admin/workflows` لا تملك Backend للكتابة، ويبقى المصمم على mock/localStorage حتى تُسلّم هذه الـendpoints. القراءة والـlifecycle والـgraph جاهزة، لذا يمكن ربط **عرض** سير العمل المنشور مبكرًا، أما التأليف فمحجوب.
+
+### ناقص أصغر في المصادقة 🟧
+`POST /auth/mfa/verify`، `POST /auth/refresh`، `POST /auth/forgot-password`، `POST /auth/reset-password`، `POST /auth/change-password` (ذاتي) — غير موجودة. (`reset-password` و`reset-mfa` موجودة لكن كإجراء إداري على `/users/{id}` فقط، لا كإجراء ذاتي للمستخدم.)
+
+---
+
+## ٥. الجاهزية لكل مرحلة (لأجل DELIVERY_STATUS)
+
+| المرحلة | جاهزية الربط | ملاحظة |
+|---|---|---|
+| 1–4 الحوكمة (جهات/فرق/أدوار/بنوك) | ✅ جاهز — بعد تثبيت المغلّف §٣.١/٣.٢ | كل الـCRUD موجود. |
+| 5 المستخدمون والمصادقة | ⚠️ جزئي | CRUD جاهز؛ تأكيد آلية Sanctum + MFA + refresh مطلوب أولًا. |
+| 6 التجار | ✅ جاهز | مطابق. |
+| 7 مصمم سير العمل (تأليف) | ⛔ محجوب | endpoints الكتابة ناقصة بالكامل. |
+| 7 مصمم سير العمل (عرض/مخطط) | ✅ جاهز | قراءة + graph + lifecycle. |
+| 8 الطلبات | ✅ جاهز | تغطية كاملة مع التزامن. |
+| 9 طابور «دوري» | ✅ جاهز | `my-queue` موجود. |
+| 10 التدقيق | ✅ جاهز | كامل. |
+| 11 التقارير | ✅ جاهز | يتجاوز العقد. |
+| 12 البيانات الأساسية | ✅ جاهز | مطابق. |
+| 13 صلاحيات الشاشات | ✅ جاهز | screens + matrix. |
+| 14 الإشعارات | ✅ جاهز | كامل. |
+
+> عبر كل المراحل: غياب schemas مكتوبة (§١ من الحكم العام) يعني أن الواجهة تكتب الأنواع يدويًا بدل توليدها من OpenAPI. غير حاجز للتشغيل لكنه يخالف «تعريف الاكتمال» في [README.md](README.md) ويزيد مخاطر الانحراف.
+
+---
+
+## ٦. مطابقة طبقة الـmock/localStorage الفعلية بالـBackend
+
+هذا القسم يقارن مخازن الواجهة الحالية (الكود الفعلي) بالـendpoints الحية، لتحديد ما **يُستبدل الآن** كما هو، وما يحتاج **تكييفًا**، وما هو **محجوب**.
+
+### ٦.١ جرد المخازن الحالية
+
+| المخزن | الموقع | المفتاح | المحتوى |
+|---|---|---|---|
+| خلايا الإدارة | [src/lib/db.ts](../../src/lib/db.ts) عبر `cell()` | `cby.v2.*` | audit, notifications, merchants, entities, referenceTables, orgs, teams, roleCatalog, rolePerms, subRoles, screenPerms |
+| المستخدمون | [src/lib/mock.ts](../../src/lib/mock.ts) | `cby:users` | `DEMO_USERS` snapshot + هوية الدخول الوهمية (`auth`) |
+| محرّك سير العمل | [src/lib/workflow-engine/storage.ts](../../src/lib/workflow-engine/storage.ts) | `wfe:*` | definitions, versions, stages, stageGroups, stageRoutingRules, transitions, actions, assignments, fieldDefs, fieldGroups, fieldRules, **instances, history** |
+
+### ٦.٢ مطابقة كل مورد (المخزن ← الـendpoint)
+
+الحالة: 🟢 استبدال الآن · 🟡 استبدال مع تكييف/refactor · 🔴 محجوب على CR.
+
+| المورد | المخزن الحالي ← الـendpoint | إعادة التسمية / الفجوة | الحالة |
+|---|---|---|---|
+| البيانات الأساسية | `referenceTablesCell` ← `/reference-tables` + `/values` | `system`→`is_system`؛ القيم المتداخلة تُنشأ عبر endpoint منفصل | 🟢 |
+| الجهات | `orgsCell {id,label,active,builtin,category}` ← `/organizations {code,name,is_system,is_active}` | `id`→`code`، `label`→`name`، `builtin`→`is_system`، `active`→`is_active`. **`category` بلا حقل مقابل** → تُشتق من `code` (commercial_banks→bank، national_committee→committee، غيرها→other) | 🟡 |
+| البنوك | `entitiesCell {swiftCode,licenseNo,status:active\|suspended}` ← `/banks {organization_id,code,name,license_number,swift_code,status:ACTIVE\|INACTIVE,is_active}` | `swiftCode`→`swift_code`، `licenseNo`→`license_number`، `suspended`→`INACTIVE`، يلزم `organization_id`+`code` | 🟢 |
+| الأدوار | `roleCatalogCell {id,name,orgId}` ← `/roles {organization_id,code,name}` | `id`→`code`، `orgId`→`organization_id` | 🟢 |
+| المستخدمون | `DEMO_USERS {roleId,entityId,orgKind,teamId,active}` ← `/users {organization_id,team_id,role_id\|role,bank_id,is_active,mfa_enabled}` | `roleId`→`role` (الـAPI يقبل كود نصّي!) أو `role_id`، `entityId`→`bank_id`، `orgKind`→`organization_id`، `teamId`→`team_id`. `org`/`avatar` عرض فقط | 🟡 (يتبع المصادقة) |
+| التجار | `merchantsCell {tax,cr,contact,category,linkedCompanies,owners[{share}],transactions}` ← `/merchants {bank_id,tax_number,commercial_register,phone,status,owners[],companies[]}` | `tax`→`tax_number`، `entityId`→`bank_id`، `contact`→`phone`، `category`→قيمة قطاع مرجعية، `share`→`ownership_percentage`، `linkedCompanies`→`companies`. **`transactions` غير موجود** (يُشتق من الطلبات). **شكل `owners`/`companies` غير موثّق** (BE-09) | 🟡 / 🔴 للمتداخل |
+| التدقيق | `auditCell` + `logAudit()` ← `/audit-logs` (قراءة فقط) | عرض: `actor`→`userName`، `event_code`→`action`، `created_at`→`ts`، `ip_address`→`ip`. **أوقف التسجيل من العميل** (الخادم يسجّل) | 🟢 قراءة |
+| الإشعارات | `notificationsCell {time,unread,href,audience}` + `notify()` ← `/notifications` (+read/archive) | `unread`←`read_at==null`، `href`→`action_url`، `time`←تنسيق `created_at`. أوقف `notify()` من العميل | 🟢 |
+| صلاحيات الشاشات | `screenPermsCell` + `canScreen()`/`requestsAccessForUser()` ← `/screens` + `/roles/{id}/screen-permissions` + `/auth/me/permissions` | **شكل ردّ `me/permissions` و`screens` غير موثّق (`{}`)** (BE-10). نموذج العميل (مصفوفة يدوية + اشتقاق الطلبات من المصمم) ≠ نموذج الخادم (قدرات شاشة + stage permissions) | 🔴 |
+| تصميم سير العمل | `wfe:` definitions/versions/stages/actions/transitions/assignments/fieldDefs/fieldGroups/fieldRules ← قراءة `/workflows`, `/workflow-versions/{id}/*` + graph | الكتابة محجوبة (BE-03). `assignments`→`stage_permissions`(PUT)، `fieldRules`→`field-rules`(PUT). **`stageGroups` و`stageRoutingRules` بلا مقابل** (الخادم يستخدم `display_label`) | 🟢 عرض / 🔴 تأليف |
+| طلبات (runtime) | `wfe:instances` + `wfe:history` ← `/requests` (list/my-queue/get/create/draft/actions/documents/history/graph) | `instance.data`→`requests.data` + أعمدة `amount/currency/invoice_number`. يتطلب `workflow_version_id` منشورة من الخادم (BE-11) | 🟡 |
+
+### ٦.٣ انحرافات تتطلب refactor في الواجهة قبل/أثناء الاستبدال
+
+1. **معرّفات نصّية → أعداد صحيحة:** الواجهة تستخدم `rc_*`, `e1`, `m1`, `team_*`؛ الخادم أعداد. يلزم جدول mapping أثناء الانتقال أو تبديل كامل لكل مورد دفعة واحدة.
+2. **`team.roleCode` يُحذف:** الفريق في الخادم لا يحمل دورًا؛ الدور يأتي من `user.role_id`. كل اشتقاق صلاحية معتمد على `TEAM_ROLE`/`getTeamRole` يجب أن يتغيّر.
+3. **نموذج الصلاحيات:** `can()` + اتحاد `Permission` (request.create / workflow.execute …) + المصفوفة اليدوية → قدرات شاشة من الخادم + stage permissions عبر `/auth/me/permissions`. أكبر تغيير منطقي.
+4. **مستخدم متعدد الأدوار/الفرق** (`WfUser.roleIds[]`, `teamIds[]`) → دور واحد وفريق واحد (المرحلة الأولى).
+5. **`StageGroup` + `StageRoutingRule`** بلا مقابل في الخادم → تُستبدل بـ`stage_permissions.display_label`.
+6. **منطق العميل ينتقل للخادم:** `logAudit`, `notify`, `isDuplicateInvoice` → التدقيق تلقائي، الإشعارات jobs، و`/compliance/duplicate-invoices`.
+7. **enums الحالة:** بنك `suspended`→`INACTIVE`، تاجر `SUSPENDED`.
+
+### ٦.٤ ترتيب الاستبدال المقترح (مرتبط بالملفات)
+
+1. **البيانات الأساسية** (`referenceTablesCell`) — بلا اعتماديات، يحتاجها التجار والحقول.
+2. **الجهات + البنوك** (`orgsCell`, `entitiesCell`).
+3. **الأدوار** (`roleCatalogCell`) ثم **الفرق** (`teamsCell`، بحذف `roleCode`).
+4. **المستخدمون + المصادقة** (`DEMO_USERS`/`cby:users` + `auth`) — بعد تأكيد BE-04.
+5. **التجار** الأساسي (`merchantsCell`)؛ المتداخل (owners/companies) بعد BE-09.
+6. **طلبات runtime** (`wfe:instances`/`history`) — يحتاج نسخة منشورة seeded (BE-11).
+7. **التدقيق + الإشعارات** (قراءة + إجراءات).
+8. **بوابة الشاشات** (`me/permissions`) — بعد BE-10.
+9. **تأليف سير العمل** — أخيرًا، بعد BE-03.
+
+---
+
+## ٧. توصية المسار
+
+1. **ابدأ الربط فورًا** على المسارات الجاهزة بعد تثبيت مغلّف الاستجابة/الخطأ (§٣.١، §٣.٢): البيانات الأساسية، الجهات، البنوك، الأدوار، الفرق، التجار (الأساسي)، التدقيق، التقارير. الترتيب التفصيلي في §٦.٤.
+2. **اربط عرض** سير العمل المنشور والمخطط (قراءة فقط) بالتوازي.
+3. **اربط طلبات runtime** بمجرد توفّر نسخة منشورة من الخادم (BE-11).
+4. **أجّل بوابة الشاشات** (`canScreen`) حتى توثيق ردّ `me/permissions` (BE-10).
+5. **أبقِ تأليف سير العمل** على mock حتى endpoints الكتابة (BE-03)، مع حذف `stageGroups`/`stageRoutingRules` من نموذج الواجهة.
+6. **ثبّت المصادقة** (Sanctum vs JWT، MFA، refresh) قبل حذف `login demo` و`RoleSwitcher`.

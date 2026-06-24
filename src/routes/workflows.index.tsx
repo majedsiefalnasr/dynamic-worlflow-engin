@@ -8,13 +8,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-  createInstance, getInitialStage, getPublishedVersion, wfStore,
+  createInstance,
+  getInitialStage,
+  getPublishedVersion,
+  wfStore,
 } from "@/lib/workflow-engine";
 import { useAuth } from "@/lib/mock";
 import {
@@ -25,14 +37,14 @@ import {
   instanceInvoiceNumber,
   instanceRef,
   instanceTitle,
-  progressForInstance,
   roleCanCreateRequest,
   isDuplicateInvoice,
-  stageLabel,
   visibleInstancesFor,
 } from "@/lib/workflow-bridge";
 import { ScreenGuard } from "@/components/workflow/ScreenGuard";
 import { toast } from "sonner";
+import { isApiEnabled } from "@/lib/api/client";
+import { useRequestsQuery, useWorkflowStagesQuery } from "@/lib/api/requests";
 
 export const Route = createFileRoute("/workflows/")({
   component: () => (
@@ -45,17 +57,35 @@ export const Route = createFileRoute("/workflows/")({
 function WorkflowsHome() {
   const nav = useNavigate();
   const { user } = useAuth();
+  const requestsApi = isApiEnabled("requests");
   const defs = wfStore.definitions.use();
-  const instances = wfStore.instances.use();
-  const stages = wfStore.stages.use();
+  const cellInstances = wfStore.instances.use();
+  const cellStages = wfStore.stages.use();
   wfStore.versions.use();
+
+  const reqQuery = useRequestsQuery(requestsApi);
+  const apiInstances = reqQuery.data ?? [];
+  const apiVersionId = apiInstances[0]?.workflowVersionId;
+  const stagesQuery = useWorkflowStagesQuery(apiVersionId, requestsApi);
+
+  const instances = requestsApi ? apiInstances : cellInstances;
+  const stages = requestsApi ? (stagesQuery.data ?? []) : cellStages;
 
   const [q, setQ] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
 
   const selectedDef = defs[0];
   const publishedVer = selectedDef ? getPublishedVersion(selectedDef.id) : undefined;
-  const scoped = visibleInstancesFor(user, instances);
+  // The API returns only requests the user may see; mock filters client-side.
+  const scoped = requestsApi ? instances : visibleInstancesFor(user, instances);
+
+  const stageNameOf = (id: string) => stages.find((s) => s.id === id)?.name ?? "—";
+  const progressOf = (inst: (typeof instances)[number]) => {
+    const ordered = stages.filter((s) => s.order < 99).sort((a, b) => a.order - b.order);
+    const idx = ordered.findIndex((s) => s.id === inst.currentStageId);
+    if (idx < 0) return inst.status === "closed" ? 100 : 0;
+    return ordered.length ? Math.round(((idx + 1) / ordered.length) * 100) : 0;
+  };
 
   const data = useMemo(() => {
     return scoped.filter((inst) => {
@@ -65,13 +95,15 @@ function WorkflowsHome() {
         instanceGoodsType(inst),
         String(inst.data.invoiceNumber ?? ""),
       ].join(" ");
-      return (stageFilter === "all" || inst.currentStageId === stageFilter)
-        && (!q || haystack.includes(q));
+      return (
+        (stageFilter === "all" || inst.currentStageId === stageFilter) &&
+        (!q || haystack.includes(q))
+      );
     });
   }, [scoped, q, stageFilter]);
 
   const stageOptions = stages
-    .filter((s) => publishedVer ? s.workflowVersionId === publishedVer.id : true)
+    .filter((s) => (publishedVer ? s.workflowVersionId === publishedVer.id : true))
     .sort((a, b) => a.order - b.order);
 
   const onCreate = () => {
@@ -100,10 +132,12 @@ function WorkflowsHome() {
           <>
             {user?.roleId === "rc_platform_admin" && (
               <Link to="/admin/workflows" className="inline-block">
-                <Button variant="outline"><Workflow className="ms-1 h-4 w-4" /> مصمم سير العمل</Button>
+                <Button variant="outline">
+                  <Workflow className="ms-1 h-4 w-4" /> مصمم سير العمل
+                </Button>
               </Link>
             )}
-            {user && roleCanCreateRequest(user) && (
+            {!requestsApi && user && roleCanCreateRequest(user) && (
               <Button onClick={onCreate} disabled={!publishedVer}>
                 <FilePlus2 className="ms-1 h-4 w-4" /> طلب جديد
               </Button>
@@ -124,11 +158,15 @@ function WorkflowsHome() {
             />
           </div>
           <Select value={stageFilter} onValueChange={setStageFilter}>
-            <SelectTrigger className="w-64"><SelectValue placeholder="المرحلة" /></SelectTrigger>
+            <SelectTrigger className="w-64">
+              <SelectValue placeholder="المرحلة" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">كل المراحل</SelectItem>
               {stageOptions.map((s) => (
-                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                <SelectItem key={s.id} value={s.id}>
+                  {s.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -162,7 +200,9 @@ function WorkflowsHome() {
             <TableBody>
               {data.map((inst) => (
                 <TableRow key={inst.id}>
-                  <TableCell className="font-mono text-xs font-semibold text-primary">{instanceRef(inst)}</TableCell>
+                  <TableCell className="font-mono text-xs font-semibold text-primary">
+                    {instanceRef(inst)}
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs">{instanceInvoiceNumber(inst)}</span>
@@ -178,21 +218,39 @@ function WorkflowsHome() {
                   <TableCell className="text-xs">{instanceGoodsType(inst)}</TableCell>
                   <TableCell className="font-semibold tabular-nums">
                     {instanceAmount(inst).toLocaleString("en-US")}
-                    <span className="text-xs text-muted-foreground mr-1">{instanceCurrency(inst)}</span>
+                    <span className="text-xs text-muted-foreground mr-1">
+                      {instanceCurrency(inst)}
+                    </span>
                   </TableCell>
-                  <TableCell>{stageLabel(inst)}</TableCell>
+                  <TableCell>{stageNameOf(inst.currentStageId)}</TableCell>
                   <TableCell>
-                    <Badge variant={inst.status === "active" ? "default" : inst.status === "closed" ? "secondary" : "destructive"}>
-                      {inst.status === "active" ? "نشط" : inst.status === "closed" ? "مغلق" : "مرفوض"}
+                    <Badge
+                      variant={
+                        inst.status === "active"
+                          ? "default"
+                          : inst.status === "closed"
+                            ? "secondary"
+                            : "destructive"
+                      }
+                    >
+                      {inst.status === "active"
+                        ? "نشط"
+                        : inst.status === "closed"
+                          ? "مغلق"
+                          : "مرفوض"}
                     </Badge>
                   </TableCell>
                   <TableCell className="w-32">
-                    <Progress value={progressForInstance(inst)} className="h-1.5" />
-                    <div className="text-xs text-muted-foreground mt-1 tabular-nums">{progressForInstance(inst)}%</div>
+                    <Progress value={progressOf(inst)} className="h-1.5" />
+                    <div className="text-xs text-muted-foreground mt-1 tabular-nums">
+                      {progressOf(inst)}%
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Link to="/workflows/instances/$id" params={{ id: inst.id }}>
-                      <Button size="sm" variant="outline">فتح</Button>
+                      <Button size="sm" variant="outline">
+                        فتح
+                      </Button>
                     </Link>
                   </TableCell>
                 </TableRow>

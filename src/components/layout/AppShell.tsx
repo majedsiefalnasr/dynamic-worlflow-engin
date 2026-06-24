@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth, auth, ROLE_LABELS, type RoleId } from "@/lib/mock";
+import { logout as apiLogout } from "@/lib/api/auth";
 import { notificationsCell, markAllRead, screenPermsCell, type ScreenKey } from "@/lib/governance";
 import { canScreen } from "@/lib/workflow-bridge";
 import { wfStore } from "@/lib/workflow-engine";
@@ -319,6 +320,7 @@ export function AppShell() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onSelect={() => {
+                    void apiLogout();
                     auth.logout();
                     nav({ to: "/login" });
                   }}

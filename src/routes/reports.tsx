@@ -23,6 +23,14 @@ import { MONTHLY, CATEGORY_DIST } from "@/lib/mock";
 import { wfStore } from "@/lib/workflow-engine";
 import { instanceAmount, instanceCurrency } from "@/lib/workflow-bridge";
 import { ScreenGuard } from "@/components/workflow/ScreenGuard";
+import { isApiEnabled } from "@/lib/api/client";
+import {
+  useReportSummary,
+  useRequestsOverTime,
+  useReportByCurrency,
+  useReportBySector,
+} from "@/lib/api/reports";
+import { useSectorValues } from "@/lib/api/merchants";
 
 export const Route = createFileRoute("/reports")({
   component: () => (
@@ -57,6 +65,27 @@ function Reports() {
         .reduce((sum, i) => sum + instanceAmount(i), 0) / 1000,
   }));
 
+  // Summary stat cards come from /reports/summary when reports is live (the
+  // charts below still use mock series until the chart endpoints are verified).
+  const reportsApi = isApiEnabled("reports");
+  const summary = useReportSummary(reportsApi).data;
+  const sTotal = reportsApi && summary ? summary.total : total;
+  const sClosed = reportsApi && summary ? summary.closed : approved;
+  const sRejected = reportsApi && summary ? summary.rejected : rejected;
+  const sActive = reportsApi && summary ? summary.active : active;
+  const sRate = sTotal > 0 ? Math.round((sClosed / sTotal) * 100) : 0;
+
+  // Chart series: live endpoints when reports is enabled, else the mock series.
+  const sectors = useSectorValues(reportsApi).data ?? [];
+  const overTime = useRequestsOverTime(reportsApi).data ?? [];
+  const byCurrency = useReportByCurrency(reportsApi).data ?? [];
+  const bySector = useReportBySector(reportsApi, sectors).data ?? [];
+  const lineData = reportsApi ? overTime.map((p) => ({ m: p.label, طلبات: p.value })) : MONTHLY;
+  const pieData = reportsApi
+    ? bySector.map((p) => ({ name: p.label, value: p.value }))
+    : CATEGORY_DIST;
+  const barData = reportsApi ? byCurrency.map((p) => ({ c: p.label, v: p.value })) : currencyRows;
+
   return (
     <div>
       <PageHeader
@@ -80,15 +109,21 @@ function Reports() {
 
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-5 mb-6">
         {[
-          { l: "إجمالي الطلبات", v: total.toLocaleString("en-US"), s: `${active} نشط` },
-          { l: "قيمة التمويل", v: `$${(totalValue / 1_000_000).toFixed(1)}M`, s: "من المحرّك" },
-          { l: "طلبات مغلقة", v: approved.toString(), s: "مكتملة" },
-          { l: "نسبة الإغلاق", v: `${approvalRate}%`, s: `${rejected} مرفوض` },
+          { l: "إجمالي الطلبات", v: sTotal.toLocaleString("en-US"), s: `${sActive} نشط` },
           {
-            l: "مراحل نشطة",
-            v: new Set(instances.map((i) => i.currentStageId)).size.toString(),
-            s: "تغطية",
+            l: "قيمة التمويل",
+            v: reportsApi ? "—" : `$${(totalValue / 1_000_000).toFixed(1)}M`,
+            s: reportsApi ? "غير متاح بعد" : "من المحرّك",
           },
+          { l: "طلبات مغلقة", v: sClosed.toString(), s: "مكتملة" },
+          { l: "نسبة الإغلاق", v: `${sRate}%`, s: `${sRejected} مرفوض` },
+          reportsApi && summary
+            ? { l: "متجاوزة SLA", v: summary.overdue.toString(), s: "تنبيه" }
+            : {
+                l: "مراحل نشطة",
+                v: new Set(instances.map((i) => i.currentStageId)).size.toString(),
+                s: "تغطية",
+              },
         ].map((k) => (
           <Card key={k.l} className="p-4 shadow-card border-0">
             <div className="text-xs text-muted-foreground">{k.l}</div>
@@ -106,7 +141,7 @@ function Reports() {
         <Card className="p-4 sm:p-5 shadow-card border-0 lg:col-span-2">
           <h3 className="font-semibold mb-4">تطور أحجام الطلبات</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={MONTHLY} margin={{ top: 8, right: 8, left: 0, bottom: 12 }}>
+            <LineChart data={lineData} margin={{ top: 8, right: 8, left: 0, bottom: 12 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.9 0.01 240)" />
               <XAxis
                 dataKey="m"
@@ -147,8 +182,8 @@ function Reports() {
           <h3 className="font-semibold mb-4">حسب الفئة</h3>
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
-              <Pie data={CATEGORY_DIST} dataKey="value" nameKey="name" outerRadius={100}>
-                {CATEGORY_DIST.map((_, i) => (
+              <Pie data={pieData} dataKey="value" nameKey="name" outerRadius={100}>
+                {pieData.map((_, i) => (
                   <Cell key={i} fill={COLORS[i % COLORS.length]} />
                 ))}
               </Pie>
@@ -160,7 +195,7 @@ function Reports() {
         <Card className="p-4 sm:p-5 shadow-card border-0 lg:col-span-3">
           <h3 className="font-semibold mb-4">قيمة التمويل بالعملة (ألف)</h3>
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={currencyRows} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+            <BarChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="c" fontSize={11} />
               <YAxis fontSize={11} width={44} />

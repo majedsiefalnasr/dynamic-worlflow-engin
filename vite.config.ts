@@ -8,4 +8,19 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
   nitro: { preset: "vercel" },
+  // Dev-only proxy: the browser calls same-origin `/api/*`, Vite forwards it to
+  // the backend server-side. This sidesteps the backend's CORS restriction
+  // (BE-08) during local development. Production must rely on a real CORS fix
+  // or same-origin deployment.
+  vite: {
+    server: {
+      proxy: {
+        "/api": {
+          target: "https://cby2.ultimate-dev2.com",
+          changeOrigin: true,
+          secure: true,
+        },
+      },
+    },
+  },
 });
