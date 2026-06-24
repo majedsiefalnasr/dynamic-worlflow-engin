@@ -1,164 +1,160 @@
-# مراجعة المشروع مقابل قاعدة البيانات والـAPIs الحقيقية (Audit)
+# Project Audit — Real Database & API Usage
 
-تاريخ المراجعة: 2026-06-24
-المصدر الحي: `https://cby2.ultimate-dev2.com/api/v1` — التوثيق: `https://cby2.ultimate-dev2.com/api/documentation` — العقد (OpenAPI JSON): `https://cby2.ultimate-dev2.com/docs`
-حساب الفحص: `admin@cby.gov.ye` (دور `rc_platform_admin`، كلمة المرور المشتركة من `seed/DemoDataSeeder.php`).
+**Date:** 2026-06-24
+**Live source:** `https://cby2.ultimate-dev2.com/api/v1` — docs: `https://cby2.ultimate-dev2.com/api/documentation` — OpenAPI JSON: `https://cby2.ultimate-dev2.com/docs` (92 paths, 114 operations).
+**Probe account:** `admin@cby.gov.ye` (role `rc_platform_admin`, shared password in `seed/DemoDataSeeder.php`).
 
-> **هدف هذا الملف:** تصنيف كل شاشة/مورد في المشروع حسب درجة استخدامه للـAPIs الحقيقية: **يستخدمها بالكامل**، **يستخدمها جزئيًا**، أو **لا يستخدمها (mock/demo)**. الإجراءات المطلوبة من فريق الـBackend مفصّلة في [BACKEND-CHANGE-REQUESTS.md](BACKEND-CHANGE-REQUESTS.md).
+> **Goal of this file:** classify every screen/resource by how much it uses the real APIs — **full**, **partial**, or **mock only** — verified against the live backend. The actions required from the backend team are in [BACKEND-CHANGE-REQUESTS.md](BACKEND-CHANGE-REQUESTS.md).
 >
-> **لا يغيّر هذا الملف سلوك التطبيق.** هو وصف للحالة الراهنة فقط.
+> **This file does not change the app's behavior.** It describes the current state only.
 
 ---
 
-## ٠. كيف يعمل التطبيق (مرجع سلوكي)
+## 0. How the app works (behavioral reference)
 
-فُهم سلوك التطبيق من حالته عند الـcommit `5e91b6b` (قبل عمل الربط الحالي)، حيث يعمل كل شيء على بيانات mock محلية. عمل الربط الحي يضيف **طبقة اختيارية** فوق ذلك دون تغيير السلوك الافتراضي:
+The app's behavior was confirmed from its state at commit `5e91b6b` (before the live-API work), where everything runs on local mock data. The live integration adds an **opt-in layer** on top without changing the default behavior:
 
-- **مفتاح التشغيل:** كل شاشة تستدعي `isApiEnabled("<resource>")` في [src/lib/api/client.ts](../../src/lib/api/client.ts).
-  - `VITE_API_BASE_URL` فارغ → كل شيء mock (لا تغيير عن `5e91b6b`).
-  - `VITE_API_BASE_URL` مضبوط + `VITE_API_RESOURCES` يحوي مفتاح المورد (أو `*`) → تلك الشاشة فقط تعمل على الـAPI الحي.
-  - الافتراضي في [.env.example](../../.env.example): `VITE_API_RESOURCES=` فارغ → **كل الشاشات mock، عدا الدخول** الذي يصبح حيًّا بمجرد ضبط `BASE_URL`.
-- **النمط المتسق:** كل شاشة تملك `useXController()` يفرّع داخليًا بين مسار React Query الحي ومسار خلية الـmock. كل الـhooks تُستدعى في كل render فيبقى ترتيب الـhooks ثابتًا. لذا **التبديل بين mock وحي لا يكسر الشاشة** — يبدّل مصدر البيانات فقط.
-- **عميل واحد رفيع** (`api.get/getList/post/patch/put/del`) يفكّ مغلّفي الاستجابة ويحوّل الأخطاء إلى `ApiError` يحمل `code`/`fields`/`requestId`.
-- **التوكن في الذاكرة فقط** (لا localStorage). الدخول الحي يخزّن `data.token` (Sanctum Bearer).
+- **The switch:** each screen calls `isApiEnabled("<resource>")` in [src/lib/api/client.ts](../../src/lib/api/client.ts).
+  - `VITE_API_BASE_URL` empty → everything is mock (identical to `5e91b6b`).
+  - `VITE_API_BASE_URL` set + `VITE_API_RESOURCES` contains the resource key (or `*`) → that screen uses the live API.
+  - Default in [.env.example](../../.env.example): `VITE_API_RESOURCES=` empty → **all screens mock, except login**, which goes live as soon as `BASE_URL` is set.
+- **Consistent pattern:** every screen has a `useXController()` that branches internally between a live React Query path and a mock-cell path. All hooks run on every render, so hook order stays stable. Switching mock↔live **never breaks a screen** — it only swaps the data source.
+- **One thin client** (`api.get/getList/post/patch/put/del`) unwraps both success envelopes and maps errors to a typed `ApiError` carrying `code`/`fields`/`requestId`.
+- **Token is in memory only** (never localStorage). Live login stores `data.token` (Sanctum Bearer).
 
-> **مهم لفهم الحالة:** ربط أي مورد لا يحذف الـmock — يبقى احتياطيًا خلف العلم. تشغيل المشروع بالكامل على القاعدة الحقيقية = ضبط `VITE_API_RESOURCES=*` بعد إغلاق البنود الحاجزة أدناه.
-
----
-
-## ١. الحكم العام
-
-التغطية القرائية للـAPI الحي **عالية وجاهزة**: ١٩ موردًا، ٩٢ مسارًا، ١١٤ عملية. كل عمليات القراءة (الحوكمة، التجار، التدقيق، التقارير، الإشعارات، عرض سير العمل، عرض الطلبات) تردّ `200` لحساب المسؤول.
-
-**تحسّن كبير منذ المراجعة السابقة** (`.backup`) — أُغلقت بنود حاسمة:
-- ✅ **CORS** يعكس أصل الواجهة الآن (`Access-Control-Allow-Origin: http://localhost:8080`).
-- ✅ **مغلّف الخطأ** يحوي `code` + `request_id` ثابتين.
-- ✅ **مغلّف القائمة** صار `{ success, message, data, meta }` (كان `{ data, meta }` بلا `success`).
-- ✅ **دور المستخدم** يُعاد ككائن `role: {id, code, name}` (كان `null`).
-- ✅ **البنوك** تُعيد `swift_code`/`license_number`/`status`.
-- ✅ **نسخة سير عمل منشورة** (`IMPORT_FINANCING`) مزروعة في القاعدة.
-
-لكن **يبقى الربط الكامل محجوبًا** بأربعة بنود (التفصيل في §٣):
-
-1. 🟥 **مصمم سير العمل للقراءة فقط** — لا endpoints كتابة لأي مكوّن (CR-14).
-2. 🟥 **إنشاء المستخدمين محجوب** — حقل `role` نصّي إلزامي بقائمة قيم ناقصة (CR-06).
-3. 🟥 **كل إجراءات الحالة تردّ 406** (`activate/deactivate/suspend`) + حذف الفريق يردّ 500 (CR-12). التجار والمستخدمون بلا حل بديل.
-4. 🟧 **بوابة الصلاحيات غير مكتملة** — `screen_permissions` يردّ `[]` حتى للمسؤول، وشكل عناصره غير موثّق (CR-09).
-
-دليل الشدة: 🟥 حاجز · 🟧 يحتاج توافق · 🟨 تحسين/تأكيد · 🟩 مطابق وجاهز.
+> **Key point:** wiring a resource to the live API never deletes the mock — it stays as a fallback behind the flag. Running the whole project on the real database = set `VITE_API_RESOURCES=*` once the blocking items below are closed.
 
 ---
 
-## ٢. التصنيف الرئيسي — كل شاشة ودرجة استخدامها للـAPIs الحقيقية
+## 1. Overall verdict
 
-الحالة: 🟢 **يستخدم الـAPI الحقيقي بالكامل** · 🟡 **يستخدمه جزئيًا** · 🔴 **لا يستخدمه (mock/demo فقط)**.
+Live-API **read coverage is high and ready**: 19 resources, 92 paths. Every read (governance, merchants, audit, reports, notifications, workflow view, requests view) returns `200` for the admin account.
 
-| الشاشة / المورد | مفتاح `isApiEnabled` | عميل API | القراءة | الكتابة/الإجراءات | الحالة | السبب |
+**Full real-API use is still blocked** by four items (detail in §3):
+
+1. 🟥 **Workflow Designer is read-only** — no write endpoints for any component (CR-01).
+2. 🟥 **User creation is blocked** — `role` is a required string with an incomplete value set; no users client in the frontend (CR-02).
+3. 🟥 **All status actions return 406** (`activate/deactivate/suspend`), team hard-delete returns 500 (CR-03). Merchants and users have no workaround.
+4. 🟧 **Permission gate is incomplete** — `screen_permissions` returns `[]` even for the admin, and the element shape is undocumented (CR-04).
+
+Severity key: 🟥 blocker · 🟧 needs agreement · 🟨 improvement/confirm · 🟩 matches & ready.
+
+---
+
+## 2. Main classification — every screen and its real-API usage
+
+Status: 🟢 **uses the real API fully** · 🟡 **uses it partially** · 🔴 **does not use it (mock/demo only)**.
+
+| Screen / resource | `isApiEnabled` key | API client | Reads | Writes / actions | Status | Reason |
 |---|---|---|---|---|---|---|
-| البيانات الأساسية | `reference-data` | `reference-data.ts` | 🟢 200 | إنشاء ✅ · حذف عبر deactivate (PATCH بديل) | 🟢 | كامل. الحذف الفعلي = إلغاء تفعيل. |
-| الجهات | `organizations` | `organizations.ts` | 🟢 200 | إنشاء/تعديل/حذف ✅ · تفعيل عبر `PATCH is_active` (بديل 406) | 🟢 | كامل بفضل الحل البديل للـ406. |
-| الفرق | `teams` | `teams.ts` | 🟢 200 | إنشاء/تعديل ✅ · تفعيل عبر PATCH · **حذف يردّ 500** | 🟡 | الحذف الصلب محجوب (CR-12). |
-| الأدوار | `roles` | `roles.ts` | 🟢 200 | إنشاء/تعديل ✅ · تفعيل عبر PATCH | 🟢 | كامل. |
-| البنوك | `banks` | `banks.ts` | 🟢 200 (swift/license/status ✅) | إنشاء/تعديل/حذف ✅ · تفعيل عبر PATCH | 🟢 | كامل بعد CR-10. |
-| التجار | `merchants` | `merchants.ts` | 🟢 200 | إنشاء/تعديل ✅ · **تعليق/تفعيل يردّ 406 بلا حل بديل** | 🟡 | تبديل الحالة محجوب (CR-12). المتداخل (owners/companies) يحتاج تأكيد شكل الكتابة (CR-13). |
-| المستخدمون | — (لا عميل) | — | 🔴 | 🔴 | 🔴 | لا `users.ts`. الإنشاء محجوب بحقل `role` (CR-06) → الشاشة تبقى mock بالكامل. |
-| المصادقة (الدخول) | `hasApiBase()` | `auth.ts` | 🟢 login/me/logout | 🟡 | 🟡 | الدخول حيّ. **ناقص: MFA verify، refresh، forgot/reset/change-password** (CR-08). |
-| التدقيق | `audit` | `audit.ts` | 🟢 200 | قراءة فقط (الخادم يسجّل) | 🟢 | كامل قراءةً. التسجيل من العميل موقوف في وضع API. |
-| التقارير | `reports` | `reports.ts` | 🟢 200 (summary + المجاميع) | تصدير (exports) | 🟢 | كامل، يتجاوز العقد. |
-| الإشعارات | `notifications` | `notifications.ts` | 🟢 200 | read/unread/archive/read-all ✅ | 🟢 | كامل. الإرسال من العميل موقوف في وضع API. |
-| سير العمل — عرض | `workflows` | `workflow-designer.ts` | 🟢 يزامن المنشور إلى `wfStore` | 🔴 لا كتابة | 🟡 | العرض حيّ، **التأليف محجوب بالكامل** (CR-14) ويبقى على mock. |
-| الطلبات — قائمة/طابور | `requests` | `requests.ts` | 🟢 list + stages | 🔴 create/draft/actions/documents | 🟡 | القائمة حيّة لكن **ناقصة الإثراء** (CR-17). الـruntime (إنشاء/إجراءات) يبقى mock. |
-| صلاحيات الشاشات | — | — | 🟡 `screens` + `me/permissions` يردّان 200 | — | 🔴 | `screen_permissions` يردّ `[]` وشكله غير موثّق (CR-09) → البوابة تبقى على النموذج اليدوي. |
+| Reference data | `reference-data` | `reference-data.ts` | 🟢 200 | create ✅ · delete via deactivate (PATCH workaround) | 🟢 | Full. "Delete" = deactivate. |
+| Organizations | `organizations` | `organizations.ts` | 🟢 200 | create/update/delete ✅ · toggle via `PATCH is_active` (406 workaround) | 🟢 | Full, via the 406 workaround. |
+| Teams | `teams` | `teams.ts` | 🟢 200 | create/update ✅ · toggle via PATCH · **hard-delete returns 500** | 🟡 | Hard delete blocked (CR-03). |
+| Roles | `roles` | `roles.ts` | 🟢 200 | create/update ✅ · toggle via PATCH | 🟢 | Full. |
+| Banks | `banks` | `banks.ts` | 🟢 200 (swift/license/status ✅) | create/update/delete ✅ · toggle via PATCH | 🟢 | Full. |
+| Merchants | `merchants` | `merchants.ts` | 🟢 200 | create/update ✅ · **suspend/activate return 406, no workaround** | 🟡 | Status toggle blocked (CR-03). Nested owners/companies need write-shape confirmation (CR-08). |
+| Users | — (no client) | — | 🔴 | 🔴 | 🔴 | No `users.ts`. Creation blocked by `role` (CR-02) → screen stays fully mock. |
+| Auth (login) | `hasApiBase()` | `auth.ts` | 🟢 login/me/logout | 🟡 | 🟡 | Login is live. **Missing: MFA verify, refresh, forgot/reset/change-password** (CR-05). |
+| Audit | `audit` | `audit.ts` | 🟢 200 | read-only (server logs) | 🟢 | Full for reads. Client-side logging is off in API mode. |
+| Reports | `reports` | `reports.ts` | 🟢 200 (summary + aggregates) | exports | 🟢 | Full. |
+| Notifications | `notifications` | `notifications.ts` | 🟢 200 | read/unread/archive/read-all ✅ | 🟢 | Full. Client-side sending is off in API mode. |
+| Workflow — view | `workflows` | `workflow-designer.ts` | 🟢 syncs published → `wfStore` | 🔴 no writes | 🟡 | View is live; **authoring fully blocked** (CR-01) and stays mock. |
+| Requests — list/queue | `requests` | `requests.ts` | 🟢 list + stages | 🔴 create/draft/actions/documents | 🟡 | List is live but **not enriched** (CR-06). Runtime (create/actions) stays mock. |
+| Screen permissions | — | — | 🟡 `screens` + `me/permissions` return 200 | — | 🔴 | `screen_permissions` returns `[]`, shape undocumented (CR-04) → gate stays on the manual model. |
 
-### ملخّص العدّ
-- 🟢 **يستخدم الـAPI بالكامل (٦):** البيانات الأساسية، الجهات، الأدوار، البنوك، التدقيق، التقارير، الإشعارات (٧ فعليًا).
-- 🟡 **يستخدمه جزئيًا (٥):** الفرق (لا حذف صلب)، التجار (لا تبديل حالة)، المصادقة (لا MFA/refresh/password)، عرض سير العمل (لا تأليف)، الطلبات (قائمة فقط).
-- 🔴 **لا يستخدمه (٢):** المستخدمون (محجوب CR-06)، بوابة صلاحيات الشاشات (CR-09).
+### Count summary
+
+- 🟢 **Full real-API use (7):** reference data, organizations, roles, banks, audit, reports, notifications.
+- 🟡 **Partial (5):** teams (no hard delete), merchants (no status toggle), auth (no MFA/refresh/password), workflow view (no authoring), requests (list only).
+- 🔴 **Mock only (2):** users (blocked by CR-02), screen-permission gate (CR-04).
 
 ---
 
-## ٣. البنود الحاجزة الأربعة (بأدلة حية اليوم)
+## 3. The four blockers (live evidence, 2026-06-24)
 
-### ٣.١ 🟥 مصمم سير العمل بلا endpoints كتابة (CR-14)
-العقد الحي يعرض **قراءة + lifecycle فقط**: `workflows` (٣ GET)، `workflow-versions` (١٠: قراءة + `clone/validate/publish/archive`)، `stages` (GET/PUT للصلاحيات والقواعد فقط). **لا يوجد** `POST/PATCH/DELETE` لأي تعريف/نسخة/مرحلة/انتقال/حقل/مجموعة/إجراء.
-**الأثر:** `workflow-designer.ts` يقرأ المنشور ويحقنه في `wfStore` عند التحميل، لكن أي تعديل يبقى محليًا (mock/localStorage). شاشة `/admin/workflows` تؤلّف على mock.
+### 3.1 🟥 Workflow Designer has no write endpoints (CR-01)
 
-### ٣.٢ 🟥 إنشاء المستخدمين (CR-06)
-`POST /v1/users` يفرض حقل `role` نصّي **إلزامي** (في الـOpenAPI: `required: [name, email, password, role]`، و`role_id` قابل لـnull). قائمة قيم `role` المقبولة ناقصة ولا تغطي كل أدوار الجهات. لا يوجد `users.ts` في الواجهة → الشاشة كلها mock.
+The live API exposes **reads + lifecycle only**: `workflows` (3 GET), `workflow-versions` (10: reads + `clone/validate/publish/archive`), `stages` (GET/PUT for permissions & field-rules only). There is **no** `POST/PATCH/DELETE` for any definition/version/stage/transition/field/field-group/action.
+**Effect:** `workflow-designer.ts` reads the published workflow and loads it into `wfStore` on mount, but any edit stays local (mock/localStorage). The `/admin/workflows` screen authors on mock.
 
-### ٣.٣ 🟥 إجراءات الحالة تردّ 406 (CR-12)
-مُتحقَّق حيًّا اليوم:
-```
+### 3.2 🟥 User creation (CR-02)
+
+`POST /v1/users` makes the `role` string **required** (OpenAPI: `required: [name, email, password, role]`; `role_id` is nullable). The accepted `role` value set is incomplete and does not cover all org roles. There is no `users.ts` client in the frontend → the whole screen is mock.
+
+### 3.3 🟥 Status actions return 406 (CR-03)
+
+Verified live today:
+
+```text
 POST /organizations/4/deactivate -> 406
 POST /organizations/4/activate   -> 406
 POST /merchants/5/suspend        -> 406
 POST /merchants/5/activate       -> 406
 ```
-**الحل البديل المطبَّق في الواجهة:** الموارد التي يقبل `PATCH` فيها `is_active` (الجهات/الفرق/الأدوار/البنوك/البيانات الأساسية) تبدّل الحالة عبر `PATCH {is_active}` — يعمل. **التجار والمستخدمون بلا حل بديل** (PATCH يرفض `status`/`is_active`) → تبديل حالتهم محجوب. حذف الفريق `DELETE /teams/{id}` يردّ 500.
+**Workaround shipped in the frontend:** resources whose `PATCH` accepts `is_active` (organizations, teams, roles, banks, reference-tables/values) toggle via `PATCH {is_active}` — works. **Merchants and users have no workaround** (their `PATCH` rejects `status`/`is_active`) → their status toggle is blocked. `DELETE /teams/{id}` returns 500.
 
-### ٣.٤ 🟧 بوابة الصلاحيات (CR-09)
-`GET /auth/me/permissions` يردّ `{ screen_permissions: [], capabilities: [...] }`. `capabilities` يعمل (المسؤول يملك `VIEW/CREATE/UPDATE/DELETE/EXPORT/MANAGE`)، لكن `screen_permissions` **فارغ حتى للمسؤول** وشكل عناصره غير موثّق (لا يمكن استنتاجه من مصفوفة فارغة). `GET /screens` يردّ `{id, code, name, is_active}`. → بوابة الشاشات تبقى على النموذج اليدوي في الواجهة.
+### 3.4 🟧 Permission gate (CR-04)
 
----
-
-## ٤. ما تم على الوجه الصحيح 🟩
-
-- **Base path** `/api/v1`، **snake_case**، `page`/`per_page` في القوائم.
-- **CORS** يعكس الأصل المطلوب مع `credentials` (CR-03 مغلق).
-- **مغلّف الخطأ** `{ success:false, code, message, errors, request_id }` (CR-02 مغلق).
-- **مغلّف القائمة** `{ success, message, data, meta }` (CR-01 — القوائم مغلقة).
-- **دور المستخدم** كائن كامل في `login`/`me` (CR-07 مغلق).
-- **البنوك** تُعيد swift/license/status (CR-10 مغلق).
-- **الجهات** تحمل `category` + `category_label` أصليًّا (لا حاجة للاشتقاق من `code`).
-- **نسخة منشورة** مزروعة: `IMPORT_FINANCING` v1 (`published_version` موجود) (CR-15 مغلق).
-- **١٦ طلبًا** + سجلات تدقيق + إشعارات مزروعة.
-- **التقارير والتدقيق** تغطية كاملة تتجاوز الحد الأدنى.
+`GET /auth/me/permissions` returns `{ screen_permissions: [], capabilities: [...] }`. `capabilities` works (admin has `VIEW/CREATE/UPDATE/DELETE/EXPORT/MANAGE`), but `screen_permissions` is **empty even for the admin** and the element shape cannot be inferred from an empty array. `GET /screens` returns `{id, code, name, is_active}`. → the screen gate stays on the manual frontend model.
 
 ---
 
-## ٥. انحرافات غير حاجزة 🟨
+## 4. What works correctly 🟩
 
-1. **شكل `meta` تغيّر** إلى Laravel الافتراضي `{ current_page, last_page, per_page, total, from, to, links[] }` بدل عقد `{ page, per_page, total, last_page }`. **غير كاسر:** لا شاشة تقرأ حقول `meta` (تستخدم `per_page` كبير). يُستحسن توحيده لاحقًا.
-2. **عدم تماثل مغلّف المفرد/القائمة** — كلاهما الآن يحوي `success/message/data`، لكن المفرد بلا `meta` (طبيعي). العميل يفكّ الاثنين.
-3. **التزامن (`version`)** مفروض فقط على `POST /requests/{id}/actions`. باقي الـPATCH (الحوكمة/التجار/البيانات الأساسية) لا تطلب `version` رغم وجوده في الردود — لا حماية `STALE_RESOURCE` (CR-11).
-4. **CR-17 جزئي:** قائمة الطلبات أضافت حقول المطالبة (`is_claimed`، `current_owner_role`…) لكن ما زالت تنقص `workflow_version_id`، `current_stage`، `merchant/applicant`، و`reference_number=null`.
-5. **schemas عامة في OpenAPI** — أجسام كثيرة `object` عام، فلا توليد client مكتوب الأنواع (CR-04). الواجهة تكتب الأنواع يدويًا.
-6. **منطق العميل ينتقل للخادم في وضع API:** `logAudit`/`notify` يتوقفان (الخادم يسجّل/يُشعر). مطبّق بالفعل في الشاشات.
-7. **تعليق `auth.ts` قديم** يقول role=null والصلاحيات فارغة تسبّب 403 — لم يعد دقيقًا (role صار كائنًا، والمسؤول حصل على capabilities). الكود يتعامل دفاعيًّا فلا كسر.
+- **Base path** `/api/v1`, **snake_case**, `page`/`per_page` on lists.
+- **CORS** reflects the requesting origin with credentials (`Access-Control-Allow-Origin: http://localhost:8080`).
+- **Error envelope** `{ success:false, code, message, errors, request_id }` (stable, machine-readable `code`).
+- **List envelope** `{ success, message, data, meta }`.
+- **User role** returned as `role: {id, code, name}` + `role_label` in `login`/`me`.
+- **Banks** return `swift_code`/`license_number`/`status`.
+- **Organizations** carry `category` + `category_label` natively.
+- **A published workflow version** is seeded: `IMPORT_FINANCING` v1 (`published_version` present).
+- **16 requests** + audit logs + notifications seeded.
+- **Reports and audit** coverage is complete.
 
 ---
 
-## ٦. جرد مخازن الـmock (المصدر الاحتياطي الحالي)
+## 5. Non-blocking deviations 🟨
 
-| المخزن | الموقع | المورد المقابل | الحالة |
+1. **`meta` shape** is the Laravel paginator default `{ current_page, last_page, per_page, total, from, to, links[] }` instead of `{ page, per_page, total, last_page }`. **Not breaking:** no screen reads `meta` fields (lists use a large `per_page`). Worth standardizing (CR-09).
+2. **Optimistic locking (`version`)** is enforced only on `POST /requests/{id}/actions`. Other `PATCH` calls (governance/merchants/reference) neither require nor check `version` despite returning it — no `STALE_RESOURCE` protection (CR-07).
+3. **Requests row is under-enriched (CR-06):** the list added claim fields (`is_claimed`, `current_owner_role`…) but still lacks `workflow_version_id`, `current_stage`, `merchant/applicant`, and `reference_number` is `null`.
+4. **Generic OpenAPI schemas** — many bodies are generic `object`, so a typed client can't be generated (CR-10). Types are hand-written.
+5. **Client-side logic moves to the server in API mode:** `logAudit`/`notify` stop (server logs/notifies). Already applied in the screens.
+
+---
+
+## 6. Mock store inventory (current fallback source)
+
+| Store | Location | Matching resource | Status |
 |---|---|---|---|
-| خلايا الإدارة (`cell()`) | [src/lib/db.ts](../../src/lib/db.ts) / [governance.ts](../../src/lib/governance.ts) | audit, notifications, merchants, orgs, teams, roleCatalog, rolePerms, screenPerms, referenceTables | 🟢 معظمها مربوط حيًّا |
-| المستخدمون | [src/lib/mock.ts](../../src/lib/mock.ts) `cby:users` | `/users` | 🔴 محجوب (CR-06) |
-| محرّك سير العمل | [src/lib/workflow-engine/storage.ts](../../src/lib/workflow-engine/storage.ts) `wfe:*` | `/workflows` + `/requests` | 🟡 عرض مربوط، تأليف+runtime على mock |
+| Admin cells (`cell()`) | [src/lib/db.ts](../../src/lib/db.ts) / [governance.ts](../../src/lib/governance.ts) | audit, notifications, merchants, orgs, teams, roleCatalog, rolePerms, screenPerms, referenceTables | 🟢 mostly wired live |
+| Users | [src/lib/mock.ts](../../src/lib/mock.ts) `cby:users` | `/users` | 🔴 blocked (CR-02) |
+| Workflow engine | [src/lib/workflow-engine/storage.ts](../../src/lib/workflow-engine/storage.ts) `wfe:*` | `/workflows` + `/requests` | 🟡 view wired, authoring + runtime on mock |
 
 ---
 
-## ٧. الجاهزية لكل مرحلة
+## 7. Readiness per area
 
-| المرحلة | الجاهزية | ملاحظة |
+| Area | Readiness | Note |
 |---|---|---|
-| البيانات الأساسية | ✅ جاهز | كامل. |
-| الجهات / البنوك / الأدوار | ✅ جاهز | كامل (تفعيل عبر PATCH). |
-| الفرق | ⚠️ جزئي | الحذف الصلب 500 (CR-12). |
-| المستخدمون والمصادقة | ⛔ محجوب (CR-06) + ⚠️ ناقص (CR-08) | لا إنشاء مستخدمين؛ لا MFA/refresh/password. |
-| التجار | ⚠️ جزئي | تبديل الحالة 406 (CR-12)؛ المتداخل (CR-13). |
-| مصمم سير العمل (تأليف) | ⛔ محجوب (CR-14) | لا endpoints كتابة. |
-| مصمم سير العمل (عرض) | ✅ جاهز | قراءة + graph + lifecycle. |
-| الطلبات (قائمة/عرض) | ⚠️ جزئي (CR-17) | تنقص الإثراء. |
-| الطلبات (runtime) | ⛔ على mock | إنشاء/إجراءات بلا ربط بعد. |
-| التدقيق / التقارير / الإشعارات | ✅ جاهز | كامل. |
-| بوابة صلاحيات الشاشات | ⛔ محجوب (CR-09) | `screen_permissions` فارغ/غير موثّق. |
+| Reference data | ✅ Ready | Full. |
+| Organizations / banks / roles | ✅ Ready | Full (toggle via PATCH). |
+| Teams | ⚠️ Partial | Hard delete returns 500 (CR-03). |
+| Users & auth | ⛔ Blocked (CR-02) + ⚠️ Missing (CR-05) | No user creation; no MFA/refresh/password. |
+| Merchants | ⚠️ Partial | Status toggle 406 (CR-03); nested writes (CR-08). |
+| Workflow Designer (authoring) | ⛔ Blocked (CR-01) | No write endpoints. |
+| Workflow Designer (view) | ✅ Ready | Read + graph + lifecycle. |
+| Requests (list/view) | ⚠️ Partial (CR-06) | Missing enrichment. |
+| Requests (runtime) | ⛔ On mock | Create/actions not wired yet. |
+| Audit / reports / notifications | ✅ Ready | Full. |
+| Screen-permission gate | ⛔ Blocked (CR-04) | `screen_permissions` empty/undocumented. |
 
 ---
 
-## ٨. توصية المسار (لا تغيّر السلوك)
+## 8. Path recommendation (does not change behavior)
 
-1. **شغّل فورًا على القاعدة الحقيقية** الموارد 🟢: البيانات الأساسية، الجهات، البنوك، الأدوار، التدقيق، التقارير، الإشعارات — بإضافة مفاتيحها في `VITE_API_RESOURCES`.
-2. **شغّل جزئيًّا** الفرق والتجار والطلبات-عرض وعرض-سير-العمل مع إبقاء العمليات المحجوبة على mock (سلوك التطبيق لا يتغيّر بفضل تفرّع الـcontroller).
-3. **أبقِ على mock** المستخدمين والتأليف وبوابة الشاشات حتى إغلاق CR-06/CR-14/CR-09.
-4. **خطوات الـBackend** للوصول إلى `VITE_API_RESOURCES=*` بالترتيب في [BACKEND-CHANGE-REQUESTS.md](BACKEND-CHANGE-REQUESTS.md).
+1. **Run on the real database now** for the 🟢 resources (reference data, organizations, banks, roles, audit, reports, notifications) by adding their keys to `VITE_API_RESOURCES`.
+2. **Run partially** teams, merchants, requests-view, and workflow-view, keeping the blocked operations on mock (the controller branch keeps app behavior unchanged).
+3. **Keep on mock** users, authoring, and the screen gate until CR-01/CR-02/CR-04 are closed.
+4. **Backend steps** to reach `VITE_API_RESOURCES=*` are in [BACKEND-CHANGE-REQUESTS.md](BACKEND-CHANGE-REQUESTS.md).
