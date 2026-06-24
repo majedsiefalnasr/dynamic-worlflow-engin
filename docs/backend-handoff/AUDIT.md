@@ -30,14 +30,15 @@ The app's behavior was confirmed from its state at commit `5e91b6b` (before the 
 
 ## 1. Overall verdict
 
-Live-API **read coverage is high and ready**: 19 resources, 92 paths. Every read (governance, merchants, audit, reports, notifications, workflow view, requests view) returns `200` for the admin account.
+Live-API **read coverage is high and ready** for the **admin** account: 19 resources, 92 paths. Every admin read (governance, merchants, audit, reports, notifications, workflow view, requests view) returns `200`. **Non-admin roles are blocked on multi-resource screens** (see item 5).
 
-**Full real-API use is still blocked** by four items (detail in §3):
+**Full real-API use is still blocked** by five items (detail in §3):
 
 1. 🟥 **Workflow Designer is read-only** — no write endpoints for any component (CR-01).
 2. 🟥 **User creation is blocked** — `role` is a required string with an incomplete value set; no users client in the frontend (CR-02).
 3. 🟥 **All status actions return 406** (`activate/deactivate/suspend`), team hard-delete returns 500 (CR-03). Merchants and users have no workaround.
-4. 🟧 **Permission gate is incomplete** — `screen_permissions` returns `[]` even for the admin, and the element shape is undocumented (CR-04).
+4. 🟧 **Permission gate** — ⚠️ **partially resolved**: `screen_permissions` is now **populated** in the `login`/`me` payload (e.g. `[{ screen:"merchants", capabilities:["MANAGE"] }]`); remaining work is OpenAPI documentation + request-create derivation (CR-04).
+5. 🟥 **Non-admin multi-resource screens 403** — a role with the right `screen_permissions` (e.g. bank-intake with `merchants:MANAGE`) still 403s on the screen's **lookup** resources (`/banks`, `/reference-tables`), because lookup READ is not granted. Blocks merchants/roles/teams/banks for non-admin roles (CR-12).
 
 Severity key: 🟥 blocker · 🟧 needs agreement · 🟨 improvement/confirm · 🟩 matches & ready.
 
@@ -101,9 +102,28 @@ POST /merchants/5/activate       -> 406
 ```
 **Workaround shipped in the frontend:** resources whose `PATCH` accepts `is_active` (organizations, teams, roles, banks, reference-tables/values) toggle via `PATCH {is_active}` — works. **Merchants and users have no workaround** (their `PATCH` rejects `status`/`is_active`) → their status toggle is blocked. `DELETE /teams/{id}` returns 500.
 
-### 3.4 🟧 Permission gate (CR-04)
+### 3.4 🟧 Permission gate (CR-04) — ⚠️ partially resolved
 
-`GET /auth/me/permissions` returns `{ screen_permissions: [], capabilities: [...] }`. `capabilities` works (admin has `VIEW/CREATE/UPDATE/DELETE/EXPORT/MANAGE`), but `screen_permissions` is **empty even for the admin** and the element shape cannot be inferred from an empty array. `GET /screens` returns `{id, code, name, is_active}`. → the screen gate stays on the manual frontend model.
+`screen_permissions` is now **populated** in the `login`/`me` user payload. Verified live for `intake@ybank.ye` (role `rc_bank_intake`):
+
+```json
+"screen_permissions": [ { "screen": "merchants", "capabilities": ["MANAGE"] } ],
+"capabilities": ["MANAGE"]
+```
+
+Shape confirmed: `{ screen, capabilities: ("VIEW"|"CREATE"|"UPDATE"|"DELETE"|"EXPORT"|"MANAGE")[] }`. The frontend can gate **page access** off this. Remaining (CR-04): document the shape in the OpenAPI, confirm `GET /auth/me/permissions` matches the login payload, and specify how request-create permission is derived. `GET /screens` returns `{id, code, name, is_active}`.
+
+### 3.5 🟥 Non-admin multi-resource screens 403 on lookups (CR-12)
+
+A role with the correct `screen_permissions` can open its screen, but the screen's **supporting lookups** 403 because lookup READ is not granted. Verified live — `intake@ybank.ye` (has `merchants:MANAGE`) opening the merchants screen:
+
+```text
+GET /banks?per_page=100             -> 403
+GET /reference-tables?per_page=100  -> 403
+GET /merchants?per_page=100         -> 403   # must be 200 — user HAS merchants:MANAGE
+```
+
+Affected screens (master + lookup): **merchants** (lookups: banks, reference-data), **roles** (organizations), **teams** (organizations), **banks/entities** (organizations). Fix is backend: grant lookup READ to whichever role holds the primary screen permission — **without** widening page access (page visibility stays driven by `screen_permissions` only). Full map + acceptance in [BACKEND-CHANGE-REQUESTS.md](BACKEND-CHANGE-REQUESTS.md) CR-12.
 
 ---
 
@@ -157,7 +177,8 @@ POST /merchants/5/activate       -> 406
 | Requests (runtime) | ⛔ On mock | Create/actions not wired yet. |
 | Audit / reports | ✅ Ready | Full. |
 | Notifications | ⚠️ Partial | Reads live; mark-read/archive/read-all return 406 (CR-03) → read-only. |
-| Screen-permission gate | ⛔ Blocked (CR-04) | `screen_permissions` empty/undocumented. |
+| Screen-permission gate | ⚠️ Partial (CR-04) | `screen_permissions` now populated + shaped; needs OpenAPI doc + create-derivation. |
+| Non-admin multi-resource screens | ⛔ Blocked (CR-12) | Role has page access but lookups (banks/orgs/reference) 403 → merchants/roles/teams/banks unusable for non-admin. |
 | Users / bank-users / CBY-staff | ⛔ Blocked (CR-02) | No `users.ts` client; creation blocked by required `role`. |
 | Requests runtime / workflow instance | ⛔ On mock | `wfStore`-driven; no live create/actions wiring (CR-06). |
 

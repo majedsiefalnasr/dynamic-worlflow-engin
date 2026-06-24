@@ -120,22 +120,27 @@ This looks like a content-negotiation / route-format issue (the action routes do
 
 ## B. Authentication & permissions (P1)
 
-### CR-04 · Document and populate the permissions payload · P1
+### CR-04 · Document and populate the permissions payload · P1 — ⚠️ PARTIALLY RESOLVED
 
-**Where:** `GET /auth/me/permissions`, `GET /screens`, `GET /roles/{id}/screen-permissions`.
+**Where:** `POST /auth/login`, `GET /auth/me`, `GET /auth/me/permissions`, `GET /screens`, `GET /roles/{id}/screen-permissions`.
 
-**Current (live):** `GET /auth/me/permissions` → `{ screen_permissions: [], capabilities: ["VIEW","CREATE","UPDATE","DELETE","EXPORT","MANAGE"] }`. `capabilities` works for the admin, **but `screen_permissions` is `[]` even for the admin** and its element shape is undocumented (cannot be inferred from an empty array). `GET /screens` → `[{ id, code, name, is_active }]`.
+**Update (live, re-verified 2026-06-24):** `screen_permissions` is now **populated and shaped**. The `login`/`me` user payload returns, e.g. for `intake@ybank.ye` (role `rc_bank_intake`):
 
-**Expected:** document, with examples:
+```json
+"screen_permissions": [ { "screen": "merchants", "capabilities": ["MANAGE"] } ],
+"capabilities": ["MANAGE"]
+```
 
-- the exact shape of `screen_permissions[]` (e.g. `{ screen: "merchants", capabilities: ["VIEW","CREATE"] }`),
-- how `capabilities[]` (global) combine with `screen_permissions`,
-- **how the frontend decides "can this user create a request?"** — per the original contract this is derived from stage permissions, not a screen capability; specify the field(s) to read,
-- and populate `screen_permissions` for the admin (and seeded roles) so the gate can be tested.
+So the element shape is confirmed: `{ screen: string, capabilities: ("VIEW"|"CREATE"|"UPDATE"|"DELETE"|"EXPORT"|"MANAGE")[] }`. The frontend can now gate page access off `screen_permissions` (VIEW/MANAGE on the screen's own key).
 
-**Why:** the entire screen-visibility / button-enablement layer is driven by this payload. Without a documented, populated shape the mock permission model cannot be replaced.
+**Still open:**
 
-**Acceptance:** `me/permissions` returns a non-empty, documented `screen_permissions[]` for the admin; the frontend can gate screens off it.
+- Document the shape officially in the OpenAPI (it was inferred from a live login, not the spec).
+- Confirm whether `GET /auth/me/permissions` returns the same populated `screen_permissions` (the **login/me user object** does; verify the dedicated permissions endpoint matches).
+- Specify **how the frontend decides "can this user create a request?"** — per the original contract this derives from stage permissions, not a screen capability; name the field(s) to read.
+- The **supporting-resource read gap** this exposed is split out as **CR-12** (in the Seeding section below).
+
+**Acceptance:** the `screen_permissions[]` shape is documented in the OpenAPI; `me/permissions` matches the login payload; request-create derivation is specified.
 
 ### CR-05 · Complete the authentication surface (MFA, refresh, password) · P1
 
@@ -255,6 +260,40 @@ trait ChecksVersion {
 
 **Acceptance:** each seeded account returns a realistic permission set from `me/permissions`.
 
+### CR-12 · Grant supporting-resource READ permissions for multi-resource screens · P0
+
+**Where:** authorization seeding / policies for every role that can open a multi-resource screen.
+
+**Symptom (verified live, 2026-06-24):** `intake@ybank.ye` (role `rc_bank_intake`) logs in with `screen_permissions: [{ screen: "merchants", capabilities: ["MANAGE"] }]` — it **can** open the merchants screen. But the screen then 403s on its supporting lookups:
+
+```text
+GET /banks?per_page=100             -> 403
+GET /reference-tables?per_page=100  -> 403
+GET /merchants?per_page=100         -> 403   # verify: must be 200 (user HAS merchants:MANAGE)
+```
+
+**Root cause:** several screens are **master + lookup** views — opening them reads more than one resource. The role is granted the **primary** screen permission but **not READ on the lookup resources**, so the lookups 403 and the page (which the user is allowed to see) error-walls.
+
+**The multi-resource map** (frontend, verified) — for each screen, the role that holds the **primary** permission must also get **VIEW/read** on the listed lookup resources:
+
+| Screen | Primary permission (page access) | Lookup resources that must be READable | Lookup used for |
+|---|---|---|---|
+| Merchants | `merchants` | `banks`, `reference-data` (`reference-tables`) | bank name + bank picker; sector/category dropdown |
+| Roles | `roles` | `organizations` | org picker + org label |
+| Teams | `teams` | `organizations` | org picker + org label |
+| Banks / Entities | `banks` | `organizations` | commercial-banks org id (needed on create) |
+
+**Expected:**
+
+- Granting a role the primary screen permission (e.g. `merchants:VIEW`/`MANAGE`) must also grant **read** on that screen's lookup resources (per the table). Seed this for every non-admin role per CR-11 (above).
+- A user who holds `merchants:MANAGE` must get **`200`** from `GET /merchants` (verify the symptom above — `merchants` itself must not 403 for a user who has the merchants permission).
+
+**Important — do NOT widen page access:** lookup READ is **data-read only**. Page visibility stays driven exclusively by `screen_permissions` (VIEW/MANAGE on the screen's own key). Granting read on `banks`/`organizations`/`reference-data` as a lookup must **not** make those screens appear in the user's navigation or pass their `ScreenGuard`. Keep "can read the resource as a lookup" separate from "has the screen permission".
+
+**Why:** without this, every role that can open a multi-resource screen hits a 403 wall on data it legitimately needs to render the page it is allowed to see. This blocks non-admin use of merchants, roles, teams, and banks screens on the live DB.
+
+**Acceptance:** logged in as each non-admin role, opening every screen it has page access to returns `200` for the screen's primary resource **and** all its lookups; and a role **without** a screen's permission still cannot open that screen even though it can read the resource as a lookup elsewhere.
+
 ---
 
 ## Summary
@@ -264,7 +303,7 @@ trait ChecksVersion {
 | CR-01 | Workflow authoring write endpoints | P0 | Workflow Designer |
 | CR-02 | `POST /users` role field | P0 | all user creation |
 | CR-03 | activate/deactivate/suspend → 406 (+team delete 500) | P0 | status toggle (merchant/user fully) |
-| CR-04 | Document + populate permissions payload | P1 | screen/action gating |
+| CR-04 | Document + populate permissions payload (⚠️ partially resolved — `screen_permissions` now populated) | P1 | screen/action gating |
 | CR-05 | Auth completeness (MFA/refresh/password) | P1 | real sign-in |
 | CR-06 | Enrich `GET /requests` row | P1 | requests list + runtime |
 | CR-07 | Optimistic locking (`version`) | P1 | safe concurrent edits |
@@ -272,9 +311,12 @@ trait ChecksVersion {
 | CR-09 | Standardize `meta` shape | P2 | contract consistency |
 | CR-10 | OpenAPI accuracy | P2 | typed client |
 | CR-11 | Seed non-admin permissions | P1 | testing non-admin roles |
+| CR-12 | Grant supporting-resource READ for multi-resource screens | P0 | merchants/roles/teams/banks for non-admin roles |
 
 **What the frontend runs on the live DB today** (`.env`, 11 keys): reference data, organizations, roles, banks, audit, reports (full); teams, merchants, requests-list, workflow-view, notifications (partial — notifications read-only, actions 406 per CR-03).
 
 **Blocked / on mock:** user management incl. bank-users + CBY-staff (CR-02), workflow authoring (CR-01), screen-permission gating (CR-04), request runtime (CR-06), merchant/user status toggle (CR-03). These keep `VITE_API_RESOURCES=*` off until their CRs close.
 
-**Order of work to reach `VITE_API_RESOURCES=*`:** CR-02 → CR-03 → CR-04 / CR-11 → CR-06 → CR-01 → CR-05, with CR-07 / CR-08 / CR-09 / CR-10 as quality passes.
+**Non-admin roles blocked on multi-resource screens (CR-12):** even with the right `screen_permissions`, roles 403 on supporting lookups (e.g. bank-intake opens merchants but `/banks` + `/reference-tables` 403). Grant lookup READ per the CR-12 map.
+
+**Order of work to reach `VITE_API_RESOURCES=*`:** CR-02 → CR-03 → CR-11 / CR-12 → CR-04 → CR-06 → CR-01 → CR-05, with CR-07 / CR-08 / CR-09 / CR-10 as quality passes.
