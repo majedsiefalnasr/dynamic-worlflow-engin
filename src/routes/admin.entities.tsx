@@ -84,9 +84,15 @@ function useBanksController(): BanksController {
           licenseNo: p.licenseNo,
           status: p.status,
         })),
-      update: async (id, p) => void (await m.update.mutateAsync({ id, name: p.name })),
+      update: async (id, p) => {
+        const ver = (banksQuery.data ?? []).find((b) => b.id === id)?._version ?? 0;
+        void (await m.update.mutateAsync({ id, version: ver, name: p.name }));
+      },
       toggle: async (e) =>
-        void (await (e.status === "active" ? m.deactivate : m.activate).mutateAsync(e.id)),
+        void (await (e.status === "active" ? m.deactivate : m.activate).mutateAsync({
+          id: e.id,
+          version: e._version ?? 0,
+        })),
     };
   }
 
@@ -126,8 +132,7 @@ function EntitiesAdmin() {
     return list.filter(
       (e) =>
         e.name.toLowerCase().includes(s) ||
-        e.licenseNo.toLowerCase().includes(s) ||
-        (e.swiftCode ?? "").toLowerCase().includes(s),
+        e.licenseNo.toLowerCase().includes(s),
     );
   }, [list, q]);
 
@@ -195,7 +200,7 @@ function EntitiesAdmin() {
             onChange={(e) => setQ(e.target.value)}
             className="pr-10"
             aria-label="بحث في البنوك"
-            placeholder="بحث بالاسم أو رقم الترخيص أو SWIFT..."
+            placeholder="بحث بالاسم أو رقم الترخيص..."
           />
         </div>
       </Card>
@@ -231,9 +236,6 @@ function EntitiesAdmin() {
                     رقم الترخيص
                   </th>
                   <th scope="col" className="px-4 py-3">
-                    SWIFT
-                  </th>
-                  <th scope="col" className="px-4 py-3">
                     الحالة
                   </th>
                   <th scope="col" className="px-4 py-3 text-left">
@@ -252,8 +254,7 @@ function EntitiesAdmin() {
                         {e.name}
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs">{e.licenseNo}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{e.swiftCode ?? "—"}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{e.licenseNo || "—"}</td>
                     <td className="px-4 py-3">
                       <Badge
                         className={
@@ -290,7 +291,7 @@ function EntitiesAdmin() {
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center">
+                    <td colSpan={4} className="px-4 py-12 text-center">
                       {list.length === 0 ? (
                         <div className="flex flex-col items-center gap-3">
                           <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary grid place-items-center">
@@ -339,8 +340,7 @@ function EntitiesAdmin() {
               <DialogDescription>تفاصيل البنك</DialogDescription>
             </DialogHeader>
             <div className="space-y-3 py-2 text-sm">
-              <Row label="رقم الترخيص" value={viewing.licenseNo} />
-              <Row label="SWIFT" value={viewing.swiftCode ?? "—"} />
+              <Row label="رقم الترخيص" value={viewing.licenseNo || "—"} />
               <Row label="الحالة" value={viewing.status === "active" ? "نشط" : "موقوف"} />
               <Row label="المعرّف" value={viewing.id} />
             </div>
@@ -373,7 +373,6 @@ function EntityDialog({
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [licenseNo, setLicenseNo] = useState(initial?.licenseNo ?? "");
-  const [swiftCode, setSwiftCode] = useState(initial?.swiftCode ?? "");
   const [status, setStatus] = useState<Entity["status"]>(initial?.status ?? "active");
   const [adminName, setAdminName] = useState(initial?.adminName ?? "");
   const [adminEmail, setAdminEmail] = useState(initial?.adminEmail ?? "");
@@ -384,7 +383,7 @@ function EntityDialog({
     : isNew
       ? adminName.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim())
       : emailOk;
-  const valid = name.trim() && licenseNo.trim() && adminOk;
+  const valid = name.trim() && adminOk;
   return (
     <DialogContent dir="rtl" className="sm:max-w-md">
       <DialogHeader>
@@ -396,19 +395,11 @@ function EntityDialog({
           <Input value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="space-y-1.5">
-          <Label>رقم الترخيص *</Label>
+          <Label>رقم الترخيص</Label>
           <Input
             value={licenseNo}
             onChange={(e) => setLicenseNo(e.target.value)}
             placeholder="BNK-004"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label>كود SWIFT</Label>
-          <Input
-            value={swiftCode}
-            onChange={(e) => setSwiftCode(e.target.value)}
-            placeholder="YBRDYESA"
           />
         </div>
         <div className="space-y-1.5">
@@ -474,7 +465,6 @@ function EntityDialog({
             onSave({
               name: name.trim(),
               licenseNo: licenseNo.trim(),
-              swiftCode: swiftCode.trim() || undefined,
               status,
               adminName: adminName.trim() || undefined,
               adminEmail: adminEmail.trim() || undefined,

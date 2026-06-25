@@ -67,8 +67,15 @@ function useReferenceController(): RefController {
       addTable: async (key, label) => void (await createTable.mutateAsync({ key, label })),
       addValue: async (tableId, key, label) =>
         void (await createValue.mutateAsync({ tableId, key, label })),
-      removeTable: async (id) => void (await deactivateTable.mutateAsync(id)),
-      removeValue: async (_tableId, valueId) => void (await deactivateValue.mutateAsync(valueId)),
+      removeTable: async (id) => {
+        const t = (query.data ?? []).find((x) => x.id === id);
+        void (await deactivateTable.mutateAsync({ id, version: t?._version ?? 0 }));
+      },
+      removeValue: async (_tableId, valueId) => {
+        const t = (query.data ?? []).find((x) => x.values.some((v) => v.id === valueId));
+        const v = t?.values.find((x) => x.id === valueId);
+        void (await deactivateValue.mutateAsync({ id: valueId, version: v?._version ?? 0 }));
+      },
     };
   }
 

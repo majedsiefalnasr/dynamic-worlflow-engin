@@ -41,6 +41,7 @@ interface MerchantDto {
   is_active?: boolean;
   owners?: OwnerDto[];
   companies?: CompanyDto[];
+  version?: number;
 }
 
 export interface SectorValue {
@@ -81,6 +82,7 @@ function toMerchant(d: MerchantDto, sectors: SectorValue[]): Merchant {
       share: o.ownership_percentage,
     })),
     linkedCompanies: companies,
+    _version: d.version,
   };
 }
 
@@ -105,6 +107,7 @@ function toWriteBody(m: Merchant, sectors: SectorValue[]) {
     address: m.address === "—" ? undefined : m.address,
     phone: m.contact === "—" ? undefined : m.contact,
     status: m.status === "active" ? "ACTIVE" : "SUSPENDED",
+    version: m._version ?? 0,
     owners: (m.owners ?? []).map((o) => ({
       name: o.name,
       ownership_percentage: Number(o.share) || 0,

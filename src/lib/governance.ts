@@ -107,6 +107,7 @@ export type ReferenceValue = {
   id: string;
   key: string;
   label: string;
+  _version?: number;
 };
 
 export type ReferenceTable = {
@@ -115,6 +116,7 @@ export type ReferenceTable = {
   label: string;
   system?: boolean;
   values: ReferenceValue[];
+  _version?: number;
 };
 
 const DEFAULT_REFERENCE_TABLES: ReferenceTable[] = [
@@ -181,6 +183,7 @@ export type OrgRecord = {
   category?: OrgCategory;
   /** Legacy value kept for stored records created before categories existed. */
   isBank?: boolean;
+  _version?: number;
 };
 
 const DEFAULT_ORGS: OrgRecord[] = [
@@ -217,6 +220,7 @@ export type TeamRecord = {
   roleCode: RoleId;
   active: boolean;
   builtin?: boolean;
+  _version?: number;
 };
 
 const DEFAULT_TEAMS: TeamRecord[] = [
@@ -259,6 +263,7 @@ export type RoleCatalogEntry = {
    * API entries set both — `id` numeric for mutation URLs, `code` for
    * cross-referencing against User.roleId, which is always the code. */
   code?: string;
+  _version?: number;
 };
 
 const DEFAULT_ROLE_CATALOG: RoleCatalogEntry[] = [

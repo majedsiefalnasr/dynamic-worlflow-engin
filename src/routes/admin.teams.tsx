@@ -117,9 +117,9 @@ function useTeamsController(): TeamsController {
       add: async (p) =>
         void (await m.create.mutateAsync({ organizationId: p.orgKind, name: p.label })),
       update: async (target, p) =>
-        void (await m.update.mutateAsync({ id: target.id, name: p.label })),
-      toggle: async (t) => void (await (t.active ? m.deactivate : m.activate).mutateAsync(t.id)),
-      remove: async (t) => void (await m.deactivate.mutateAsync(t.id)), // no hard delete server-side
+        void (await m.update.mutateAsync({ id: target.id, version: target._version ?? 0, name: p.label })),
+      toggle: async (t) => void (await (t.active ? m.deactivate : m.activate).mutateAsync({ id: t.id, version: t._version ?? 0 })),
+      remove: async (t) => void (await m.deactivate.mutateAsync({ id: t.id, version: t._version ?? 0 })), // no hard delete server-side
     };
   }
 

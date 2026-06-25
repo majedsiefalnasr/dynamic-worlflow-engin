@@ -59,6 +59,7 @@ export type Entity = {
   status: "active" | "suspended";
   adminName?: string;
   adminEmail?: string;
+  _version?: number;
 };
 
 export const ENTITIES: Entity[] = [
@@ -212,6 +213,7 @@ export type Merchant = {
   commercialRegistrationExpiry?: string;
   owners?: { id: string; name: string; share: number }[];
   linkedCompanies?: { id: string; name: string; category: string; cr: string; crExpiry: string }[];
+  _version?: number;
 };
 
 export const MERCHANTS: Merchant[] = importers.map((n, i) => ({

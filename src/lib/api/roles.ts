@@ -15,6 +15,7 @@ interface RoleDto {
   name: string;
   is_system?: boolean;
   is_active?: boolean;
+  version?: number;
 }
 
 function toRoleEntry(d: RoleDto): RoleCatalogEntry {
@@ -25,6 +26,7 @@ function toRoleEntry(d: RoleDto): RoleCatalogEntry {
     active: d.is_active ?? true,
     builtin: d.is_system,
     code: d.code,
+    _version: d.version,
   };
 }
 
@@ -67,17 +69,19 @@ export function useRoleMutations() {
       onSuccess: invalidate,
     }),
     update: useMutation({
-      mutationFn: (input: { id: string; name: string }) =>
-        api.patch(`/roles/${input.id}`, { name: input.name }),
+      mutationFn: (input: { id: string; version: number; name: string }) =>
+        api.patch(`/roles/${input.id}`, { name: input.name, version: input.version }),
       onSuccess: invalidate,
     }),
     // POST /{id}/activate|deactivate return 406 (CR-03); toggle via PATCH is_active.
     activate: useMutation({
-      mutationFn: (id: string) => api.patch(`/roles/${id}`, { is_active: true }),
+      mutationFn: (input: { id: string; version: number }) =>
+        api.patch(`/roles/${input.id}`, { is_active: true, version: input.version }),
       onSuccess: invalidate,
     }),
     deactivate: useMutation({
-      mutationFn: (id: string) => api.patch(`/roles/${id}`, { is_active: false }),
+      mutationFn: (input: { id: string; version: number }) =>
+        api.patch(`/roles/${input.id}`, { is_active: false, version: input.version }),
       onSuccess: invalidate,
     }),
   };

@@ -92,9 +92,9 @@ function useRolesController(): RolesController {
       add: async (p) =>
         void (await m.create.mutateAsync({ organizationId: p.orgId, name: p.name })),
       update: async (target, p) =>
-        void (await m.update.mutateAsync({ id: target.id, name: p.name })),
-      toggle: async (r) => void (await (r.active ? m.deactivate : m.activate).mutateAsync(r.id)),
-      remove: async (r) => void (await m.deactivate.mutateAsync(r.id)), // no hard delete server-side
+        void (await m.update.mutateAsync({ id: target.id, version: target._version ?? 0, name: p.name })),
+      toggle: async (r) => void (await (r.active ? m.deactivate : m.activate).mutateAsync({ id: r.id, version: r._version ?? 0 })),
+      remove: async (r) => void (await m.deactivate.mutateAsync({ id: r.id, version: r._version ?? 0 })), // no hard delete server-side
     };
   }
 

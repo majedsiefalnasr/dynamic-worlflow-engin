@@ -18,6 +18,7 @@ interface RefValueDto {
   label: string;
   is_active?: boolean;
   is_system?: boolean;
+  version?: number;
 }
 
 interface RefTableDto {
@@ -26,6 +27,7 @@ interface RefTableDto {
   label: string;
   is_system?: boolean;
   values?: RefValueDto[];
+  version?: number;
 }
 
 // NOTE: assumes GET /reference-tables nests `values`. Confirm with backend
@@ -36,7 +38,13 @@ function toScreenTable(dto: RefTableDto): ReferenceTable {
     key: dto.key,
     label: dto.label,
     system: dto.is_system,
-    values: (dto.values ?? []).map((v) => ({ id: String(v.id), key: v.key, label: v.label })),
+    values: (dto.values ?? []).map((v) => ({
+      id: String(v.id),
+      key: v.key,
+      label: v.label,
+      _version: v.version,
+    })),
+    _version: dto.version,
   };
 }
 
@@ -78,11 +86,13 @@ export function useReferenceMutations() {
   // No hard delete — "remove" deactivates. POST /{id}/deactivate returns 406
   // (CR-03), so deactivate via PATCH is_active.
   const deactivateTable = useMutation({
-    mutationFn: (id: string) => api.patch(`/reference-tables/${id}`, { is_active: false }),
+    mutationFn: (input: { id: string; version: number }) =>
+      api.patch(`/reference-tables/${input.id}`, { is_active: false, version: input.version }),
     onSuccess: invalidate,
   });
   const deactivateValue = useMutation({
-    mutationFn: (id: string) => api.patch(`/reference-values/${id}`, { is_active: false }),
+    mutationFn: (input: { id: string; version: number }) =>
+      api.patch(`/reference-values/${input.id}`, { is_active: false, version: input.version }),
     onSuccess: invalidate,
   });
 

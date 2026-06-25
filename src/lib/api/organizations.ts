@@ -16,6 +16,7 @@ interface OrgDto {
   category?: string;
   is_system?: boolean;
   is_active?: boolean;
+  version?: number;
 }
 
 // Backend OrganizationCategory enum ↔ the frontend's OrgCategory.
@@ -37,6 +38,7 @@ function toOrgRecord(d: OrgDto): OrgRecord {
     active: d.is_active ?? true,
     builtin: d.is_system,
     category: TO_FRONTEND_CATEGORY[d.category ?? ""] ?? "other",
+    _version: d.version,
   };
 }
 
@@ -80,20 +82,23 @@ export function useOrganizationMutations() {
       onSuccess: invalidate,
     }),
     update: useMutation({
-      mutationFn: (input: { id: string; name: string; category: OrgCategory }) =>
+      mutationFn: (input: { id: string; version: number; name: string; category: OrgCategory }) =>
         api.patch(`/organizations/${input.id}`, {
           name: input.name,
           category: TO_BACKEND_CATEGORY[input.category],
+          version: input.version,
         }),
       onSuccess: invalidate,
     }),
     // Backend POST /{id}/activate|deactivate return 406 (CR-03); toggle via PATCH is_active.
     activate: useMutation({
-      mutationFn: (id: string) => api.patch(`/organizations/${id}`, { is_active: true }),
+      mutationFn: (input: { id: string; version: number }) =>
+        api.patch(`/organizations/${input.id}`, { is_active: true, version: input.version }),
       onSuccess: invalidate,
     }),
     deactivate: useMutation({
-      mutationFn: (id: string) => api.patch(`/organizations/${id}`, { is_active: false }),
+      mutationFn: (input: { id: string; version: number }) =>
+        api.patch(`/organizations/${input.id}`, { is_active: false, version: input.version }),
       onSuccess: invalidate,
     }),
     remove: useMutation({

@@ -123,8 +123,8 @@ function useOrgController(): OrgController {
       refetch: () => void query.refetch(),
       add: async (p) => void (await m.create.mutateAsync({ name: p.label, category: p.category })),
       update: async (target, p) =>
-        void (await m.update.mutateAsync({ id: target.id, name: p.label, category: p.category })),
-      toggle: async (o) => void (await (o.active ? m.deactivate : m.activate).mutateAsync(o.id)),
+        void (await m.update.mutateAsync({ id: target.id, version: target._version ?? 0, name: p.label, category: p.category })),
+      toggle: async (o) => void (await (o.active ? m.deactivate : m.activate).mutateAsync({ id: o.id, version: o._version ?? 0 })),
       remove: async (o) => void (await m.remove.mutateAsync(o.id)),
     };
   }

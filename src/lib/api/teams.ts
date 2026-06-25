@@ -17,6 +17,7 @@ interface TeamDto {
   name: string;
   is_system?: boolean;
   is_active?: boolean;
+  version?: number;
 }
 
 function toTeamRecord(d: TeamDto): TeamRecord {
@@ -27,6 +28,7 @@ function toTeamRecord(d: TeamDto): TeamRecord {
     roleCode: "" as RoleId, // backend team has no role
     active: d.is_active ?? true,
     builtin: d.is_system,
+    _version: d.version,
   };
 }
 
@@ -69,17 +71,19 @@ export function useTeamMutations() {
       onSuccess: invalidate,
     }),
     update: useMutation({
-      mutationFn: (input: { id: string; name: string }) =>
-        api.patch(`/teams/${input.id}`, { name: input.name }),
+      mutationFn: (input: { id: string; version: number; name: string }) =>
+        api.patch(`/teams/${input.id}`, { name: input.name, version: input.version }),
       onSuccess: invalidate,
     }),
     // POST /{id}/activate|deactivate return 406 (CR-03); toggle via PATCH is_active.
     activate: useMutation({
-      mutationFn: (id: string) => api.patch(`/teams/${id}`, { is_active: true }),
+      mutationFn: (input: { id: string; version: number }) =>
+        api.patch(`/teams/${input.id}`, { is_active: true, version: input.version }),
       onSuccess: invalidate,
     }),
     deactivate: useMutation({
-      mutationFn: (id: string) => api.patch(`/teams/${id}`, { is_active: false }),
+      mutationFn: (input: { id: string; version: number }) =>
+        api.patch(`/teams/${input.id}`, { is_active: false, version: input.version }),
       onSuccess: invalidate,
     }),
   };
