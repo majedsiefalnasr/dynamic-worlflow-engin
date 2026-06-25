@@ -27,6 +27,8 @@ import {
 } from "@/lib/workflow-bridge";
 import { ScreenGuard } from "@/components/workflow/ScreenGuard";
 import { toast } from "sonner";
+import { isApiEnabled, ApiError } from "@/lib/api/client";
+import { useRequestDetailQuery, useRequestHistoryQuery, useRequestMutations } from "@/lib/api/requests";
 
 export const Route = createFileRoute("/workflows/instances/$id")({
   component: () => (
@@ -39,6 +41,10 @@ export const Route = createFileRoute("/workflows/instances/$id")({
 function InstancePage() {
   const { id } = Route.useParams();
   const nav = useNavigate();
+  const requestsApi = isApiEnabled("requests");
+  const detailQuery = useRequestDetailQuery(id, requestsApi);
+  const historyQuery = useRequestHistoryQuery(id, requestsApi);
+  const mutations = useRequestMutations();
   const instances = wfStore.instances.use();
   const stages = wfStore.stages.use();
   const users = wfStore.users.use();
@@ -53,7 +59,11 @@ function InstancePage() {
   const isAdmin = legacyUser?.roleId === "rc_platform_admin";
   const canActOnRequests = canScreen(legacyUser, "requests", "edit");
 
-  const instance = instances.find((i) => i.id === id);
+  // Live path: instance from API detail query
+  // Mock path: instance from wfStore (existing behavior)
+  const instance = requestsApi
+    ? (detailQuery.data ? { ...detailQuery.data } : undefined)
+    : instances.find((i) => i.id === id);
   const stage = instance ? stages.find((s) => s.id === instance.currentStageId) : undefined;
 
   const isExecutor = user ? canExecute(instance?.currentStageId ?? "", user) : false;
@@ -72,6 +82,30 @@ function InstancePage() {
   const [draftData, setDraftData] = useState<Record<string, unknown>>(instance?.data ?? {});
   const [comments, setComments] = useState("");
 
+  if (requestsApi && detailQuery.isLoading) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
+        جارٍ تحميل الطلب…
+      </div>
+    );
+  }
+
+  if (requestsApi && detailQuery.error) {
+    return (
+      <div>
+        <PageHeader title="خطأ" actions={<Link to="/workflows"><Button variant="outline">رجوع</Button></Link>} />
+        <Card className="p-6 text-center">
+          <p className="text-sm text-muted-foreground">
+            {detailQuery.error instanceof ApiError ? detailQuery.error.message : "تعذّر تحميل الطلب"}
+          </p>
+          <Button variant="outline" size="sm" onClick={() => detailQuery.refetch()} className="mt-4">
+            إعادة المحاولة
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
   if (!instance) {
     return (
       <div>
@@ -86,7 +120,9 @@ function InstancePage() {
   // تعديل الحقول مسموح فقط لمن يملك صلاحية التنفيذ على المرحلة + صلاحية شاشة الطلبات.
   const canEditFields = isExecutor && canActOnRequests;
   const showActionPanel = canSeeStage && isExecutor && canActOnRequests;
-  const history = getInstanceHistory(instance.id);
+  const history = requestsApi
+    ? (historyQuery.data ?? [])
+    : getInstanceHistory(instance.id);
 
   const progress = progressForInstance(instance);
   const creator = users.find((u) => u.id === instance.createdBy);
@@ -99,14 +135,48 @@ function InstancePage() {
 
   const duplicateInvoice = isDuplicateInvoice(draftData, instance.id);
 
-  const onSaveDraft = () => {
-    if (!user) return;
+  const onSaveDraft = async () => {
+    if (!user || !instance) return;
+    if (requestsApi) {
+      try {
+        await mutations.saveDraft.mutateAsync({
+          id: instance.id,
+          version: (instance as { _version?: number })._version ?? 0,
+          data: draftData,
+        });
+        toast.success("تم حفظ المسودة");
+        detailQuery.refetch();
+      } catch (error) {
+        toast.error(error instanceof ApiError ? error.message : "تعذّر حفظ المسودة");
+      }
+      return;
+    }
+    // Mock path (existing)
     saveDraftData(instance.id, draftData, user);
     toast.success("تم حفظ المسودة");
   };
 
-  const onAction = (transitionId: string, actionName: string) => {
+  const onAction = async (transitionId: string, actionName: string) => {
     if (!user) return toast.error("اختر مستخدمًا");
+    if (requestsApi && instance) {
+      try {
+        await mutations.executeAction.mutateAsync({
+          id: instance.id,
+          transitionId: Number(transitionId),
+          version: (instance as { _version?: number })._version ?? 0,
+          comment: comments || undefined,
+          data: draftData,
+        });
+        toast.success(`تم تنفيذ: ${actionName}`);
+        setComments("");
+        detailQuery.refetch();
+        historyQuery.refetch();
+      } catch (error) {
+        toast.error(error instanceof ApiError ? error.message : "تعذّر تنفيذ الإجراء");
+      }
+      return;
+    }
+    // Mock path (existing)
     const res = applyAction({ instanceId: instance.id, transitionId, user, comments, data: draftData });
     if (!res.ok) return toast.error(res.error);
     toast.success(`تم تنفيذ: ${actionName}`);
