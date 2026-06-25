@@ -6,8 +6,8 @@
 // reference value: stored as sector_reference_value_id, shown/edited as a label,
 // so we resolve label <-> id via the sector_activity reference values.
 //
-// NOTE: activate/suspend POST endpoints return 406 (CR-03) and merchant PATCH
-// rejects status/is_active, so the status toggle is currently blocked server-side.
+// CR-03 closed (2026-06-25): activate/suspend POST endpoints now return 200/403.
+// CR-13 (open): tax_number uniqueness is global, not per bank — backend fix pending.
 // ============================================================
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -163,6 +163,9 @@ export function useMerchantMutations() {
   const qc = useQueryClient();
   const invalidate = () => qc.invalidateQueries({ queryKey: merchantKeys.all });
   return {
+    // CR-13 (backend, open): tax_number uniqueness is GLOBAL, not per bank_id.
+    // Once fixed, duplicate tax within same bank -> 422 (fields.tax_number);
+    // duplicate across different banks -> allowed. No frontend change needed.
     create: useMutation({
       mutationFn: (input: { merchant: Merchant; sectors: SectorValue[] }) =>
         api.post("/merchants", toWriteBody(input.merchant, input.sectors)),
@@ -173,7 +176,7 @@ export function useMerchantMutations() {
         api.patch(`/merchants/${input.id}`, toWriteBody(input.merchant, input.sectors)),
       onSuccess: invalidate,
     }),
-    // Blocked server-side (CR-03) — kept so it works once the 406 is fixed.
+    // CR-03 closed (2026-06-25): activate/suspend now return 200/403.
     setStatus: useMutation({
       mutationFn: (input: { id: string; suspend: boolean }) =>
         api.post(`/merchants/${input.id}/${input.suspend ? "suspend" : "activate"}`),
