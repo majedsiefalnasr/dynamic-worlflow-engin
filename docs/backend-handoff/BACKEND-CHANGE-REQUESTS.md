@@ -177,11 +177,11 @@ So the element shape is confirmed: `{ screen: string, capabilities: ("VIEW"|"CRE
 
 Also add `workflow_version_id` and `current_stage` to `ImportRequestResource` (detail) — it has `merchant` but is missing these two.
 
-**Also still needed:** `reference_number` populated for seeded requests (currently `null`).
+**`reference_number` bug (found 2026-06-25):** `ImportRequestListResource` and `ImportRequestResource` both read `$this->reference_number`, but the model column is `reference` (confirmed in `ImportRequest` fillable and `WorkflowService::createRequest` which writes `'reference' => $this->generateReference()`). Fix: change both resources to `'reference_number' => $this->reference` — or rename the DB column. New requests created via `POST /requests` DO get a generated reference (via `generateReference()`), but the resources never return it because they read the wrong column name.
 
 **Why:** this is the last backend change needed before the frontend can wire request creation + stage progression (PM priority #5). The request runtime endpoints (`POST /requests`, `PATCH /requests/{id}/draft`, `POST /requests/{id}/actions`, documents, history) are all confirmed working in the backend code — only the list/detail response shape is incomplete.
 
-**Acceptance:** each list row includes `workflow_version_id`, `current_stage: { id, name }`, `merchant: { id, name }`, and a non-null `reference_number`.
+**Acceptance:** each list row includes `workflow_version_id`, `current_stage: { id, name }`, `merchant: { id, name }`, and a non-null `reference_number` (fix the column name mismatch: model has `reference`, resources read `reference_number`).
 
 ### CR-07 · Enforce optimistic locking (`version`) on sensitive updates · P1
 
