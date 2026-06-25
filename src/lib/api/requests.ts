@@ -36,7 +36,7 @@ interface RequestDto {
 function toInstance(d: RequestDto): WorkflowInstance {
   const data: Record<string, unknown> = { ...(d.data ?? {}) };
   // Hoist the flat list fields into `data` so the list display helpers find them.
-  if (d.reference_number) data.requestIdentifier = d.reference_number;
+  if (d.reference_number && d.reference_number !== "NULL") data.requestIdentifier = d.reference_number;
   if (data.invoiceNumber == null && d.invoice_number != null) data.invoiceNumber = d.invoice_number;
   if (data.financeAmount == null && d.amount != null) data.financeAmount = d.amount;
   if (data.currency == null && d.currency != null) data.currency = d.currency;
