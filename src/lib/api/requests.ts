@@ -7,9 +7,9 @@
 // config + a create form); the list + stage labels are wired here.
 // ============================================================
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
-import type { WorkflowInstance, WorkflowStage } from "@/lib/workflow-engine";
+import type { WorkflowInstance, WorkflowHistory, WorkflowStage } from "@/lib/workflow-engine";
 
 interface RequestDto {
   id: number;
@@ -98,4 +98,159 @@ export function useWorkflowStagesQuery(versionId: string | undefined, enabled: b
         .getList<StageDto>(`/workflow-versions/${versionId}/stages`, { per_page: 100 }, signal)
         .then((r) => r.data.map((d) => toStage(d, versionId as string))),
   });
+}
+
+// ============================================================
+// Detail query — single request with extra fields
+// ============================================================
+
+interface RequestDetailDto extends RequestDto {
+  merchant?: { id: number; name: string; commercial_register?: string } | null;
+  goods_description?: string | null;
+  port_of_entry?: string | null;
+  notes?: string | null;
+  payment_terms?: string | null;
+  expected_arrival_date?: string | null;
+  country_of_origin?: string | null;
+  invoice_date?: string | null;
+  shipping_port?: string | null;
+  bill_of_lading_number?: string | null;
+  version?: number;
+  documents?: {
+    id: number;
+    type?: string;
+    original_filename?: string;
+    mime_type?: string;
+    size_bytes?: number;
+    uploaded_by?: number;
+    uploaded_by_name?: string | null;
+    uploaded_at?: string;
+    download_url?: string;
+  }[];
+}
+
+function toDetailInstance(d: RequestDetailDto): WorkflowInstance & { _version: number; _merchantName: string } {
+  const base = toInstance(d);
+  if (d.merchant?.name && !base.data.importerName) base.data.importerName = d.merchant.name;
+  return {
+    ...base,
+    _version: d.version ?? 0,
+    _merchantName: d.merchant?.name ?? "",
+  };
+}
+
+export function useRequestDetailQuery(id: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ["requests", "detail", id],
+    enabled: enabled && !!id,
+    queryFn: ({ signal }) =>
+      api.get<RequestDetailDto>(`/requests/${id}`, undefined, signal).then(toDetailInstance),
+  });
+}
+
+// ============================================================
+// History query — transition log for a request
+// ============================================================
+
+interface HistoryDto {
+  id?: number;
+  request_id: number;
+  from_stage_id: number | null;
+  to_stage_id: number | null;
+  action_id?: number | null;
+  transition_id?: number | null;
+  performed_by: number;
+  comment?: string | null;
+  data_snapshot?: Record<string, unknown> | null;
+  created_at?: string;
+}
+
+function toHistory(d: HistoryDto): WorkflowHistory {
+  return {
+    id: String(d.id ?? d.request_id),
+    workflowInstanceId: String(d.request_id),
+    fromStageId: d.from_stage_id != null ? String(d.from_stage_id) : null,
+    toStageId: String(d.to_stage_id ?? ""),
+    actionCode: String(d.action_id ?? ""),
+    actionName: "",
+    performedBy: String(d.performed_by),
+    comments: d.comment ?? undefined,
+    timestamp: d.created_at ?? "",
+  };
+}
+
+export function useRequestHistoryQuery(id: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ["requests", "history", id],
+    enabled: enabled && !!id,
+    queryFn: ({ signal }) =>
+      api.get<HistoryDto[]>(`/requests/${id}/history`, undefined, signal)
+        .then((arr) => (Array.isArray(arr) ? arr : []).map(toHistory)),
+  });
+}
+
+// ============================================================
+// Mutations — create, save draft, execute action
+// ============================================================
+
+export function useRequestMutations() {
+  const qc = useQueryClient();
+  const invalidateList = () => qc.invalidateQueries({ queryKey: ["requests"] });
+  return {
+    create: useMutation({
+      mutationFn: (input: {
+        workflowVersionId: number;
+        bankId: number;
+        merchantId: number;
+        amount?: number;
+        currency?: string;
+        invoiceNumber?: string;
+        data?: Record<string, unknown>;
+      }) =>
+        api.post<RequestDetailDto>("/requests", {
+          workflow_version_id: input.workflowVersionId,
+          bank_id: input.bankId,
+          merchant_id: input.merchantId,
+          amount: input.amount,
+          currency: input.currency,
+          invoice_number: input.invoiceNumber,
+          data: input.data,
+        }),
+      onSuccess: invalidateList,
+    }),
+    saveDraft: useMutation({
+      mutationFn: (input: {
+        id: string;
+        version: number;
+        data?: Record<string, unknown>;
+        amount?: number;
+        currency?: string;
+        invoiceNumber?: string;
+      }) =>
+        api.patch(`/requests/${input.id}/draft`, {
+          version: input.version,
+          data: input.data,
+          amount: input.amount,
+          currency: input.currency,
+          invoice_number: input.invoiceNumber,
+        }),
+      onSuccess: invalidateList,
+    }),
+    executeAction: useMutation({
+      mutationFn: (input: {
+        id: string;
+        transitionId: number;
+        version: number;
+        comment?: string;
+        data?: Record<string, unknown>;
+      }) =>
+        api.post(`/requests/${input.id}/actions`, {
+          transition_id: input.transitionId,
+          version: input.version,
+          comment: input.comment,
+          data: input.data,
+        }),
+      onSuccess: invalidateList,
+    }),
+  };
 }
