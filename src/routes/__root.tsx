@@ -8,12 +8,14 @@ import {
   useRouterState,
   useNavigate,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import appCss from "../styles.css?url";
 import { AppShell } from "@/components/layout/AppShell";
-import { useAuth } from "@/lib/mock";
+import { auth, useAuth } from "@/lib/mock";
 import { Toaster } from "@/components/ui/sonner";
 import { seedIfEmpty } from "@/lib/workflow-engine";
+import { tokenStore, hasApiBase, api } from "@/lib/api/client";
+import { mapApiUserToAppUser, type ApiUser } from "@/lib/api/auth";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -115,12 +117,29 @@ function AuthGate() {
   const { user } = useAuth();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const nav = useNavigate();
+  const [restoring, setRestoring] = useState(() => !user && hasApiBase() && !!tokenStore.get());
 
   useEffect(() => {
+    if (!restoring) return;
+    let cancelled = false;
+    api.get<ApiUser>("/auth/me").then((data) => {
+      if (cancelled) return;
+      auth.login(mapApiUserToAppUser(data));
+    }).catch(() => {
+      tokenStore.clear();
+    }).finally(() => {
+      if (!cancelled) setRestoring(false);
+    });
+    return () => { cancelled = true; };
+  }, [restoring]);
+
+  useEffect(() => {
+    if (restoring) return;
     if (!user && path !== "/login") nav({ to: "/login" });
     if (user && path === "/login") nav({ to: "/" });
-  }, [user, path, nav]);
+  }, [user, path, nav, restoring]);
 
+  if (restoring) return null;
   if (!user || path === "/login") return <Outlet />;
   return <AppShell />;
 }

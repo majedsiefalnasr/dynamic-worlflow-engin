@@ -59,6 +59,8 @@ function toUser(d: UserDto): User {
     phone: d.phone ?? undefined,
     orgKind: categoryToOrgKind(d.organization?.category),
     teamId: d.team?.code,
+    _orgId: d.organization_id != null ? String(d.organization_id) : (d.organization?.id != null ? String(d.organization.id) : undefined),
+    _teamId: d.team_id != null ? String(d.team_id) : (d.team?.id != null ? String(d.team.id) : undefined),
     _version: d.version,
   };
 }

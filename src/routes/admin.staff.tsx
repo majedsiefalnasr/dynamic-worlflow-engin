@@ -691,6 +691,10 @@ function UserDialog({
   onSave: (p: Payload) => void;
 }) {
   const defaultOrg = (() => {
+    if (initial?._orgId) {
+      const byOrgId = orgs.find((o) => o.id === initial._orgId);
+      if (byOrgId) return byOrgId.id;
+    }
     if (!initial?.orgKind) return orgs[0]?.id ?? "";
     const byCategory = orgs.find((o) => o.category === initial.orgKind);
     if (byCategory) return byCategory.id;
@@ -711,6 +715,10 @@ function UserDialog({
   const rolesForOrg = roles.filter((r) => r.orgId === orgId);
 
   const resolvedTeamId = (() => {
+    if (initial?._teamId) {
+      const byTeamId = teamsForOrg.find((t) => t.id === initial._teamId);
+      if (byTeamId) return byTeamId.id;
+    }
     if (!initial?.teamId) return teamsForOrg[0]?.id ?? "";
     const byId = teamsForOrg.find((t) => t.id === initial.teamId);
     if (byId) return byId.id;

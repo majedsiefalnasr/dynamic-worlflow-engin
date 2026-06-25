@@ -36,16 +36,28 @@ export const isApiEnabled = (resource?: string): boolean => {
   return API_RESOURCES.has("*") || API_RESOURCES.has(resource);
 };
 
-// ---------- Access token (in memory only, never localStorage — see 09) ----------
+// ---------- Access token (sessionStorage — survives reloads, clears on tab close) ----------
 
-let accessToken: string | null = null;
+const TOKEN_KEY = "cby:token";
+
+function readToken(): string | null {
+  try { return sessionStorage.getItem(TOKEN_KEY); } catch { return null; }
+}
+
+let accessToken: string | null = readToken();
+
 export const tokenStore = {
   get: () => accessToken,
   set: (token: string | null) => {
     accessToken = token;
+    try {
+      if (token) sessionStorage.setItem(TOKEN_KEY, token);
+      else sessionStorage.removeItem(TOKEN_KEY);
+    } catch { /* private mode */ }
   },
   clear: () => {
     accessToken = null;
+    try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* */ }
   },
 };
 
