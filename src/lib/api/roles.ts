@@ -24,6 +24,7 @@ function toRoleEntry(d: RoleDto): RoleCatalogEntry {
     orgId: String(d.organization_id ?? d.organization?.id ?? ""),
     active: d.is_active ?? true,
     builtin: d.is_system,
+    code: d.code,
   };
 }
 

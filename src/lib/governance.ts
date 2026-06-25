@@ -255,6 +255,10 @@ export type RoleCatalogEntry = {
   orgId: string;
   active: boolean;
   builtin?: boolean;
+  /** Stable role code (e.g. "rc_bank_intake"). Mock entries use this as `id`;
+   * API entries set both — `id` numeric for mutation URLs, `code` for
+   * cross-referencing against User.roleId, which is always the code. */
+  code?: string;
 };
 
 const DEFAULT_ROLE_CATALOG: RoleCatalogEntry[] = [
@@ -271,9 +275,9 @@ const DEFAULT_ROLE_CATALOG: RoleCatalogEntry[] = [
 export const roleCatalogCell = cell<RoleCatalogEntry[]>("roleCatalog", DEFAULT_ROLE_CATALOG);
 
 // Normalize previously persisted records to the current role schema.
-if (roleCatalogCell.get().some((role) => Object.keys(role).some((key) => !["id", "name", "orgId", "active", "builtin"].includes(key)))) {
+if (roleCatalogCell.get().some((role) => Object.keys(role).some((key) => !["id", "name", "orgId", "active", "builtin", "code"].includes(key)))) {
   roleCatalogCell.set((roles) =>
-    roles.map(({ id, name, orgId, active, builtin }) => ({ id, name, orgId, active, builtin })),
+    roles.map(({ id, name, orgId, active, builtin, code }) => ({ id, name, orgId, active, builtin, code })),
   );
 }
 
