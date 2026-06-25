@@ -93,7 +93,7 @@ interface StaffController {
   users: User[];
   banks: { id: string; name: string }[];
   orgs: { id: string; label: string; active: boolean; category?: string }[];
-  teams: { id: string; label: string; orgKind: string; active: boolean }[];
+  teams: { id: string; label: string; orgKind: string; active: boolean; code?: string }[];
   roles: { id: string; code?: string; name: string; orgId: string; active: boolean }[];
   isLoading: boolean;
   error: unknown;
@@ -136,6 +136,7 @@ function useCbyStaffController(orgLabelFor: (p: Payload) => string): StaffContro
         label: t.label,
         orgKind: t.orgKind,
         active: t.active,
+        code: t.code,
       })),
       roles: apiRoles.map((r) => ({
         id: r.id,
@@ -685,7 +686,7 @@ function UserDialog({
   initialRoleId?: string;
   banks: { id: string; name: string }[];
   orgs: { id: string; label: string; category?: string }[];
-  teams: { id: string; label: string; orgKind: string }[];
+  teams: { id: string; label: string; orgKind: string; code?: string }[];
   roles: { id: string; name: string; orgId: string }[];
   onSave: (p: Payload) => void;
 }) {
@@ -709,7 +710,15 @@ function UserDialog({
   const teamsForOrg = teams.filter((t) => t.orgKind === orgId);
   const rolesForOrg = roles.filter((r) => r.orgId === orgId);
 
-  const [teamId, setTeamId] = useState<string>(initial?.teamId ?? teamsForOrg[0]?.id ?? "");
+  const resolvedTeamId = (() => {
+    if (!initial?.teamId) return teamsForOrg[0]?.id ?? "";
+    const byId = teamsForOrg.find((t) => t.id === initial.teamId);
+    if (byId) return byId.id;
+    const byCode = teamsForOrg.find((t) => t.code === initial.teamId);
+    if (byCode) return byCode.id;
+    return teamsForOrg[0]?.id ?? "";
+  })();
+  const [teamId, setTeamId] = useState<string>(resolvedTeamId);
   const [roleId, setRoleId] = useState<string>(initialRoleId ?? rolesForOrg[0]?.id ?? "");
 
   function switchOrg(next: string) {

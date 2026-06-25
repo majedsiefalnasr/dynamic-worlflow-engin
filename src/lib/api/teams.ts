@@ -28,6 +28,7 @@ function toTeamRecord(d: TeamDto): TeamRecord {
     roleCode: "" as RoleId, // backend team has no role
     active: d.is_active ?? true,
     builtin: d.is_system,
+    code: d.code,
     _version: d.version,
   };
 }

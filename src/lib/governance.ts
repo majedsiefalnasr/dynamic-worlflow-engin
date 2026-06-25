@@ -220,6 +220,7 @@ export type TeamRecord = {
   roleCode: RoleId;
   active: boolean;
   builtin?: boolean;
+  code?: string;
   _version?: number;
 };
 
