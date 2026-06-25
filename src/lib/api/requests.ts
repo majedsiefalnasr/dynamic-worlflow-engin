@@ -22,6 +22,7 @@ interface RequestDto {
   bank_name?: string;
   merchant_id?: number;
   merchant_name?: string;
+  merchant?: { id: number; name: string } | null;
   amount?: number;
   currency?: string;
   invoice_number?: string;
@@ -42,8 +43,8 @@ function toInstance(d: RequestDto): WorkflowInstance {
   if (data.currency == null && d.currency != null) data.currency = d.currency;
   if (data.importType == null && d.import_type) data.importType = d.import_type;
   if (data.supplierName == null && d.supplier_name) data.supplierName = d.supplier_name;
-  // Applicant name isn't in the list row yet (only bank) — see CR to enrich /requests.
-  if (data.importerName == null && d.merchant_name) data.importerName = d.merchant_name;
+  const merchantName = d.merchant?.name ?? d.merchant_name;
+  if (data.importerName == null && merchantName) data.importerName = merchantName;
   return {
     id: String(d.id),
     workflowVersionId: String(d.workflow_version_id ?? ""),
