@@ -111,6 +111,8 @@ export type User = {
   phone?: string;
   orgKind?: OrgKind;
   teamId?: TeamId;
+  /** Optimistic-locking version from the backend; required on update once live. */
+  _version?: number;
 };
 
 export const DEMO_USERS: User[] = [
