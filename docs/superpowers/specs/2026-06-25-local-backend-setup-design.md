@@ -17,14 +17,20 @@ ultimately remove all mock fallback.
 
 ## Sub-project roadmap (this spec covers #1 only)
 
-| # | Sub-project | Depends on | Delivers |
-|---|---|---|---|
-| **1** | **Local backend setup + baseline verification** | — | Laravel running locally, 11 resources verified |
-| 2 | Users system | #1 | `users.ts` client, `bank.users` + `admin.cby-staff` live |
-| 3 | Workflow designer writes | #1 | Authoring UI writes to backend CRUD |
-| 4 | Request runtime | #1, #3 | Create/draft/actions/documents via live API |
-| 5 | Screen permissions gate | #1, #2 | `admin.screen-permissions` wired to live model |
-| 6 | Mock removal + `VITE_API_RESOURCES=*` | #1–#5 | Remove `mock.ts`, `db.ts`, mock cells, `wfStore` mock paths |
+**Reordered 2026-06-25 to match the project manager's minimum-viable priority**
+(login → bank management → users → merchants → request creation/stages).
+Workflow-designer authoring (old #3) and the screen-permissions gate (old #5)
+are demoted, not cancelled — the PM has not asked for them yet.
+
+| # | Sub-project | Depends on | Delivers | PM priority |
+|---|---|---|---|---|
+| **1** | **Local backend setup + baseline verification** | — | Laravel running locally, 11 resources verified | #1 login, #2 banks (already pass) |
+| **2** | **Users system** | #1 | `users.ts` client, `bank.users` + `admin.cby-staff` live | #3 users |
+| **3** | **Merchants verification + CR-13 close-out** | #1 | Bank-scoping confirmed (already correct); tax-number-per-bank regression test once backend ships the fix | #4 merchants |
+| 4 | Request runtime | #1, #2 | Create/draft/actions/documents via live API | #5 requests + stages |
+| 5 | Workflow designer writes | #1 | Authoring UI writes to backend CRUD | not currently prioritized |
+| 6 | Screen permissions gate | #1, #2 | `admin.screen-permissions` wired to live model | not currently prioritized |
+| 7 | Mock removal + `VITE_API_RESOURCES=*` | #1–#6 | Remove `mock.ts`, `db.ts`, mock cells, `wfStore` mock paths | final cleanup |
 
 ## Architecture
 
