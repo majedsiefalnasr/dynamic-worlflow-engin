@@ -81,10 +81,9 @@ const NAV: NavItem[] = [
   },
   { to: "/admin/entities", label: "إدارة البنوك", icon: Network, roles: ["rc_platform_admin"] },
   { to: "/admin/orgs", label: "إدارة الجهات", icon: Building2, roles: ["rc_platform_admin"] },
-  { to: "/admin/cby-staff", label: "مستخدمي النظام", icon: UserCog, roles: ["rc_platform_admin"] },
+  { to: "/admin/staff", label: "إدارة المستخدمين", icon: UserCog, roles: ["rc_platform_admin"] },
   { to: "/admin/teams", label: "إدارة الفرق", icon: Users, roles: ["rc_platform_admin"] },
   { to: "/admin/roles", label: "إدارة الأدوار", icon: KeyRound, roles: ["rc_platform_admin"] },
-  { to: "/bank/users", label: "موظفو الجهة", icon: Users, roles: ["rc_bank_admin"] },
   { to: "/settings", label: "إعدادات النظام", icon: Settings, roles: ["rc_platform_admin"] },
 ];
 

@@ -22,16 +22,15 @@ import { Route as WorkflowsIndexRouteImport } from './routes/workflows.index'
 import { Route as RequestsIndexRouteImport } from './routes/requests.index'
 import { Route as RequestsNewRouteImport } from './routes/requests.new'
 import { Route as RequestsIdRouteImport } from './routes/requests.$id'
-import { Route as BankUsersRouteImport } from './routes/bank.users'
 import { Route as AdminWorkflowsRouteImport } from './routes/admin.workflows'
 import { Route as AdminWorkflowDocsRouteImport } from './routes/admin.workflow-docs'
 import { Route as AdminTeamsRouteImport } from './routes/admin.teams'
+import { Route as AdminStaffRouteImport } from './routes/admin.staff'
 import { Route as AdminScreenPermissionsRouteImport } from './routes/admin.screen-permissions'
 import { Route as AdminRolesRouteImport } from './routes/admin.roles'
 import { Route as AdminReferenceDataRouteImport } from './routes/admin.reference-data'
 import { Route as AdminOrgsRouteImport } from './routes/admin.orgs'
 import { Route as AdminEntitiesRouteImport } from './routes/admin.entities'
-import { Route as AdminCbyStaffRouteImport } from './routes/admin.cby-staff'
 import { Route as WorkflowsInstancesIdRouteImport } from './routes/workflows.instances.$id'
 import { Route as RequestsIdSwiftRouteImport } from './routes/requests.$id.swift'
 import { Route as CustomsIdPrintRouteImport } from './routes/customs.$id.print'
@@ -101,11 +100,6 @@ const RequestsIdRoute = RequestsIdRouteImport.update({
   path: '/requests/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
-const BankUsersRoute = BankUsersRouteImport.update({
-  id: '/bank/users',
-  path: '/bank/users',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdminWorkflowsRoute = AdminWorkflowsRouteImport.update({
   id: '/admin/workflows',
   path: '/admin/workflows',
@@ -119,6 +113,11 @@ const AdminWorkflowDocsRoute = AdminWorkflowDocsRouteImport.update({
 const AdminTeamsRoute = AdminTeamsRouteImport.update({
   id: '/admin/teams',
   path: '/admin/teams',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminStaffRoute = AdminStaffRouteImport.update({
+  id: '/admin/staff',
+  path: '/admin/staff',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminScreenPermissionsRoute = AdminScreenPermissionsRouteImport.update({
@@ -144,11 +143,6 @@ const AdminOrgsRoute = AdminOrgsRouteImport.update({
 const AdminEntitiesRoute = AdminEntitiesRouteImport.update({
   id: '/admin/entities',
   path: '/admin/entities',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminCbyStaffRoute = AdminCbyStaffRouteImport.update({
-  id: '/admin/cby-staff',
-  path: '/admin/cby-staff',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WorkflowsInstancesIdRoute = WorkflowsInstancesIdRouteImport.update({
@@ -177,16 +171,15 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
-  '/admin/cby-staff': typeof AdminCbyStaffRoute
   '/admin/entities': typeof AdminEntitiesRoute
   '/admin/orgs': typeof AdminOrgsRoute
   '/admin/reference-data': typeof AdminReferenceDataRoute
   '/admin/roles': typeof AdminRolesRoute
   '/admin/screen-permissions': typeof AdminScreenPermissionsRoute
+  '/admin/staff': typeof AdminStaffRoute
   '/admin/teams': typeof AdminTeamsRoute
   '/admin/workflow-docs': typeof AdminWorkflowDocsRoute
   '/admin/workflows': typeof AdminWorkflowsRoute
-  '/bank/users': typeof BankUsersRoute
   '/requests/$id': typeof RequestsIdRouteWithChildren
   '/requests/new': typeof RequestsNewRoute
   '/requests/': typeof RequestsIndexRoute
@@ -205,16 +198,15 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
-  '/admin/cby-staff': typeof AdminCbyStaffRoute
   '/admin/entities': typeof AdminEntitiesRoute
   '/admin/orgs': typeof AdminOrgsRoute
   '/admin/reference-data': typeof AdminReferenceDataRoute
   '/admin/roles': typeof AdminRolesRoute
   '/admin/screen-permissions': typeof AdminScreenPermissionsRoute
+  '/admin/staff': typeof AdminStaffRoute
   '/admin/teams': typeof AdminTeamsRoute
   '/admin/workflow-docs': typeof AdminWorkflowDocsRoute
   '/admin/workflows': typeof AdminWorkflowsRoute
-  '/bank/users': typeof BankUsersRoute
   '/requests/$id': typeof RequestsIdRouteWithChildren
   '/requests/new': typeof RequestsNewRoute
   '/requests': typeof RequestsIndexRoute
@@ -234,16 +226,15 @@ export interface FileRoutesById {
   '/profile': typeof ProfileRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
-  '/admin/cby-staff': typeof AdminCbyStaffRoute
   '/admin/entities': typeof AdminEntitiesRoute
   '/admin/orgs': typeof AdminOrgsRoute
   '/admin/reference-data': typeof AdminReferenceDataRoute
   '/admin/roles': typeof AdminRolesRoute
   '/admin/screen-permissions': typeof AdminScreenPermissionsRoute
+  '/admin/staff': typeof AdminStaffRoute
   '/admin/teams': typeof AdminTeamsRoute
   '/admin/workflow-docs': typeof AdminWorkflowDocsRoute
   '/admin/workflows': typeof AdminWorkflowsRoute
-  '/bank/users': typeof BankUsersRoute
   '/requests/$id': typeof RequestsIdRouteWithChildren
   '/requests/new': typeof RequestsNewRoute
   '/requests/': typeof RequestsIndexRoute
@@ -264,16 +255,15 @@ export interface FileRouteTypes {
     | '/profile'
     | '/reports'
     | '/settings'
-    | '/admin/cby-staff'
     | '/admin/entities'
     | '/admin/orgs'
     | '/admin/reference-data'
     | '/admin/roles'
     | '/admin/screen-permissions'
+    | '/admin/staff'
     | '/admin/teams'
     | '/admin/workflow-docs'
     | '/admin/workflows'
-    | '/bank/users'
     | '/requests/$id'
     | '/requests/new'
     | '/requests/'
@@ -292,16 +282,15 @@ export interface FileRouteTypes {
     | '/profile'
     | '/reports'
     | '/settings'
-    | '/admin/cby-staff'
     | '/admin/entities'
     | '/admin/orgs'
     | '/admin/reference-data'
     | '/admin/roles'
     | '/admin/screen-permissions'
+    | '/admin/staff'
     | '/admin/teams'
     | '/admin/workflow-docs'
     | '/admin/workflows'
-    | '/bank/users'
     | '/requests/$id'
     | '/requests/new'
     | '/requests'
@@ -320,16 +309,15 @@ export interface FileRouteTypes {
     | '/profile'
     | '/reports'
     | '/settings'
-    | '/admin/cby-staff'
     | '/admin/entities'
     | '/admin/orgs'
     | '/admin/reference-data'
     | '/admin/roles'
     | '/admin/screen-permissions'
+    | '/admin/staff'
     | '/admin/teams'
     | '/admin/workflow-docs'
     | '/admin/workflows'
-    | '/bank/users'
     | '/requests/$id'
     | '/requests/new'
     | '/requests/'
@@ -349,16 +337,15 @@ export interface RootRouteChildren {
   ProfileRoute: typeof ProfileRoute
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
-  AdminCbyStaffRoute: typeof AdminCbyStaffRoute
   AdminEntitiesRoute: typeof AdminEntitiesRoute
   AdminOrgsRoute: typeof AdminOrgsRoute
   AdminReferenceDataRoute: typeof AdminReferenceDataRoute
   AdminRolesRoute: typeof AdminRolesRoute
   AdminScreenPermissionsRoute: typeof AdminScreenPermissionsRoute
+  AdminStaffRoute: typeof AdminStaffRoute
   AdminTeamsRoute: typeof AdminTeamsRoute
   AdminWorkflowDocsRoute: typeof AdminWorkflowDocsRoute
   AdminWorkflowsRoute: typeof AdminWorkflowsRoute
-  BankUsersRoute: typeof BankUsersRoute
   RequestsIdRoute: typeof RequestsIdRouteWithChildren
   RequestsNewRoute: typeof RequestsNewRoute
   RequestsIndexRoute: typeof RequestsIndexRoute
@@ -459,13 +446,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RequestsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/bank/users': {
-      id: '/bank/users'
-      path: '/bank/users'
-      fullPath: '/bank/users'
-      preLoaderRoute: typeof BankUsersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/admin/workflows': {
       id: '/admin/workflows'
       path: '/admin/workflows'
@@ -485,6 +465,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/teams'
       fullPath: '/admin/teams'
       preLoaderRoute: typeof AdminTeamsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/staff': {
+      id: '/admin/staff'
+      path: '/admin/staff'
+      fullPath: '/admin/staff'
+      preLoaderRoute: typeof AdminStaffRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/screen-permissions': {
@@ -520,13 +507,6 @@ declare module '@tanstack/react-router' {
       path: '/admin/entities'
       fullPath: '/admin/entities'
       preLoaderRoute: typeof AdminEntitiesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/cby-staff': {
-      id: '/admin/cby-staff'
-      path: '/admin/cby-staff'
-      fullPath: '/admin/cby-staff'
-      preLoaderRoute: typeof AdminCbyStaffRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/workflows/instances/$id': {
@@ -586,16 +566,15 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileRoute: ProfileRoute,
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
-  AdminCbyStaffRoute: AdminCbyStaffRoute,
   AdminEntitiesRoute: AdminEntitiesRoute,
   AdminOrgsRoute: AdminOrgsRoute,
   AdminReferenceDataRoute: AdminReferenceDataRoute,
   AdminRolesRoute: AdminRolesRoute,
   AdminScreenPermissionsRoute: AdminScreenPermissionsRoute,
+  AdminStaffRoute: AdminStaffRoute,
   AdminTeamsRoute: AdminTeamsRoute,
   AdminWorkflowDocsRoute: AdminWorkflowDocsRoute,
   AdminWorkflowsRoute: AdminWorkflowsRoute,
-  BankUsersRoute: BankUsersRoute,
   RequestsIdRoute: RequestsIdRouteWithChildren,
   RequestsNewRoute: RequestsNewRoute,
   RequestsIndexRoute: RequestsIndexRoute,

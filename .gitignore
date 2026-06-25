@@ -37,3 +37,4 @@ dist-ssr
 # Playwright session snapshots
 .playwright-cli/
 .playwright-mcp/
+backend/

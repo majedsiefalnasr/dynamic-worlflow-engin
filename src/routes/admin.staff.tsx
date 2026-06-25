@@ -58,7 +58,7 @@ import { useTeamsQuery } from "@/lib/api/teams";
 import { useOrganizationsQuery } from "@/lib/api/organizations";
 import { useBanksQuery } from "@/lib/api/banks";
 
-export const Route = createFileRoute("/admin/cby-staff")({
+export const Route = createFileRoute("/admin/staff")({
   component: () => (
     <RoleGuard allow={["rc_platform_admin"]}>
       <SystemUsers />
@@ -92,7 +92,7 @@ interface StaffController {
   apiEnabled: boolean;
   users: User[];
   banks: { id: string; name: string }[];
-  orgs: { id: string; label: string; active: boolean }[];
+  orgs: { id: string; label: string; active: boolean; category?: string }[];
   teams: { id: string; label: string; orgKind: string; active: boolean }[];
   roles: { id: string; code?: string; name: string; orgId: string; active: boolean }[];
   isLoading: boolean;
@@ -130,7 +130,7 @@ function useCbyStaffController(orgLabelFor: (p: Payload) => string): StaffContro
       apiEnabled: true,
       users: usersQuery.data ?? [],
       banks: apiBanks.map((b) => ({ id: b.id, name: b.name })),
-      orgs: apiOrgs.map((o) => ({ id: o.id, label: o.label, active: o.active })),
+      orgs: apiOrgs.map((o) => ({ id: o.id, label: o.label, active: o.active, category: o.category })),
       teams: apiTeams.map((t) => ({
         id: t.id,
         label: t.label,
@@ -183,7 +183,7 @@ function useCbyStaffController(orgLabelFor: (p: Payload) => string): StaffContro
     apiEnabled: false,
     users: DEMO_USERS,
     banks: entitiesCell.get().map((e) => ({ id: e.id, name: e.name })),
-    orgs: orgsCell.get().map((o) => ({ id: o.id, label: o.label, active: o.active })),
+    orgs: orgsCell.get().map((o) => ({ id: o.id, label: o.label, active: o.active, category: o.category })),
     teams: teamsCell
       .get()
       .map((t) => ({ id: t.id, label: t.label, orgKind: t.orgKind, active: t.active })),
@@ -684,18 +684,26 @@ function UserDialog({
   initial?: User;
   initialRoleId?: string;
   banks: { id: string; name: string }[];
-  orgs: { id: string; label: string }[];
+  orgs: { id: string; label: string; category?: string }[];
   teams: { id: string; label: string; orgKind: string }[];
   roles: { id: string; name: string; orgId: string }[];
   onSave: (p: Payload) => void;
 }) {
-  const defaultOrg = initial?.orgKind ?? orgs[0]?.id ?? "bank";
+  const defaultOrg = (() => {
+    if (!initial?.orgKind) return orgs[0]?.id ?? "";
+    const byCategory = orgs.find((o) => o.category === initial.orgKind);
+    if (byCategory) return byCategory.id;
+    const byId = orgs.find((o) => o.id === initial.orgKind);
+    if (byId) return byId.id;
+    return orgs[0]?.id ?? "";
+  })();
   const [name, setName] = useState(initial?.name ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
   const [orgId, setOrgId] = useState<string>(defaultOrg);
+  const defaultNeedsBank = orgs.find((o) => o.id === defaultOrg)?.category === "bank";
   const [entityId, setEntityId] = useState<string | null>(
-    initial?.entityId ?? (defaultOrg === "bank" ? (banks[0]?.id ?? null) : null),
+    initial?.entityId ?? (defaultNeedsBank ? (banks[0]?.id ?? null) : null),
   );
 
   const teamsForOrg = teams.filter((t) => t.orgKind === orgId);
@@ -710,7 +718,8 @@ function UserDialog({
     const nr = roles.filter((r) => r.orgId === next);
     setTeamId(nt[0]?.id ?? "");
     setRoleId(nr[0]?.id ?? "");
-    if (next === "bank") {
+    const isBankOrg = orgs.find((o) => o.id === next)?.category === "bank";
+    if (isBankOrg) {
       if (!entityId) setEntityId(banks[0]?.id ?? null);
     } else {
       setEntityId(null);
@@ -718,7 +727,8 @@ function UserDialog({
   }
 
   const emailOk = /\S+@\S+\.\S+/.test(email);
-  const needsBank = orgId === "bank";
+  const selectedOrg = orgs.find((o) => o.id === orgId);
+  const needsBank = selectedOrg?.category === "bank";
   const valid =
     name.trim() && emailOk && !!orgId && !!teamId && !!roleId && (!needsBank || !!entityId);
 
