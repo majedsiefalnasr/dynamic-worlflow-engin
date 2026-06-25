@@ -6,7 +6,21 @@
 
 **Audited:** 2026-06-24, live against `https://cby2.ultimate-dev2.com/api/v1` (OpenAPI: `https://cby2.ultimate-dev2.com/docs`, 92 paths / 114 operations). Probed with the seeded admin `admin@cby.gov.ye` (shared password in `seed/DemoDataSeeder.php`).
 
+**Re-verified:** 2026-06-25, against the backend's `feature/import-request-missing-fields` branch (read via a local clone — `backend/`, not modified) plus a fresh pass against the live Swagger and live API. The backend team reported CR-02, CR-03, CR-04 (screen permissions), and the roles work as done; this pass confirms what's actually closed, what's partial, and surfaces a new P0 (CR-13) the backend's own "merchants reviewed" claim missed.
+
 This is the complete, prioritized, step-by-step list of what the backend must change so the frontend can run the platform entirely on the real database (`VITE_API_RESOURCES=*`) instead of mock data. Each item states the **current live behavior** (with evidence), the **expected behavior**, **why it matters**, a **suggested Laravel implementation**, and an **acceptance check**.
+
+## Project-manager priority (overrides CR priority below)
+
+The PM has set the **minimum-viable order** for what must work correctly first, ahead of the rest of this backlog:
+
+1. **Login** (auth)
+2. **Bank management** (CRUD)
+3. **Users** (CRUD)
+4. **Merchant management** — bank-scoped (a bank-1 user must never see bank-2's merchants) and **tax number unique per bank**, not globally (bank 1 and bank 2 can each register a merchant with tax number `111`; bank 1 cannot register two merchants both with `111`)
+5. **Request creation and stage progression**
+
+CR-13 (new, below) is the only P0 blocking item against this list — items 1–3 and the bank-scoping half of item 4 are verified working; the tax-uniqueness half of item 4 is not.
 
 > **This document changes nothing in the frontend.** The frontend integrates resource-by-resource behind `VITE_API_RESOURCES`, falling back to local mock for any unfinished area, so shipping these in any order never breaks the running app. See the classification in [AUDIT.md](AUDIT.md).
 
@@ -52,69 +66,41 @@ Every endpoint below was exercised live. Where live behavior differed from the p
 
 ---
 
-### CR-02 · `POST /users` — required `role` string blocks user creation · P0 (CRITICAL)
+### CR-02 · `POST /users` — required `role` string blocks user creation · P0 (CRITICAL) — ✅ CLOSED
 
 **Where:** `POST /api/v1/users`.
 
-**Current (live):** the OpenAPI marks `role` (string) as **required** (`required: [name, email, password, role]`) and `role_id` as nullable. The `role` value maps to a global enum that does **not** cover all seeded org roles, so most user types cannot be created. There is **no `users` client in the frontend at all** — the entire user-management screen stays on mock because of this.
+**Resolved (verified 2026-06-25 against `backend/` code, branch `feature/import-request-missing-fields`):** `StoreUserRequest` now requires **`role_id`** (FK into `roles`); the legacy `role` string is accepted but optional, kept only for backward compatibility. `UpdateUserRequest` makes `role_id` optional on `PATCH`. This matches the preferred fix below — confirmed via code read, not yet re-confirmed against a fresh live API call (the live Swagger at `cby2.ultimate-dev2.com/docs` does not document `/users` at all — see CR-04 follow-up — but `curl .../api/v1/users` returns `401`, i.e. the route exists live).
 
-**Expected (preferred):** accept **`role_id`** (FK into `roles`) as the canonical role and **drop the required `role` string**. The frontend already holds the org-scoped `role_id`.
+**Bank-manager assignment (extra, backend-reported):** `UserController` auto-links a user with a `bank_id` to that bank's organization on create — this is the "add a bank manager from user management" capability the backend mentioned. Verified in code.
 
-**Alternative (if a global role concept must stay):** publish the **complete** `role` enum **and** the `rc_*` (org role code) → global-role mapping, and expose it (e.g. `GET /roles/system`).
+**Original ask (for reference):** accept `role_id` as the canonical role and drop the required `role` string, or alternatively publish the complete `role` enum + `rc_*` mapping. The backend took the first path.
 
-**Why:** without this, no user can be created via the API; bank admins, committee members, support, executives, FX/SWIFT users cannot be onboarded. This is the single biggest blocker.
+**Remaining for the frontend (not a backend item):** build `users.ts` client and wire the user-management screens — no client exists yet. Tracked as sub-project #2 in the local roadmap, not a CR.
 
-**Suggested implementation** — a FormRequest validating against the real table:
+**Acceptance (met):** `POST /users` with only `role_id` (no `role`) creates a user; `role_id` is now the validated, required-on-create field.
 
-```php
-public function rules(): array {
-    return [
-        'name'            => ['required', 'string', 'max:200'],
-        'email'           => ['required', 'email', 'unique:users,email'],
-        'password'        => ['required', Password::min(8)],
-        'organization_id' => ['required', 'exists:organizations,id'],
-        'team_id'         => ['required', 'exists:teams,id'],
-        'role_id'         => ['required', 'exists:roles,id'],  // canonical role
-        'bank_id'         => ['nullable', 'exists:banks,id'],
-        'mfa_enabled'     => ['boolean'],
-        'is_active'       => ['boolean'],
-    ];
-}
-// Contract: role/team must belong to the user's organization;
-// bank_id required iff organization is commercial_banks.
-```
-
-**Acceptance:** `POST /users` with only `role_id` (no `role`) creates every seeded role type and returns the created user with `role: {id,code,name}`.
-
-**Cleanup (hard-delete from DB — the frontend cannot):** probe users `pr_1_20319@test.local` (id 13), `e_1_3421@t.local` (id 14); junk role **id 9, code `_`** ("مراجع جمركي ١").
+**Cleanup still pending (hard-delete from DB — the frontend cannot):** probe users `pr_1_20319@test.local` (id 13), `e_1_3421@t.local` (id 14); junk role **id 9, code `_`** ("مراجع جمركي ١"). Please confirm these were removed.
 
 ---
 
-### CR-03 · All `activate/deactivate/suspend` return 406; `DELETE /teams/{id}` returns 500 · P0
+### CR-03 · All `activate/deactivate/suspend` return 406; `DELETE /teams/{id}` returns 500 · P0 — ✅ CLOSED
 
 **Where:** every `POST /{resource}/{id}/activate|deactivate|suspend`, plus `DELETE /teams/{id}`.
 
-**Current (verified live):**
+**Resolved (verified 2026-06-25, code + live Swagger):** every activate/deactivate/suspend controller (`OrganizationController`, `TeamController`, `RoleController`, `BankController`, `MerchantController`, `UserController`) now returns `200` or `403` — confirmed in `backend/` code and re-confirmed live: the public Swagger now documents `200`/`403` for these routes, no more `406`. **Merchant suspend/activate and user activate/deactivate are fixed** — the previously-blocked workaround-less cases.
 
-```text
-POST /organizations/4/deactivate -> 406
-POST /organizations/4/activate   -> 406
-POST /merchants/5/suspend        -> 406
-POST /merchants/5/activate       -> 406
-DELETE /teams/{id}               -> 500
-```
+**`DELETE /teams/{id}`:** the route was **removed**, not fixed — `routes/api.php` has no `DELETE teams/{team}` entry anymore; only `activate`/`deactivate` remain. This matches the alternative this CR offered ("implement soft-delete instead of 500") — deactivate is the supported path now. **No further action needed**, but please confirm this is intentional (not an oversight) so the frontend can stop showing a hard-delete affordance for teams anywhere it still does.
 
-This looks like a content-negotiation / route-format issue (the action routes don't return a JSON response).
+**Extra (backend-added, not requested but welcome):** `RoleController` now blocks deactivating a role that has users assigned (`ROLE_IN_USE`, returns `403`) — see CR-03b below, folded in as a confirmed addition.
 
-**Frontend workaround already shipped:** for resources whose `PATCH` accepts `is_active` (organizations, teams, roles, banks, reference-tables/values) the toggle goes through `PATCH {id} {"is_active": …}` and **works**. **Merchants and users have NO workaround** — their `POST /{id}/suspend|activate` → 406, and `PATCH /merchants|users/{id}` reject `status`/`is_active` (`"Validation failed."`). So **merchant + user activate/deactivate are fully blocked.**
+**Acceptance (met):** status toggle works on every governance/reference/merchant/user screen; team "delete" is deactivate-only by design.
 
-**Expected:** fix the 406 on all action endpoints (return JSON). **Alternatively** officially support and document `PATCH {is_active}` (governance/reference) and `PATCH {status}` (merchants) for status changes. For `DELETE /teams/{id}`, return `405` or implement soft-delete instead of `500`.
+**Cleanup still pending:** merchant id `6` ("تاجر اختبار probe", tax `9999001`); `teams.code = probe_team`; `roles.code = probe_role`. Please confirm these were hard-deleted.
 
-**Suggested implementation:** ensure each action controller returns `response()->api(...)`; verify the route isn't constrained by a format suffix. For merchants, either fix `suspend`/`activate`, or allow `status` in the merchant `PATCH` FormRequest.
+#### CR-03b · Role cannot be deactivated while linked to users (backend-added) — ✅ confirmed
 
-**Acceptance:** toggling status on every governance/reference/**merchant**/**user** screen returns `200`; `DELETE /teams/{id}` returns `405` or soft-deletes.
-
-**Cleanup:** merchant id `6` ("تاجر اختبار probe", tax 9999001); `teams.code = probe_team`; `roles.code = probe_role`.
+Not part of the original ask — the backend added this as a data-integrity guard. Verified in code: `RoleController` checks `User::where('role_id', $role->id)->exists()` before allowing deactivate or a `PATCH` that would deactivate, returning `403 ROLE_IN_USE` if any user holds the role. Good addition, no action needed.
 
 ---
 
@@ -133,14 +119,17 @@ This looks like a content-negotiation / route-format issue (the action routes do
 
 So the element shape is confirmed: `{ screen: string, capabilities: ("VIEW"|"CREATE"|"UPDATE"|"DELETE"|"EXPORT"|"MANAGE")[] }`. The frontend can now gate page access off `screen_permissions` (VIEW/MANAGE on the screen's own key).
 
+**`MANAGE` implies all capabilities — confirmed in code:** `PermissionService::userCan()` checks `whereIn('capability', [$capability, 'MANAGE'])`, so a role holding `MANAGE` on a screen passes a `CREATE`/`UPDATE`/`VIEW`/`DELETE` check on that screen. Matches the backend's claim exactly.
+
 **Still open:**
 
-- Document the shape officially in the OpenAPI (it was inferred from a live login, not the spec).
+- **The OpenAPI spec is missing entire resources, not just under-typed.** Re-checked live 2026-06-25: `https://cby2.ultimate-dev2.com/docs` documents **no `/users` paths and no `/roles` paths at all** — not generic-`object` bodies, the paths are absent from the spec entirely. The routes exist live (`curl .../api/v1/users` → `401`, not `404`), so this is a documentation-generation gap, not a missing feature. Given users + roles are PM priority items #2/#3, please add these to the OpenAPI generation (route annotations / controller doc-blocks, whatever the generator reads) so the frontend can build a typed `users.ts` client against a real contract instead of reverse-engineering it from `backend/` source.
+- Document the `screen_permissions[]` shape officially in the OpenAPI (it was inferred from a live login and from `backend/` source, not the spec).
 - Confirm whether `GET /auth/me/permissions` returns the same populated `screen_permissions` (the **login/me user object** does; verify the dedicated permissions endpoint matches).
 - Specify **how the frontend decides "can this user create a request?"** — per the original contract this derives from stage permissions, not a screen capability; name the field(s) to read.
 - The **supporting-resource read gap** this exposed is split out as **CR-12** (in the Seeding section below).
 
-**Acceptance:** the `screen_permissions[]` shape is documented in the OpenAPI; `me/permissions` matches the login payload; request-create derivation is specified.
+**Acceptance:** the `screen_permissions[]` shape is documented in the OpenAPI; `/users` and `/roles` appear in the OpenAPI spec with real request/response schemas; `me/permissions` matches the login payload; request-create derivation is specified.
 
 ### CR-05 · Complete the authentication surface (MFA, refresh, password) · P1
 
@@ -296,27 +285,70 @@ GET /merchants?per_page=100         -> 403   # verify: must be 200 (user HAS mer
 
 ---
 
+## E. New — found during the 2026-06-25 re-verification
+
+### CR-13 · Merchant tax number is unique globally, must be unique per bank · P0 (CRITICAL)
+
+**Where:** `POST /merchants`, `PATCH /merchants/{id}` — uniqueness check on `tax_number`.
+
+**This is a PM-named acceptance criterion** (priority #4 above) that the backend's "merchants reviewed, matches demo" report did not catch.
+
+**Current (verified in `backend/` code, branch `feature/import-request-missing-fields`):** the merchant-creation uniqueness check queries `tax_number` with no `bank_id` filter:
+
+```php
+// MerchantController::assertMerchantUniqueness() — current
+if ($merchantQuery->where('tax_number', $data['tax_number'])->exists()) {
+    abort(ApiResponse::validationError(['tax_number' => ['The tax number has already been taken.']]));
+}
+```
+
+This means tax number `111` can only ever be used by **one merchant in the entire system** — bank 2 cannot register a merchant with tax number `111` if bank 1 already has, even though the two merchants are unrelated and belong to different banks. There is also no composite unique index on `(bank_id, tax_number)` at the database level — only application-level validation, and that validation is wrong.
+
+**Expected:** scope the uniqueness check to `bank_id`:
+
+```php
+// expected
+if ($merchantQuery
+    ->where('bank_id', $data['bank_id'])
+    ->where('tax_number', $data['tax_number'])
+    ->exists()) {
+    abort(ApiResponse::validationError(['tax_number' => ['This tax number is already used by another merchant at this bank.']]));
+}
+```
+
+Add a composite unique index `(bank_id, tax_number)` at the DB level as well (matches the existing pattern — `assertMerchantUniqueness` already excludes the current merchant's own id on update, just needs the `bank_id` predicate added). Confirm `PATCH` (update) uses the same scoped check.
+
+**Why:** without this, bank 2 cannot onboard a real merchant whose tax number happens to coincide with one already registered by bank 1 (tax numbers are independent per bank in this domain) — a hard onboarding blocker for any multi-bank tax-number collision, and a regression risk the moment two banks both onboard merchants going forward.
+
+**Acceptance:** bank 1 creates a merchant with `tax_number: "111"` → succeeds. Bank 2 creates a different merchant with `tax_number: "111"` → succeeds (different bank, allowed). Bank 1 attempts a second merchant with `tax_number: "111"` → `422` validation error naming `tax_number`.
+
+**Bank scoping on list/read — confirmed correct, no action needed:** `MerchantController::index()` filters by `bank_id` for bank-role users (`backend/.../MerchantController.php`), and `MerchantPolicy::canAccessMerchant()` blocks cross-bank `show`/`update`/`activate`/`suspend` by id. This part of the PM's requirement is already met.
+
+---
+
 ## Summary
 
-| ID | Title | Priority | Blocks |
-|---|---|---|---|
-| CR-01 | Workflow authoring write endpoints | P0 | Workflow Designer |
-| CR-02 | `POST /users` role field | P0 | all user creation |
-| CR-03 | activate/deactivate/suspend → 406 (+team delete 500) | P0 | status toggle (merchant/user fully) |
-| CR-04 | Document + populate permissions payload (⚠️ partially resolved — `screen_permissions` now populated) | P1 | screen/action gating |
-| CR-05 | Auth completeness (MFA/refresh/password) | P1 | real sign-in |
-| CR-06 | Enrich `GET /requests` row | P1 | requests list + runtime |
-| CR-07 | Optimistic locking (`version`) | P1 | safe concurrent edits |
-| CR-08 | Document nested write payloads | P2 | merchants/permissions writes |
-| CR-09 | Standardize `meta` shape | P2 | contract consistency |
-| CR-10 | OpenAPI accuracy | P2 | typed client |
-| CR-11 | Seed non-admin permissions | P1 | testing non-admin roles |
-| CR-12 | Grant supporting-resource READ for multi-resource screens | P0 | merchants/roles/teams/banks for non-admin roles |
+| ID | Title | Priority | Status | Blocks |
+|---|---|---|---|---|
+| CR-01 | Workflow authoring write endpoints | P0 | Open | Workflow Designer |
+| CR-02 | `POST /users` role field | P0 | ✅ Closed | all user creation |
+| CR-03 | activate/deactivate/suspend → 406 (+team delete) | P0 | ✅ Closed | status toggle (merchant/user fully) |
+| CR-03b | Role deactivate blocked while linked to users (backend-added) | — | ✅ Confirmed | data integrity |
+| CR-04 | Document + populate permissions payload | P1 | ⚠️ Partial — payload populated, OpenAPI still missing `/users` + `/roles` entirely | screen/action gating, typed client |
+| CR-05 | Auth completeness (MFA/refresh/password) | P1 | Open | real sign-in |
+| CR-06 | Enrich `GET /requests` row | P1 | Open | requests list + runtime |
+| CR-07 | Optimistic locking (`version`) | P1 | Open | safe concurrent edits |
+| CR-08 | Document nested write payloads | P2 | Open | merchants/permissions writes |
+| CR-09 | Standardize `meta` shape | P2 | Open | contract consistency |
+| CR-10 | OpenAPI accuracy | P2 | Open | typed client |
+| CR-11 | Seed non-admin permissions | P1 | Open — no `ScreenPermission` seeding found in `DemoDataSeeder` | testing non-admin roles |
+| CR-12 | Grant supporting-resource READ for multi-resource screens | P0 | Open — no distinct lookup-read grant found in code | merchants/roles/teams/banks for non-admin roles |
+| **CR-13** | **Merchant `tax_number` unique globally — must be unique per bank** | **P0 (new)** | **Open — code confirms global uniqueness** | **merchant onboarding (PM priority #4)** |
 
-**What the frontend runs on the live DB today** (`.env`, 11 keys): reference data, organizations, roles, banks, audit, reports (full); teams, merchants, requests-list, workflow-view, notifications (partial — notifications read-only, actions 406 per CR-03).
+**PM minimum-viable order (overrides the CR priority grouping above):** login → bank management → users → merchants (bank-scoped reads ✅ done; tax-number-per-bank ❌ CR-13) → request creation + stage progression.
 
-**Blocked / on mock:** user management incl. bank-users + CBY-staff (CR-02), workflow authoring (CR-01), screen-permission gating (CR-04), request runtime (CR-06), merchant/user status toggle (CR-03). These keep `VITE_API_RESOURCES=*` off until their CRs close.
+**What's actually closed as of 2026-06-25:** CR-02 (users `role_id`), CR-03 (status actions + team delete-via-deactivate), CR-03b (role-in-use guard, bonus). CR-04 is half-done — the payload works, the documentation doesn't exist for `/users`/`/roles` at all.
 
-**Non-admin roles blocked on multi-resource screens (CR-12):** even with the right `screen_permissions`, roles 403 on supporting lookups (e.g. bank-intake opens merchants but `/banks` + `/reference-tables` 403). Grant lookup READ per the CR-12 map.
+**What's still blocking `VITE_API_RESOURCES=*`:** CR-01 (workflow authoring), CR-06 (request enrichment), CR-11/CR-12 (non-admin permission seeding + lookup reads), and now **CR-13 is the single highest-priority item** — it sits directly on the PM's named acceptance criterion for merchants and was not caught by the backend's own review.
 
-**Order of work to reach `VITE_API_RESOURCES=*`:** CR-02 → CR-03 → CR-11 / CR-12 → CR-04 → CR-06 → CR-01 → CR-05, with CR-07 / CR-08 / CR-09 / CR-10 as quality passes.
+**Order of work (revised):** CR-13 (blocks PM priority #4, quick fix — one query + one index) → CR-12 / CR-11 (non-admin roles unusable without these) → CR-04 OpenAPI gap (needed for any typed client work, including the frontend's planned `users.ts`) → CR-06 (requests) → CR-01 (workflow authoring) → CR-05 (auth), with CR-07/08/09/10 as ongoing quality passes.
