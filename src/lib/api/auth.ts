@@ -72,6 +72,9 @@ export function mapApiUserToAppUser(u: ApiUser): User {
     active: u.is_active ?? true,
     orgKind: orgKindFor(roleId),
     teamId: teamCode,
+    _orgId: u.organization?.id != null ? String(u.organization.id) : undefined,
+    _teamId: u.team?.id != null ? String(u.team.id) : undefined,
+    _roleId: u.role?.id != null ? String(u.role.id) : undefined,
   };
 }
 

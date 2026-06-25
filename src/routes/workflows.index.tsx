@@ -43,13 +43,8 @@ import {
 } from "@/lib/workflow-bridge";
 import { ScreenGuard } from "@/components/workflow/ScreenGuard";
 import { toast } from "sonner";
-import { isApiEnabled, ApiError } from "@/lib/api/client";
-import { useRequestsQuery, useRequestMutations, useWorkflowStagesQuery } from "@/lib/api/requests";
-import { useMerchantsQuery } from "@/lib/api/merchants";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { isApiEnabled } from "@/lib/api/client";
+import { useRequestsQuery, useWorkflowStagesQuery } from "@/lib/api/requests";
 
 export const Route = createFileRoute("/workflows/")({
   component: () => (
@@ -74,18 +69,12 @@ function WorkflowsHome() {
   const stagesQuery = useWorkflowStagesQuery(apiVersionId, requestsApi);
 
   const instances = requestsApi ? apiInstances : cellInstances;
-  const stages = requestsApi ? (stagesQuery.data ?? []) : cellStages;
+  const stages = requestsApi
+    ? (cellStages.length > 0 ? cellStages : (stagesQuery.data ?? []))
+    : cellStages;
 
   const [q, setQ] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
-  const [openCreate, setOpenCreate] = useState(false);
-  const [selectedMerchant, setSelectedMerchant] = useState("");
-
-  const merchantsQuery = useMerchantsQuery(requestsApi);
-  const bankMerchants = (merchantsQuery.data ?? []).filter(
-    (m) => !user?.entityId || m.entityId === user.entityId,
-  );
-  const mutations = useRequestMutations();
 
   const selectedDef = defs[0];
   const publishedVer = selectedDef ? getPublishedVersion(selectedDef.id) : undefined;
@@ -156,7 +145,7 @@ function WorkflowsHome() {
               </Button>
             )}
             {requestsApi && user && (
-              <Button onClick={() => { setSelectedMerchant(""); setOpenCreate(true); }} disabled={!publishedVer}>
+              <Button onClick={() => nav({ to: "/workflows/instances/$id", params: { id: "new" } })} disabled={!publishedVer}>
                 <FilePlus2 className="ms-1 h-4 w-4" /> طلب جديد
               </Button>
             )}
@@ -224,7 +213,7 @@ function WorkflowsHome() {
                   <TableCell>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs">{instanceInvoiceNumber(inst)}</span>
-                      {isDuplicateInvoice(inst.data, inst.id).duplicate && (
+                      {isDuplicateInvoice(inst.data, inst.id, requestsApi ? instances : undefined).duplicate && (
                         <Badge variant="destructive" className="gap-1">
                           <AlertTriangle className="h-3 w-3" />
                           مكرر
@@ -278,57 +267,6 @@ function WorkflowsHome() {
         )}
       </Card>
 
-      {/* Live create: pick merchant then POST /requests */}
-      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
-        <DialogContent dir="rtl" className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>إنشاء طلب جديد</DialogTitle>
-            <DialogDescription>اختر التاجر لإنشاء طلب تمويل واردات جديد.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="space-y-1.5">
-              <Label>التاجر *</Label>
-              <Select value={selectedMerchant} onValueChange={setSelectedMerchant}>
-                <SelectTrigger>
-                  <SelectValue placeholder="اختر التاجر..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {bankMerchants.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {bankMerchants.length === 0 && (
-                <p className="text-xs text-destructive">لا يوجد تجار مسجلون. أضف تاجراً أولاً.</p>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenCreate(false)}>إلغاء</Button>
-            <Button
-              disabled={!selectedMerchant || mutations.create.isPending}
-              onClick={async () => {
-                if (!publishedVer || !user) return;
-                try {
-                  const result = await mutations.create.mutateAsync({
-                    workflowVersionId: Number(publishedVer.id),
-                    bankId: Number(user.entityId ?? 0),
-                    merchantId: Number(selectedMerchant),
-                  });
-                  toast.success("تم إنشاء الطلب");
-                  setOpenCreate(false);
-                  const newId = (result as { id?: number })?.id;
-                  if (newId) nav({ to: "/workflows/instances/$id", params: { id: String(newId) } });
-                } catch (error) {
-                  toast.error(error instanceof ApiError ? error.message : "تعذّر إنشاء الطلب");
-                }
-              }}
-            >
-              {mutations.create.isPending ? "جارٍ الإنشاء..." : "إنشاء"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

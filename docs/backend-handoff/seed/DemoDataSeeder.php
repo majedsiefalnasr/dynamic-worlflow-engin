@@ -3,35 +3,8 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-
-// ============================================================================
-// DemoDataSeeder — mirrors the frontend's FULL demo dataset so the testing
-// experience is identical between the mock build and the real database.
-//
-// Sections:
-//   1. Governance      (organizations, teams, roles, banks)        — verified live
-//   2. Reference data  (sector_activity, arrival_port, origin)     — verified live
-//   3. Users           (12 login accounts, shared password)        — verified live
-//   4. Merchants       (5 merchants + owners + companies)          — verified live
-//   5. Notifications   (sample per-user notifications)             — see note
-//   6. Workflow        (definition, published version, stages,
-//                       actions, transitions, stage permissions,
-//                       field groups, fields, stage field rules)   — see note
-//   7. Requests        (16 sample requests + workflow history)     — see note
-//   8. Audit logs      (25 sample append-only entries)             — see note
-//
-// NOTE on sections 5–8: the workflow / requests / notifications / audit tables were NOT
-// verifiable from the live API (no schema-returning reads, no write endpoints —
-// see CR-14). Their table/column names below follow docs/backend-handoff/
-// 07-data-model.md. Verify them against your migrations and adjust names if they
-// differ. These sections seed at the DB level (Eloquent), bypassing the missing
-// authoring endpoints, and satisfy CR-15 (a published workflow + sample requests).
-//
-// Idempotent: every record uses firstOrCreate on a natural key, safe to re-run.
-// All users share Self::PASSWORD; mfa_enabled = false. Admin: admin@cby.gov.ye.
-// ============================================================================
-
 use App\Models\Organization;
 use App\Models\Team;
 use App\Models\Role;
@@ -40,7 +13,6 @@ use App\Models\User;
 use App\Models\ReferenceTable;
 use App\Models\ReferenceValue;
 use App\Models\Merchant;
-// --- adjust the model names below to match your codebase ---------------------
 use App\Models\Notification;
 use App\Models\NotificationRecipient;
 use App\Models\WorkflowDefinition;
@@ -52,17 +24,30 @@ use App\Models\StagePermission;
 use App\Models\FieldGroup;
 use App\Models\FieldDefinition;
 use App\Models\StageFieldRule;
-use App\Models\Request as WorkflowRequest;
+use App\Models\ImportRequest as WorkflowRequest;
 use App\Models\WorkflowHistory;
 use App\Models\AuditLog;
+use App\Models\Screen;
+use App\Models\ScreenPermission;
 
 class DemoDataSeeder extends Seeder
 {
     /** Shared password for every seeded account. */
     public const PASSWORD = 'Password@123';
+    public const SWAGGER_LOGIN_EMAIL = 'admin@cby.gov.ye';
+    public const SWAGGER_LOGIN_PASSWORD = self::PASSWORD;
+    public const SWAGGER_BEARER_TOKEN = 'swagger-demo-token-9f1c6a2b4d0e7f3c8a';
+    public const SWAGGER_REQUEST_REFERENCE = 'IMP-2026-2001';
+    public const SWAGGER_REQUEST_INVOICE = 'INV-2026-10000';
+    public const SWAGGER_REQUEST_CURRENCY = 'USD';
+    public const SWAGGER_BANK_CODE = 'ybrd';
+    public const SWAGGER_BANK_NAME = 'Yemen Bank for Reconstruction and Development';
+    public const SWAGGER_BANK_LICENSE = 'BNK-001';
+    public const SWAGGER_BANK_SWIFT = 'YBRDYESA';
 
     public function run(): void
     {
+        $this->clearDemoTables();
         $orgs   = $this->seedOrganizations();
         $teams  = $this->seedTeams($orgs);
         $roles  = $this->seedRoles($orgs);
@@ -70,11 +55,35 @@ class DemoDataSeeder extends Seeder
         $values = $this->seedReferenceData();
         $this->seedUsers($orgs, $teams, $roles, $banks);
         $this->seedMerchants($banks, $values);
-
         $this->seedNotifications();
+        $this->seedScreenPermissions($roles);
         $version = $this->seedWorkflow($orgs, $teams, $roles, $values);
         $this->seedRequests($version);
         $this->seedAuditLogs();
+        $this->seedSwaggerToken();
+    }
+    private function clearDemoTables(): void
+    {
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+
+        foreach ([
+                     'screen_permissions',
+                     'merchant_companies',
+                     'merchant_owners',
+                     'merchants',
+                     'users',
+                     'banks',
+                     'roles',
+                     'teams',
+                     'organizations',
+                     'reference_values',
+                     'reference_tables',
+                     'notifications',
+                 ] as $table) {
+            DB::table($table)->truncate();
+        }
+
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
     }
 
     // ========================================================================
@@ -263,6 +272,28 @@ class DemoDataSeeder extends Seeder
         }
     }
 
+    private function seedSwaggerToken(): void
+    {
+        $admin = User::where('email', self::SWAGGER_LOGIN_EMAIL)->first();
+        if (!$admin) {
+            return;
+        }
+
+        DB::table('personal_access_tokens')->updateOrInsert(
+            ['token' => hash('sha256', self::SWAGGER_BEARER_TOKEN)],
+            [
+                'tokenable_type' => User::class,
+                'tokenable_id' => $admin->id,
+                'name' => 'swagger-ui',
+                'abilities' => json_encode(['*']),
+                'last_used_at' => null,
+                'expires_at' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
+    }
+
     // ========================================================================
     // 4. Merchants
     // ========================================================================
@@ -324,7 +355,7 @@ class DemoDataSeeder extends Seeder
             ['type' => 'request_assigned',  'severity' => 'info',    'title' => 'طلب جديد بحاجة لمراجعتك', 'body' => 'طلب من محرّك سير العمل في مرحلتك الحالية', 'unread' => true],
             ['type' => 'request_action',    'severity' => 'info',    'title' => 'تم تنفيذ إجراء سير عمل',  'body' => 'انتقل الطلب إلى المرحلة التالية',          'unread' => true],
             ['type' => 'compliance',        'severity' => 'warning', 'title' => 'تنبيه: فاتورة مكررة',     'body' => 'رقم فاتورة مستخدم في أكثر من طلب',          'unread' => true],
-            ['type' => 'request_closed',    'severity' => 'success', 'title' => 'تم إغلاق طلب',            'body' => 'اكتمل مسار سير العمل',                     'unread' => false],
+            ['type' => 'request_closed',    'severity' => 'info',    'title' => 'تم إغلاق طلب',            'body' => 'اكتمل مسار سير العمل',                     'unread' => false],
             ['type' => 'workflow_published','severity' => 'info',    'title' => 'تحديث في مصمم سير العمل', 'body' => 'تم نشر نسخة جديدة من سير العمل',           'unread' => false],
         ];
         foreach ($rows as $row) {
@@ -336,6 +367,118 @@ class DemoDataSeeder extends Seeder
                 ['notification_id' => $notification->id, 'user_id' => $admin->id],
                 ['read_at' => $row['unread'] ? null : now(), 'archived_at' => null],
             );
+        }
+    }
+
+    // ========================================================================
+    // 5b. Screen permissions (CR-11 + CR-12)
+    // ========================================================================
+
+    private function seedScreenPermissions(array $roles): void
+    {
+        $screenIds = Screen::pluck('id', 'code');
+        $allCapabilities = ['VIEW', 'CREATE', 'UPDATE', 'DELETE', 'EXPORT', 'MANAGE'];
+
+        // Permission matrix: role_code => [screen_code => [capabilities]]
+        // MANAGE implies all capabilities (VIEW/CREATE/UPDATE/DELETE/EXPORT).
+        // Lookup-only entries use VIEW to satisfy CR-12 (multi-resource screen lookups).
+        $matrix = [
+            'rc_platform_admin' => [
+                'organizations' => $allCapabilities,
+                'teams' => $allCapabilities,
+                'roles' => $allCapabilities,
+                'banks' => $allCapabilities,
+                'users' => $allCapabilities,
+                'merchants' => $allCapabilities,
+                'workflow_designer' => $allCapabilities,
+                'requests' => $allCapabilities,
+                'reports' => $allCapabilities,
+                'audit' => $allCapabilities,
+                'reference_data' => $allCapabilities,
+                'screen_permissions' => $allCapabilities,
+                'notifications' => $allCapabilities,
+                'settings' => $allCapabilities,
+            ],
+            'rc_bank_admin' => [
+                'merchants' => ['MANAGE'],
+                'requests' => ['MANAGE'],
+                'users' => ['VIEW', 'CREATE', 'UPDATE'],
+                'banks' => ['VIEW'],
+                'reports' => ['VIEW', 'EXPORT'],
+                'reference_data' => ['VIEW'],           // lookup for merchants
+                'organizations' => ['VIEW'],            // lookup for banks
+                'notifications' => ['VIEW'],
+            ],
+            'rc_bank_intake' => [
+                'merchants' => ['MANAGE'],
+                'requests' => ['VIEW', 'CREATE', 'UPDATE'],
+                'banks' => ['VIEW'],                    // lookup for merchants
+                'reference_data' => ['VIEW'],           // lookup for merchants
+                'notifications' => ['VIEW'],
+            ],
+            'rc_bank_reviewer' => [
+                'requests' => ['VIEW', 'UPDATE'],
+                'merchants' => ['VIEW'],
+                'banks' => ['VIEW'],                    // lookup
+                'reference_data' => ['VIEW'],           // lookup
+                'notifications' => ['VIEW'],
+            ],
+            'rc_bank_swift' => [
+                'requests' => ['VIEW', 'UPDATE'],
+                'merchants' => ['VIEW'],
+                'banks' => ['VIEW'],                    // lookup
+                'notifications' => ['VIEW'],
+            ],
+            'rc_support_member' => [
+                'requests' => ['VIEW', 'UPDATE'],
+                'merchants' => ['VIEW'],
+                'banks' => ['VIEW'],                    // lookup
+                'reference_data' => ['VIEW'],           // lookup
+                'reports' => ['VIEW', 'EXPORT'],
+                'notifications' => ['VIEW'],
+            ],
+            'rc_executive_member' => [
+                'requests' => ['VIEW', 'UPDATE'],
+                'merchants' => ['VIEW'],
+                'banks' => ['VIEW'],                    // lookup
+                'reports' => ['VIEW', 'EXPORT'],
+                'notifications' => ['VIEW'],
+            ],
+            'rc_committee_manager' => [
+                'requests' => ['MANAGE'],
+                'merchants' => ['VIEW'],
+                'banks' => ['VIEW'],                    // lookup
+                'users' => ['VIEW'],
+                'roles' => ['VIEW'],
+                'teams' => ['VIEW'],
+                'organizations' => ['VIEW'],            // lookup for roles/teams
+                'reports' => ['MANAGE'],
+                'audit' => ['VIEW'],
+                'reference_data' => ['VIEW'],           // lookup
+                'notifications' => ['VIEW'],
+            ],
+        ];
+
+        foreach ($matrix as $roleCode => $screens) {
+            $roleId = $roles[$roleCode] ?? null;
+            if (!$roleId) {
+                continue;
+            }
+
+            foreach ($screens as $screenCode => $capabilities) {
+                $screenId = $screenIds[$screenCode] ?? null;
+                if (!$screenId) {
+                    continue;
+                }
+
+                foreach ($capabilities as $capability) {
+                    ScreenPermission::firstOrCreate([
+                        'role_id' => $roleId,
+                        'screen_id' => $screenId,
+                        'capability' => $capability,
+                    ]);
+                }
+            }
         }
     }
 
@@ -413,11 +556,18 @@ class DemoDataSeeder extends Seeder
             ['FINAL',      'FINAL_APPROVE', 'CLOSED'],
             ['FINAL',      'REJECT',        'FX_CONFIRM'],
         ];
+        $transitions = []; // from|action|to => id
         foreach ($transitionRows as [$from, $action, $to]) {
-            WorkflowTransition::firstOrCreate(
-                ['workflow_version_id' => $version->id, 'from_stage_id' => $stages[$from], 'action_id' => $actions[$action]],
-                ['to_stage_id' => $stages[$to], 'requires_comment' => in_array($action, ['REJECT', 'REJECT_FINAL'], true)],
+            $transition = WorkflowTransition::updateOrCreate(
+                ['from_stage_id' => $stages[$from], 'action_id' => $actions[$action]],
+                [
+                    'workflow_version_id' => $version->id,
+                    'to_stage_id' => $stages[$to],
+                    'requires_comment' => in_array($action, ['REJECT', 'REJECT_FINAL'], true),
+                    'confirmation_message' => null,
+                ],
             );
+            $transitions[$from . '|' . $action . '|' . $to] = $transition->id;
         }
 
         // ---- Stage permissions: [stage, org, team|null, role|null, level, label] ----
@@ -466,8 +616,8 @@ class DemoDataSeeder extends Seeder
         $groups = []; // key => id
         foreach ($groupRows as [$key, $name, $order]) {
             $groups[$key] = FieldGroup::firstOrCreate(
-                ['workflow_version_id' => $version->id, 'name' => $name],
-                ['sort_order' => $order],
+                ['workflow_version_id' => $version->id, 'code' => $key],
+                ['label' => $name, 'sort_order' => $order],
             )->id;
         }
 
@@ -536,7 +686,7 @@ class DemoDataSeeder extends Seeder
                     'options'            => $options,        // cast to array/json on the model
                     'reference_table_id' => $refTableId,
                     'dynamic_source'     => $dynamicSource,
-                    'group_id'           => $groups[$group],
+                    'field_group_id'     => $groups[$group],
                     'is_system'          => true,
                 ],
             )->id;
@@ -562,10 +712,11 @@ class DemoDataSeeder extends Seeder
     // 7. Requests  (15 samples + workflow history; per 07-data-model.md — verify)
     // ========================================================================
 
-    private function seedRequests(WorkflowVersion $version): void
+        private function seedRequests(WorkflowVersion $version): void
     {
         $creator = User::where('email', 'intake@ybank.ye')->first();
         $stages = WorkflowStage::where('workflow_version_id', $version->id)->pluck('id', 'code');
+        $actions = WorkflowAction::all()->mapWithKeys(fn ($action) => [strtoupper($action->code) => $action->id]);
         $merchantsByName = Merchant::pluck('id', 'name');
         $merchantBank = Merchant::pluck('bank_id', 'name');
 
@@ -580,30 +731,96 @@ class DemoDataSeeder extends Seeder
             $actorId[$stage] = User::where('email', $email)->value('id');
         }
 
-        // [stage, status, importer, amount, currency, invoiceNumber, importType, supplier, origin, arrivalPort]
+        // [stage, status, importer, amount, currencyLabel, invoiceNumber, importType, supplier, origin, arrivalPort]
+        // NOTE: Request #13 (FINAL) intentionally uses the same invoice INV-2026-10022 as #3 (INTERNAL)
+        //       to test the duplicate invoice warning feature in the frontend.
         $rows = [
-            ['CREATE', 'ACTIVE', 'شركة هائل سعيد أنعم', 120000, 'دولار أمريكي', 'INV-2026-10000', 'مواد غذائية', 'Cargill Inc.', 'الولايات المتحدة', 'ميناء عدن'],
-            ['CREATE', 'ACTIVE', 'مجموعة الشيباني', 340000, 'دولار أمريكي', 'INV-2026-10011', 'قطع غيار', 'Siemens AG', 'ألمانيا', 'ميناء الحديدة'],
-            ['INTERNAL', 'ACTIVE', 'شركة ثابت إخوان', 510000, 'دولار أمريكي', 'INV-2026-10022', 'أدوية ومستلزمات طبية', 'Pfizer Ltd.', 'الولايات المتحدة', 'ميناء عدن'],
-            ['INTERNAL', 'ACTIVE', 'شركة الكميم للأدوية', 89000, 'يورو', 'INV-2026-10033', 'أدوية ومستلزمات طبية', 'Bayer AG', 'ألمانيا', 'ميناء المكلا'],
-            ['SUPPORT', 'ACTIVE', 'مجموعة الأهدل', 720000, 'دولار أمريكي', 'INV-2026-10044', 'مشتقات نفطية', 'Saudi Aramco Trading', 'السعودية', 'ميناء الحديدة'],
-            ['SUPPORT', 'ACTIVE', 'شركة هائل سعيد أنعم', 145000, 'ريال سعودي', 'INV-2026-10055', 'إلكترونيات', 'Siemens AG', 'ألمانيا', 'منفذ الوديعة'],
-            ['EXEC', 'ACTIVE', 'مجموعة الشيباني', 980000, 'دولار أمريكي', 'INV-2026-10066', 'مواد غذائية', 'Cargill Inc.', 'الولايات المتحدة', 'ميناء عدن'],
-            ['EXEC', 'ACTIVE', 'شركة ثابت إخوان', 230000, 'يورو', 'INV-2026-10077', 'مواد بناء', 'Siemens AG', 'ألمانيا', 'ميناء الحديدة'],
-            ['FX', 'ACTIVE', 'شركة الكميم للأدوية', 415000, 'دولار أمريكي', 'INV-2026-10088', 'أدوية ومستلزمات طبية', 'Pfizer Ltd.', 'الولايات المتحدة', 'ميناء المكلا'],
-            ['FX', 'ACTIVE', 'مجموعة الأهدل', 1250000, 'دولار أمريكي', 'INV-2026-10099', 'مشتقات نفطية', 'Saudi Aramco Trading', 'السعودية', 'ميناء عدن'],
-            ['FX_CONFIRM', 'ACTIVE', 'شركة هائل سعيد أنعم', 640000, 'دولار أمريكي', 'INV-2026-10110', 'مواد غذائية', 'Cargill Inc.', 'الولايات المتحدة', 'ميناء الحديدة'],
-            ['FX_CONFIRM', 'ACTIVE', 'مجموعة الشيباني', 1100000, 'دولار أمريكي', 'INV-2026-10121', 'مشتقات نفطية', 'Saudi Aramco Trading', 'السعودية', 'ميناء عدن'],
-            ['FINAL', 'ACTIVE', 'شركة ثابت إخوان', 420000, 'يورو', 'INV-2026-10132', 'إلكترونيات', 'Bayer AG', 'ألمانيا', 'منفذ الوديعة'],
-            ['CLOSED', 'CLOSED', 'مجموعة الأهدل', 540000, 'دولار أمريكي', 'INV-2026-10143', 'مواد غذائية', 'Cargill Inc.', 'الولايات المتحدة', 'ميناء عدن'],
-            ['CLOSED', 'CLOSED', 'شركة الكميم للأدوية', 1280000, 'دولار أمريكي', 'INV-2026-10154', 'قطع غيار', 'Siemens AG', 'ألمانيا', 'ميناء الحديدة'],
-            ['CLOSED', 'REJECTED', 'شركة هائل سعيد أنعم', 980000, 'دولار أمريكي', 'INV-2026-10165', 'مشتقات نفطية', 'Saudi Aramco Trading', 'السعودية', 'ميناء المكلا'],
+            ['CREATE',     'ACTIVE',   'شركة هائل سعيد أنعم',  120000,  'دولار أمريكي', 'INV-2026-10000', 'مواد غذائية',           'Cargill Inc.',          'الولايات المتحدة', 'ميناء عدن'],
+            ['CREATE',     'ACTIVE',   'مجموعة الشيباني',      340000,  'دولار أمريكي', 'INV-2026-10011', 'قطع غيار',             'Siemens AG',            'ألمانيا',          'ميناء الحديدة'],
+            ['INTERNAL',   'ACTIVE',   'شركة ثابت إخوان',      510000,  'دولار أمريكي', 'INV-2026-10022', 'أدوية ومستلزمات طبية', 'Pfizer Ltd.',           'الولايات المتحدة', 'ميناء عدن'],
+            ['INTERNAL',   'ACTIVE',   'شركة الكميم للأدوية',  89000,   'يورو',         'INV-2026-10033', 'أدوية ومستلزمات طبية', 'Bayer AG',              'ألمانيا',          'ميناء المكلا'],
+            ['SUPPORT',    'ACTIVE',   'مجموعة الأهدل',        720000,  'دولار أمريكي', 'INV-2026-10044', 'مشتقات نفطية',         'Saudi Aramco Trading',  'السعودية',         'ميناء الحديدة'],
+            ['SUPPORT',    'ACTIVE',   'شركة هائل سعيد أنعم',  145000,  'ريال سعودي',   'INV-2026-10055', 'إلكترونيات',           'Siemens AG',            'ألمانيا',          'منفذ الوديعة'],
+            ['EXEC',       'ACTIVE',   'مجموعة الشيباني',      980000,  'دولار أمريكي', 'INV-2026-10066', 'مواد غذائية',           'Cargill Inc.',          'الولايات المتحدة', 'ميناء عدن'],
+            ['EXEC',       'ACTIVE',   'شركة ثابت إخوان',      230000,  'يورو',         'INV-2026-10077', 'مواد بناء',             'Siemens AG',            'ألمانيا',          'ميناء الحديدة'],
+            ['FX',         'ACTIVE',   'شركة الكميم للأدوية',  415000,  'دولار أمريكي', 'INV-2026-10088', 'أدوية ومستلزمات طبية', 'Pfizer Ltd.',           'الولايات المتحدة', 'ميناء المكلا'],
+            ['FX',         'ACTIVE',   'مجموعة الأهدل',        1250000, 'دولار أمريكي', 'INV-2026-10099', 'مشتقات نفطية',         'Saudi Aramco Trading',  'السعودية',         'ميناء عدن'],
+            ['FX_CONFIRM', 'ACTIVE',   'شركة هائل سعيد أنعم',  640000,  'دولار أمريكي', 'INV-2026-10110', 'مواد غذائية',           'Cargill Inc.',          'الولايات المتحدة', 'ميناء الحديدة'],
+            ['FX_CONFIRM', 'ACTIVE',   'مجموعة الشيباني',      1100000, 'دولار أمريكي', 'INV-2026-10121', 'مشتقات نفطية',         'Saudi Aramco Trading',  'السعودية',         'ميناء عدن'],
+            ['FINAL',      'ACTIVE',   'شركة ثابت إخوان',      420000,  'يورو',         'INV-2026-10022', 'إلكترونيات',           'Bayer AG',              'ألمانيا',          'منفذ الوديعة'],
+            ['CLOSED',     'CLOSED',   'مجموعة الأهدل',        540000,  'دولار أمريكي', 'INV-2026-10143', 'مواد غذائية',           'Cargill Inc.',          'الولايات المتحدة', 'ميناء عدن'],
+            ['CLOSED',     'CLOSED',   'شركة الكميم للأدوية',  1280000, 'دولار أمريكي', 'INV-2026-10154', 'قطع غيار',             'Siemens AG',            'ألمانيا',          'ميناء الحديدة'],
+            ['CLOSED',     'REJECTED', 'شركة هائل سعيد أنعم',  980000,  'دولار أمريكي', 'INV-2026-10165', 'مشتقات نفطية',         'Saudi Aramco Trading',  'السعودية',         'ميناء المكلا'],
+        ];
+        $currencyCodes = [
+            'دولار أمريكي' => 'USD',
+            'يورو' => 'EUR',
+            'ريال سعودي' => 'SAR',
         ];
 
+        // Merchant details for the data JSON — matches frontend mock merchantFixture()
+        $merchantDetails = [
+            'شركة هائل سعيد أنعم' => ['taxNumber' => '4100000', 'linkedCompany' => 'شركة هائل سعيد أنعم للتجارة', 'commercialRegistration' => 'CR-50000', 'owners' => 'عبد الجليل هائل سعيد - 25%'],
+            'مجموعة الشيباني'     => ['taxNumber' => '4107777', 'linkedCompany' => 'الشيباني للاستيراد',           'commercialRegistration' => 'CR-50013', 'owners' => 'أحمد الشيباني - 25%'],
+            'شركة ثابت إخوان'     => ['taxNumber' => '4115554', 'linkedCompany' => 'ثابت إخوان للتجارة',          'commercialRegistration' => 'CR-50026', 'owners' => 'محمد ثابت - 25%'],
+            'شركة الكميم للأدوية' => ['taxNumber' => '4123331', 'linkedCompany' => 'الكميم للأدوية',              'commercialRegistration' => 'CR-50039', 'owners' => 'علي الكميم - 25%'],
+            'مجموعة الأهدل'       => ['taxNumber' => '4131108', 'linkedCompany' => 'الأهدل للتجارة',              'commercialRegistration' => 'CR-50052', 'owners' => 'سالم الأهدل - 25%'],
+        ];
+
+        // Lookup transition IDs for history entries
+        $transitions = [];
+        $allTransitions = WorkflowTransition::where('workflow_version_id', $version->id)->get();
+        foreach ($allTransitions as $t) {
+            $fromCode = WorkflowStage::find($t->from_stage_id)?->code;
+            $toCode = WorkflowStage::find($t->to_stage_id)?->code;
+            $actionCode = WorkflowAction::find($t->action_id)?->code;
+            if ($fromCode && $toCode && $actionCode) {
+                $transitions["{$fromCode}|{$actionCode}|{$toCode}"] = $t->id;
+            }
+        }
+
         foreach ($rows as $idx => $row) {
-            [$stageCode, $status, $importer, $amount, $currency, $invoiceNumber, $importType, $supplier, $origin, $arrivalPort] = $row;
+            [$stageCode, $status, $importer, $amount, $currencyLabel, $invoiceNumber, $importType, $supplier, $origin, $arrivalPort] = $row;
+            $currencyCode = $currencyCodes[$currencyLabel] ?? $currencyLabel;
             $reference = 'IMP-2026-' . str_pad((string) (2001 + $idx), 4, '0', STR_PAD_LEFT);
             $createdAt = now()->copy()->subDays(30 - ($idx % 27));
+            $merchant = $merchantDetails[$importer] ?? [];
+
+            // Full data JSON — all form fields the frontend dynamic form expects
+            $fullData = [
+                'taxNumber'                    => $merchant['taxNumber'] ?? null,
+                'importerName'                 => $importer,
+                'linkedCompany'                => $merchant['linkedCompany'] ?? null,
+                'taxCardExpiry'                => '2026-06-16',
+                'commercialRegistration'       => $merchant['commercialRegistration'] ?? null,
+                'commercialRegistrationExpiry' => '2026-06-16',
+                'owners'                       => $merchant['owners'] ?? null,
+                'requestType'                  => 'طلب مصارفة وتحويل خارجي',
+                'coverageType'                 => 'اعتماد مستندي',
+                'foreignCurrencySource'        => 'حساب العميل',
+                'paymentTerms'                 => 'كلي',
+                'requestCurrency'              => $currencyLabel,
+                'requestPercentage'            => 100,
+                'invoiceType'                  => 'فاتورة تجارية',
+                'financeAmount'                => $amount,
+                'currency'                     => $currencyCode,
+                'invoiceNumber'                => $invoiceNumber,
+                'invoiceDate'                  => '2026-06-16',
+                'quantity'                     => 1,
+                'unit'                         => 'كرتون',
+                'invoiceTotal'                 => $amount,
+                'importType'                   => $importType,
+                'supplierName'                 => $supplier,
+                'supplierLocation'             => 'المدينة / الدولة',
+                'originCountry'                => $origin,
+                'shippingDate'                 => '2026-06-16',
+                'arrivalDate'                  => '2026-06-16',
+                'shippingPort'                 => 'ميناء الشحن',
+                'arrivalPort'                  => $arrivalPort,
+                'deliveryTerms'                => 'CIF',
+                'finalDestination'             => 'المدينة / المخزن الوجهة',
+                'requestIdentifier'            => $reference,
+            ];
 
             $request = WorkflowRequest::firstOrCreate(
                 ['reference' => $reference],
@@ -615,13 +832,17 @@ class DemoDataSeeder extends Seeder
                     'bank_id'             => $merchantBank[$importer] ?? null,
                     'merchant_id'         => $merchantsByName[$importer] ?? null,
                     'amount'              => $amount,
-                    'currency'            => $currency,
+                    'currency'            => $currencyCode,
                     'invoice_number'      => $invoiceNumber,
-                    'data'                => [
-                        'importerName' => $importer, 'importType' => $importType, 'financeAmount' => $amount,
-                        'currency' => $currency, 'invoiceNumber' => $invoiceNumber, 'supplierName' => $supplier,
-                        'originCountry' => $origin, 'arrivalPort' => $arrivalPort,
-                    ],
+                    'supplier_name'       => $supplier,
+                    'import_type'         => $importType,
+                    'country_of_origin'   => $origin,
+                    'goods_description'   => $importType,
+                    'port_of_entry'       => $arrivalPort,
+                    'payment_terms'       => 'كلي',
+                    'invoice_date'        => '2026-06-16',
+                    'shipping_port'       => 'ميناء الشحن',
+                    'data'                => $fullData,
                     'created_at'          => $createdAt,
                 ],
             );
@@ -630,7 +851,14 @@ class DemoDataSeeder extends Seeder
             $ts = $createdAt->copy();
             WorkflowHistory::firstOrCreate(
                 ['request_id' => $request->id, 'to_stage_id' => $stages['CREATE'], 'from_stage_id' => null],
-                ['action_code' => 'create', 'action_name' => 'إنشاء الطلب', 'performed_by' => $actorId['CREATE'], 'created_at' => $ts->copy()],
+                [
+                    'action_id'     => null,
+                    'transition_id' => null,
+                    'performed_by'  => $actorId['CREATE'],
+                    'comment'       => 'إنشاء الطلب',
+                    'data_snapshot' => ['event' => 'create', 'stage' => 'CREATE'],
+                    'created_at'    => $ts->copy(),
+                ],
             );
 
             if ($status === 'REJECTED') {
@@ -646,8 +874,14 @@ class DemoDataSeeder extends Seeder
             foreach ($hops as [$from, $to, $action]) {
                 $ts = $ts->copy()->addDay();
                 WorkflowHistory::firstOrCreate(
-                    ['request_id' => $request->id, 'from_stage_id' => $stages[$from], 'to_stage_id' => $stages[$to]],
-                    ['action_code' => $action, 'action_name' => $action, 'performed_by' => $actorId[$from] ?? $creator?->id, 'created_at' => $ts->copy()],
+                    ['request_id' => $request->id, 'from_stage_id' => $stages[$from], 'to_stage_id' => $stages[$to], 'action_id' => $actions[$action]],
+                    [
+                        'transition_id' => $transitions["{$from}|{$action}|{$to}"] ?? null,
+                        'performed_by'  => $actorId[$from] ?? $creator?->id,
+                        'comment'       => $action,
+                        'data_snapshot' => ['from' => $from, 'to' => $to, 'action' => $action],
+                        'created_at'    => $ts->copy(),
+                    ],
                 );
             }
         }
@@ -674,6 +908,7 @@ class DemoDataSeeder extends Seeder
             AuditLog::firstOrCreate(
                 ['correlation_id' => 'demo_audit_' . $i],
                 [
+                    'action'        => $events[$i % 5],
                     'actor_user_id' => $users[$actorName] ?? null,
                     'event_code'    => $events[$i % 5],
                     'ip_address'    => '196.' . (10 + ($i % 200)) . '.' . ($i % 255) . '.' . (($i * 13) % 255),

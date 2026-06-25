@@ -2,33 +2,28 @@ import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   canViewByStageRouting, getStagesForVersion, isAssigned, processLabelForStage,
-  wfStore, type WorkflowInstance,
+  wfStore, type WorkflowInstance, type WorkflowStage,
 } from "@/lib/workflow-engine";
 import { useWfUser } from "@/lib/workflow-engine/wfAuth";
 import { Badge } from "@/components/ui/badge";
 
-/**
- * Vertical organizational-process view that replaces the raw timeline.
- * Shows the stage path with done / current / pending status, and marks
- * the stages that concern the signed-in user ("دورك"). Stages are filtered
- * to the groups whose audience includes the user (admins see everything).
- */
-export function OrgProcessStepper({ instance }: { instance: WorkflowInstance }) {
+export function OrgProcessStepper({ instance, apiStages }: { instance: WorkflowInstance; apiStages?: WorkflowStage[] }) {
   wfStore.stages.use();
   wfStore.stageRoutingRules.use();
   wfStore.assignments.use();
   const user = useWfUser();
 
-  const allStages = getStagesForVersion(instance.workflowVersionId);
+  const allStages = apiStages ?? getStagesForVersion(instance.workflowVersionId);
   const currentIdx = allStages.findIndex((s) => s.id === instance.currentStageId);
   const rejected = instance.status === "rejected";
   const isAdmin = Boolean(user?.roleIds.includes("role_admin"));
 
-  // A stage shows when its routing rules allow the signed-in user's org/team/role.
-  const visibleStages = allStages.filter((s) => {
-    if (isAdmin) return true;
-    return canViewByStageRouting(s.id, user);
-  });
+  const visibleStages = apiStages
+    ? allStages
+    : allStages.filter((s) => {
+        if (isAdmin) return true;
+        return canViewByStageRouting(s.id, user);
+      });
 
   if (visibleStages.length === 0) {
     return <p className="text-sm text-muted-foreground">لا توجد مراحل مخصّصة لعرضها.</p>;
@@ -41,7 +36,7 @@ export function OrgProcessStepper({ instance }: { instance: WorkflowInstance }) 
         const isCurrent = i === currentIdx;
         const isDone = currentIdx >= 0 && i < currentIdx;
         const isPending = currentIdx >= 0 && i > currentIdx;
-        const mine = isAssigned(s.id, user);
+        const mine = apiStages ? false : isAssigned(s.id, user);
         const isLast = vi === visibleStages.length - 1;
 
         const statusLabel = isCurrent
@@ -76,7 +71,7 @@ export function OrgProcessStepper({ instance }: { instance: WorkflowInstance }) 
             <div className="pb-1 -mt-0.5">
               <div className="flex items-center gap-2">
                 <span className={cn("text-sm font-medium", isCurrent ? "text-foreground" : "text-foreground/80")}>
-                  {processLabelForStage(s, user)}
+                  {apiStages ? s.name : processLabelForStage(s, user)}
                 </span>
                 {mine && (
                   <Badge variant="outline" className="h-4 px-1.5 text-xs border-primary/40 text-primary">دورك</Badge>

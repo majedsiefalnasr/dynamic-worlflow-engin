@@ -20,7 +20,7 @@ The PM has set the **minimum-viable order** for what must work correctly first, 
 4. **Merchant management** — bank-scoped (a bank-1 user must never see bank-2's merchants) and **tax number unique per bank**, not globally (bank 1 and bank 2 can each register a merchant with tax number `111`; bank 1 cannot register two merchants both with `111`)
 5. **Request creation and stage progression**
 
-CR-13 (new, below) is the only P0 blocking item against this list — items 1–3 and the bank-scoping half of item 4 are verified working; the tax-uniqueness half of item 4 is not.
+All PM priority items are unblocked as of the `fix-db` branch deployment. Items 1–5 verified working end-to-end (login, banks, users, merchants, request list + detail + stage display).
 
 > **This document changes nothing in the frontend.** The frontend integrates resource-by-resource behind `VITE_API_RESOURCES`, falling back to local mock for any unfinished area, so shipping these in any order never breaks the running app. See the classification in [AUDIT.md](AUDIT.md).
 
@@ -323,31 +323,169 @@ This matches the PM's acceptance criterion exactly: bank 1 and bank 2 can each r
 
 **Bank scoping on list/read — confirmed correct, no action needed:** unchanged from prior verification.
 
+### CR-14 · `GET /requests/{request}` returns 200 with all null fields — route model binding mismatch · P0 (CRITICAL)
+
+**Where:** `GET /requests/{request}`, `PATCH /requests/{request}/draft`, `POST /requests/{request}/actions`, `GET /requests/{request}/history`, document endpoints — any route using `{request}` parameter.
+
+**Current (live, localhost:8000 fix-db branch):** `GET /requests/1` returns HTTP 200 with the correct response structure (all expected keys present) but **every field is `null`**, including `id`. The list endpoint `GET /requests` returns correct data for the same record.
+
+```json
+{
+  "id": null,
+  "reference_number": null,
+  "workflow_version_id": null,
+  "current_stage": null,
+  "merchant": null,
+  "amount": 0,
+  "status": null,
+  "created_at": null
+}
+```
+
+**Root cause (verified in code):** The route is defined as `Route::get('requests/{request}', ...)` (route param name = `request`). The controller method signature is:
+
+```php
+public function show(Request $request, ImportRequest $requestModel): JsonResponse
+```
+
+Laravel's implicit route model binding matches by **parameter name**: `{request}` binds to the parameter named `$request`, which is `Illuminate\Http\Request` — the HTTP request object. The `$requestModel` parameter **never gets resolved** because its name doesn't match the route param `{request}`. Laravel injects a fresh, empty `ImportRequest` instance via the service container instead of looking up ID 1. All fields are null because no database lookup happens.
+
+**Expected:** `GET /requests/1` returns the full request record with all fields populated.
+
+**Fix (one of):**
+
+1. **Rename the route parameter** (recommended, least disruptive):
+   ```php
+   // routes/api.php
+   Route::get('requests/{importRequest}', [RequestController::class, 'show']);
+   // controller
+   public function show(Request $request, ImportRequest $importRequest): JsonResponse
+   ```
+
+2. **Or register an explicit model binding** in `AppServiceProvider::boot()`:
+   ```php
+   Route::model('request', ImportRequest::class);
+   ```
+
+3. **Or rename the controller parameter** to match the route:
+   ```php
+   public function show(HttpRequest $httpRequest, ImportRequest $request): JsonResponse
+   ```
+
+**Acceptance:** `GET /requests/1` returns `"id": 1`, `"reference_number": "IMP-2026-2001"`, `"merchant": { "id": ..., "name": "..." }`, etc. — matching what the list endpoint returns for the same record. Same fix must apply to `draft`, `action`, `history`, and document endpoints using `{request}`.
+
+**Blocks:** PM priority #5 (request detail page, stage progression, draft save, action execution, document upload/download). The request **list** page works fine; only per-request operations are broken.
+
+---
+
+### CR-15 · `ImportRequestResource` / `ImportRequestListResource` omit `data` and `version` · P0
+
+**Where:** `GET /requests/{id}` (`ImportRequestResource`), `GET /requests` (`ImportRequestListResource`).
+
+**Current (live, localhost:8000 `fix-db` branch, re-verified 2026-06-25):** `GET /requests/1` returns the dedicated columns (`reference_number`, `merchant`, `current_stage`, `goods_description`, `port_of_entry`, etc.) but the JSON has **no `data` key and no `version` key at all** — not null, absent:
+
+```json
+{
+  "id": 1,
+  "reference_number": "IMP-2026-2001",
+  "current_stage": { "id": 3, "name": "..." },
+  "merchant": { "id": 1, "name": "..." },
+  "goods_description": "...",
+  "port_of_entry": "...",
+  "created_at": "..."
+}
+```
+
+Same for the list row.
+
+**Root cause (verified in code):** `ImportRequestResource::toArray()` and `ImportRequestListResource::toArray()` only list the explicit dedicated columns; they never reference `$this->data` (the model's JSON blob column, used for dynamic-form fields not promoted to dedicated columns) or `$this->version` (the optimistic-locking counter — present on every other resource per CR-07, but not on requests).
+
+**Expected:** both resources include the raw `data` JSON object and the integer `version`, the same pattern already used by `banks`/`merchants`/`organizations`/`teams`/`roles` for `version`.
+
+**Fix (one of):**
+
+```php
+// ImportRequestResource::toArray() and ImportRequestListResource::toArray()
+'data' => $this->data ?? [],
+'version' => $this->version,
+```
+
+**Why:** without `data`, the frontend's dynamic workflow form cannot render engine-configured fields with live values for a request — only the 8 dedicated columns are visible, so any field not promoted to a dedicated column shows nothing. Without `version`, `PATCH /requests/{id}/draft` and `POST /requests/{id}/actions` cannot do optimistic-locking the way CR-07 already enforces on every other resource — the frontend currently sends `version: 0` on every request write because it has no real value to send.
+
+**Acceptance:** `GET /requests/1` returns a `data` object matching what was submitted/saved for that request, and an integer `version` that increments on each successful `draft`/`action` write; a stale `PATCH .../draft` with an old `version` returns `409 STALE_RESOURCE` (per CR-07's existing pattern).
+
+**Blocks:** dynamic form rendering on the request detail page (currently substituted with a flat read-only field list as a stopgap) and optimistic locking for request draft-save / action-execute.
+
+---
+
+### CR-16 · Bank-scoped admin sees zero requests · P0 — ✅ CLOSED (fix-db, re-verified 2026-06-25)
+
+**Where:** `GET /requests` for a bank-scoped user.
+
+**Was (live, localhost:8000 `fix-db` branch, pre-fix):** `admin@ybank.ye` (`bank_id: 1`) called `GET /requests` and got `total: 0`, despite seeded request #1 having `bank_id: 1`. Platform admin saw all 16.
+
+**Root cause (per backend's fix):** `WorkflowService::canUserSeeRequest()` required a matching `StagePermission` row for every access level including plain `VIEW`; bank-admin roles have no stage-permission row anywhere (only the team actually working a stage does), so they were structurally invisible despite the `bank_id` check already being correct.
+
+**Fix:** bank-role users now get `VIEW` whenever `bank_id` matches, no stage-permission row required; `EXECUTE` (used by `/requests/my-queue`) still requires the real stage permission.
+
+**Re-verified live (2026-06-25):** `admin@ybank.ye` (bank 1) → `GET /requests` → `total: 7`, all rows `bank_id: 1`. Platform admin still `total: 16` (unaffected). `GET /requests/my-queue` still correctly EXECUTE-gated — `intake@ybank.ye` (has a stage permission) gets 1 result, `admin@ybank.ye` (no stage permission) gets 0, neither errors nor leaks all 16.
+
+**Cross-bank isolation — now fully verified (2026-06-25):** backend seeded a second bank-admin, `admin@tsib.ye` (bank 2). `GET /requests` for tsib → `total: 6`, all rows `bank_id: 2`, IDs `[2,5,7,10,12,14]` — zero overlap with ybank's IDs `[1,4,6,9,11,15,16]`. Platform admin's `total: 16` splits exactly bank 1 (7) + bank 2 (6) + bank 3 (3) = 16, confirming a third bank's requests are correctly visible only to platform admin. Isolation confirmed both directions, no gaps remaining.
+
+---
+
+### CR-17 · Banks/merchants responses omit `version`, despite PATCH requiring it · P1 — ✅ CLOSED (fix-db, re-verified 2026-06-25)
+
+**Where:** `GET /banks`, `GET /banks/{id}`, `GET /merchants`, `GET /merchants/{id}`.
+
+**Was (live, localhost:8000 `fix-db` branch, pre-fix):** CR-07 made `PATCH /banks/{id}` and `PATCH /merchants/{id}` require `version` (missing → `422`, mismatched → `409`), but neither resource's read responses included a `version` key at all.
+
+**Fix:** `BankResource`/`MerchantResource` now project `'version' => $this->version` on every read.
+
+**Re-verified live (2026-06-25):** `GET /banks?per_page=2`, `GET /banks/1`, `GET /merchants?per_page=2`, `GET /merchants/1` all return integer `version`. Round-trip confirmed: read `version:1` on bank id 1, sent it back on `PATCH /banks/1`, got `200` (not `409`), version bumped to `2` as expected — optimistic-lock flow is now usable end-to-end from the client.
+
+---
+
+## F. Frontend-side, not backend CRs (noted for completeness)
+
+These were investigated during the 2026-06-25 re-verification and determined to need **no backend change** — listed here so they aren't mistaken for open backend gaps:
+
+- **Workflow-designer wiring:** the designer screen (`admin.workflows.tsx`) is now fully wired to CR-01's live write endpoints — stages, transitions, stage permissions/assignments, field groups, fields, field rules (full-replace `PUT`), and actions all create/update/delete through the live API, gated by `canEdit` (DRAFT versions only; PUBLISHED is read-only until a new version is created). `StageRoutingTab` remains mock-only by design — confirmed no backend equivalent exists for it. Minor gap noted: `PUT /stages/{stage}/field-rules` rejects an empty `field_rules` array (`required` validation), so there is no way to clear a stage's rules to zero or delete a single rule — low priority, not yet filed as its own CR.
+- **Transition → action name not embedded:** `GET /workflow-versions/{id}/transitions` returns `action_id` (FK int) only, no inline action `code`/`name`. This does **not** need a backend change — `GET /workflow-actions` is a small, global, already-cheap lookup; the frontend should fetch it once and join client-side to render action labels on transition rows.
+- **No "mark as live workflow" control — latent gap, not yet a blocker:** screen-permissions (`admin.screen-permissions.tsx`, "الطلبات" column) and the requests engine both resolve "the live workflow + version" via `wfStore.definitions.get()[0]` (`src/lib/workflow-bridge.ts:180`) — i.e. whichever workflow definition the backend lists *first* in `GET /workflows`, with no explicit UI marker (`isDefault`/`isPrimary`) and no admin-facing "تعيين كنشط" control to pick among multiple definitions. Harmless today because exactly one workflow definition exists in both mock seed and the live backend seed. **Becomes a real bug the moment a second `WorkflowDefinition` is created** — array order (likely created-at) would silently decide which workflow drives request routing/permissions with zero signal to the admin. Not filed as a CR since it requires no backend change — if/when multi-definition support is needed, the frontend should add a definition-level "primary/live" flag (local state is enough; no new backend field required unless the backend wants to enforce single-active-workflow server-side). Logged here so it isn't rediscovered as a surprise later.
+
 ---
 
 ## Summary
 
 | ID | Title | Priority | Status | Blocks |
 |---|---|---|---|---|
-| CR-01 | Workflow authoring write endpoints | P0 | ✅ Closed (fix-db: draft guards + stage update fields) | Workflow Designer |
+| CR-01 | Workflow authoring write endpoints | P0 | ✅ Closed (fix-db: all create/update/delete routes live and verified — `POST /workflows`, stages, transitions, fields, field-groups; Workflow Designer frontend now fully wired to these endpoints) | — |
 | CR-02 | `POST /users` role field | P0 | ✅ Closed | all user creation |
 | CR-03 | activate/deactivate/suspend → 406 (+team delete) | P0 | ✅ Closed | status toggle (merchant/user fully) |
 | CR-03b | Role deactivate blocked while linked to users (backend-added) | — | ✅ Confirmed | data integrity |
-| CR-04 | Document + populate permissions payload | P1 | ⚠️ Mostly closed (fix-db: OpenAPI for users/roles exists; screen_permissions shape still undocumented) | screen/action gating |
+| CR-04 | Document + populate permissions payload | P1 | ✅ Closed (fix-db: `me/permissions` OpenAPI typed, live-confirmed matches login shape) | screen/action gating |
 | CR-05 | Auth completeness (MFA/refresh/password) | P1 | Open | real sign-in |
 | CR-06 | Enrich `GET /requests` row | P0 | ✅ Closed (fix-db: reference_number bug fixed, workflow_version_id + current_stage + merchant added) | requests list + runtime |
-| CR-07 | Optimistic locking (`version`) | P1 | ✅ Closed (fix-db: banks + merchants enforce version; orgs/teams/roles already did) | safe concurrent edits |
-| CR-08 | Document nested write payloads | P2 | Open | merchants/permissions writes |
-| CR-09 | Standardize `meta` shape | P2 | Open | contract consistency |
-| CR-10 | OpenAPI accuracy | P2 | Open | typed client |
+| CR-07 | Optimistic locking (`version`) | P1 | ✅ Closed (fix-db: banks + merchants enforce `version` on PATCH; orgs/teams/roles already did) | safe concurrent edits |
+| CR-08 | Document nested write payloads | P2 | ✅ Closed (fix-db: merchants `owners[]`/`companies[]`, stage `permissions[]`/`field_rules[]` typed) | merchants/permissions writes |
+| CR-09 | Standardize `meta` shape | P2 | ✅ Closed (fix-db: pagination meta unified to `{page, per_page, total, last_page}` on all list endpoints) | contract consistency |
+| CR-10 | OpenAPI accuracy | P2 | ⚠️ Mostly closed (fix-db: generic `object` types fixed where under-typed; `requests.data`/`reports.filters` correctly left open by design) | typed client |
 | CR-11 | Seed non-admin permissions | P1 | ✅ Closed (fix-db: seedScreenPermissions for all 8 roles) | testing non-admin roles |
 | CR-12 | Grant supporting-resource READ for multi-resource screens | P0 | ✅ Closed (fix-db: lookup VIEW grants seeded per role) | merchants/roles/teams/banks for non-admin roles |
 | CR-13 | Merchant `tax_number` unique globally — must be unique per bank | P0 | ✅ Closed | merchant onboarding (PM priority #4) |
+| CR-14 | `GET /requests/{request}` returns all nulls — route model binding | P0 | ✅ Closed (fix-db: renamed {request} → {importRequest} in routes + controller) | request detail, actions, draft, documents (PM priority #5) |
+| CR-15 | `ImportRequestResource`/`ImportRequestListResource` omit `data` and `version` | P0 | ✅ Closed (fix-db: both keys present and populated, live-verified 2026-06-25) | dynamic form rendering + optimistic locking on requests |
+| CR-16 | Bank-scoped admin sees zero requests on `GET /requests` | P0 | ✅ Closed (fix-db: bank-role `VIEW` no longer requires stage-permission row; cross-bank isolation fully verified with bank-1/bank-2 accounts) | request list for every bank-side role (PM priority #5, bank users only) |
+| CR-17 | Banks/merchants responses omit `version` despite PATCH requiring it | P1 | ✅ Closed (fix-db: `version` now on `BankResource`/`MerchantResource`; round-trip live-verified) | optimistic-locking round-trip on bank/merchant edits |
 
-**All PM priority items (1-5) now unblocked.** Backend `fix-db` branch closes CR-01 (quality), CR-06, CR-07, CR-11, CR-12. See [HANDOFF-FIX-DB.md](HANDOFF-FIX-DB.md) for full details.
+**All PM priority items 1-5 unblocked, including bank-scoped roles.** Backend `fix-db` branch closes CR-01 (quality), CR-04, CR-06, CR-07, CR-08, CR-09, CR-11, CR-12, CR-14, CR-15, CR-16, CR-17. See [HANDOFF-FIX-DB.md](HANDOFF-FIX-DB.md) for full details.
 
-**What's closed as of 2026-06-25 (fix-db):** CR-01 (workflow writes + quality fixes), CR-02, CR-03/03b, CR-06 (request enrichment + reference_number fix), CR-07 (version enforcement on all resources), CR-11 (permission seeding for all 8 roles), CR-12 (lookup READ grants), CR-13. Frontend proxy now points at `http://localhost:8000`.
+**What's closed as of 2026-06-25 (fix-db, re-verified live):** CR-01 (workflow writes + quality fixes + frontend wiring), CR-02, CR-03/03b, CR-04 (me/permissions typed), CR-06 (request enrichment + reference_number fix), CR-07 (version enforcement on banks/merchants), CR-08 (nested payloads typed), CR-09 (pagination meta unified), CR-11 (permission seeding for all 8 roles), CR-12 (lookup READ grants), CR-13, CR-14 (route model binding + detail columns migration + seeder enrichment), CR-15 (`data`/`version` on requests), CR-16 (bank-scoped requests list), CR-17 (`version` on banks/merchants read). Frontend proxy now points at `http://localhost:8000`.
 
-**What's still open:** CR-04 (screen_permissions OpenAPI shape), CR-05 (MFA/refresh/password), CR-08/09/10 (documentation quality).
+**What's still open (backend):** CR-05 (MFA/refresh/password), CR-10 (mostly closed, minor doc quality remains).
 
-**What's still blocking `VITE_API_RESOURCES=*`:** Only CR-05 (auth completeness — MFA flow needed to remove the demo login). All data screens are unblocked.
+**What's still blocking full `VITE_API_RESOURCES=*`:** CR-05 only (auth completeness — MFA flow needed to remove the demo login). All other screens functional for both platform admin and bank-scoped roles.
+
+
+**Frontend-side work still pending (not backend CRs, see section F):** transition rows need a client-side join against `/workflow-actions` to show action names. (Workflow Designer wiring is now complete — see section F.)

@@ -69,7 +69,31 @@ import { orgsCell, teamsCell, roleCatalogCell, referenceTablesCell } from "@/lib
 import { RoleGuard } from "@/components/workflow/RoleGuard";
 import { toast } from "sonner";
 import { isApiEnabled } from "@/lib/api/client";
-import { useWorkflowSync } from "@/lib/api/workflow-designer";
+import { useOrganizationsQuery } from "@/lib/api/organizations";
+import { useTeamsQuery } from "@/lib/api/teams";
+import { useRolesQuery } from "@/lib/api/roles";
+import {
+  useWorkflowSync,
+  useCreateStage,
+  useUpdateStage,
+  useDeleteStage,
+  useCreateVersion,
+  useCloneVersion,
+  usePublishVersion,
+  useCreateTransition,
+  useDeleteTransition,
+  useCreateStagePermission,
+  useDeleteStagePermission,
+  useCreateFieldGroup,
+  useDeleteFieldGroup,
+  useCreateField,
+  useUpdateField,
+  useDeleteField,
+  useUpdateStageFieldRules,
+  useCreateAction,
+  useDeleteAction,
+} from "@/lib/api/workflow-designer";
+import type { ApiError } from "@/lib/api/client";
 
 export const Route = createFileRoute("/admin/workflows")({
   component: () => (
@@ -143,8 +167,40 @@ function DesignerPage() {
     if (fallback && fallback !== verId) setVerId(fallback);
   }
 
+  const createVersion = useCreateVersion();
+  const cloneVersionApi = useCloneVersion();
+  const publishVersionApi = usePublishVersion();
+
   const onClone = () => {
     if (!verId) return;
+    if (wfApi) {
+      const current = defVersions.find((v) => v.id === verId);
+      if (current?.isPublished) {
+        if (!def) return;
+        createVersion.mutate(
+          { workflowId: Number(def.id) },
+          {
+            onSuccess: (created) => {
+              toast.success("تم إنشاء نسخة جديدة");
+              setVerId(String((created as { id: number }).id));
+            },
+            onError: () => toast.error("فشل إنشاء نسخة جديدة"),
+          },
+        );
+      } else {
+        cloneVersionApi.mutate(
+          { versionId: Number(verId) },
+          {
+            onSuccess: (cloned) => {
+              toast.success("تم نسخ النسخة الحالية");
+              setVerId(String((cloned as { id: number }).id));
+            },
+            onError: () => toast.error("فشل نسخ النسخة"),
+          },
+        );
+      }
+      return;
+    }
     const newVer = cloneVersion(
       verId,
       `${defVersions.find((v) => v.id === verId)?.version ?? "1.0"}.${Date.now().toString().slice(-3)}`,
@@ -157,6 +213,20 @@ function DesignerPage() {
 
   const onPublish = () => {
     if (!verId) return;
+    if (wfApi) {
+      publishVersionApi.mutate(
+        { versionId: Number(verId) },
+        {
+          onSuccess: () => toast.success("تم نشر النسخة"),
+          onError: (err) => {
+            const apiErr = err as ApiError;
+            const firstError = apiErr.fields ? Object.values(apiErr.fields)[0]?.[0] : undefined;
+            toast.error(firstError ?? apiErr.message ?? "فشل نشر النسخة");
+          },
+        },
+      );
+      return;
+    }
     publishVersion(verId);
     toast.success("تم نشر النسخة");
   };
@@ -197,9 +267,9 @@ function DesignerPage() {
       />
 
       {wfApi && (
-        <Card className="mb-4 border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-          عرض فقط — سير العمل من القاعدة الحقيقية. تأليف/تعديل سير العمل غير متاح بعد (CR-01)؛ أي
-          تغييرات هنا لا تُحفظ في الخادم.
+        <Card className="mb-4 border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+          كل التبويبات قابلة للتعديل مباشرة على النسخ غير المنشورة (المسودة)؛ النسخ المنشورة عرض
+          فقط — أنشئ نسخة جديدة أو استنسخ نسخة مسودة للتعديل.
         </Card>
       )}
 
@@ -237,10 +307,20 @@ function DesignerPage() {
             </Select>
           </div>
           <div className="flex items-end gap-2">
-            <Button variant="secondary" onClick={onClone} disabled={wfApi}>
+            <Button
+              variant="secondary"
+              onClick={onClone}
+              disabled={createVersion.isPending || cloneVersionApi.isPending}
+            >
               <Plus className="ms-1 h-4 w-4" /> نسخة جديدة
             </Button>
-            <Button onClick={onPublish} disabled={wfApi}>
+            <Button
+              onClick={onPublish}
+              disabled={
+                publishVersionApi.isPending ||
+                (wfApi && !!versions.find((v) => v.id === verId)?.isPublished)
+              }
+            >
               <Tag className="ms-1 h-4 w-4" /> نشر
             </Button>
           </div>
@@ -276,25 +356,45 @@ function DesignerPage() {
           </TabsList>
 
           <TabsContent value="stages">
-            <StagesTab versionId={verId} />
+            <StagesTab
+              versionId={verId}
+              wfApi={wfApi}
+              canEdit={!wfApi || !versions.find((v) => v.id === verId)?.isPublished}
+            />
           </TabsContent>
           <TabsContent value="stageRouting">
             <StageRoutingTab versionId={verId} />
           </TabsContent>
           <TabsContent value="transitions">
-            <TransitionsTab versionId={verId} />
+            <TransitionsTab
+              versionId={verId}
+              wfApi={wfApi}
+              canEdit={!wfApi || !versions.find((v) => v.id === verId)?.isPublished}
+            />
           </TabsContent>
           <TabsContent value="assignments">
-            <AssignmentsTab versionId={verId} />
+            <AssignmentsTab
+              versionId={verId}
+              wfApi={wfApi}
+              canEdit={!wfApi || !versions.find((v) => v.id === verId)?.isPublished}
+            />
           </TabsContent>
           <TabsContent value="fields">
-            <FieldsTab versionId={verId} />
+            <FieldsTab
+              versionId={verId}
+              wfApi={wfApi}
+              canEdit={!wfApi || !versions.find((v) => v.id === verId)?.isPublished}
+            />
           </TabsContent>
           <TabsContent value="rules">
-            <RulesTab versionId={verId} />
+            <RulesTab
+              versionId={verId}
+              wfApi={wfApi}
+              canEdit={!wfApi || !versions.find((v) => v.id === verId)?.isPublished}
+            />
           </TabsContent>
           <TabsContent value="actions">
-            <ActionsTab />
+            <ActionsTab wfApi={wfApi} />
           </TabsContent>
         </Tabs>
       )}
@@ -305,29 +405,60 @@ function DesignerPage() {
 // ============================================================
 // Stages
 // ============================================================
-function StagesTab({ versionId }: { versionId: string }) {
+function StagesTab({
+  versionId,
+  wfApi,
+  canEdit,
+}: {
+  versionId: string;
+  wfApi: boolean;
+  canEdit: boolean;
+}) {
   const stages = wfStore.stages
     .use()
     .filter((s) => s.workflowVersionId === versionId)
     .sort((a, b) => a.order - b.order);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const createStage = useCreateStage();
+  const updateStage = useUpdateStage();
+  const deleteStage = useDeleteStage();
 
   const add = () => {
     if (!name || !code) return toast.error("الاسم والرمز مطلوبان");
     const max = stages.reduce((m, s) => Math.max(m, s.order), 0);
-    const s: WorkflowStage = {
-      id: uid("s"),
-      workflowVersionId: versionId,
-      code,
-      name,
-      order: max + 1,
-    };
-    wfStore.stages.update((arr) => [...arr, s]);
+    if (wfApi) {
+      createStage.mutate(
+        { versionId: Number(versionId), body: { code, name, sort_order: max + 1 } },
+        {
+          onSuccess: () => toast.success("تم إضافة المرحلة"),
+          onError: () => toast.error("فشل إضافة المرحلة"),
+        },
+      );
+    } else {
+      const s: WorkflowStage = {
+        id: uid("s"),
+        workflowVersionId: versionId,
+        code,
+        name,
+        order: max + 1,
+      };
+      wfStore.stages.update((arr) => [...arr, s]);
+    }
     setName("");
     setCode("");
   };
   const remove = (id: string) => {
+    if (wfApi) {
+      deleteStage.mutate(
+        { stageId: Number(id) },
+        {
+          onSuccess: () => toast.success("تم حذف المرحلة"),
+          onError: () => toast.error("فشل حذف المرحلة"),
+        },
+      );
+      return;
+    }
     wfStore.stages.update((arr) => arr.filter((s) => s.id !== id));
     wfStore.transitions.update((arr) =>
       arr.filter((t) => t.fromStageId !== id && t.toStageId !== id),
@@ -337,22 +468,43 @@ function StagesTab({ versionId }: { versionId: string }) {
     wfStore.fieldRules.update((arr) => arr.filter((r) => r.stageId !== id));
   };
   const toggleFlag = (id: string, key: "isInitial" | "isFinal") => {
+    const current = stages.find((s) => s.id === id);
+    if (!current) return;
+    if (wfApi) {
+      const apiKey = key === "isInitial" ? "is_initial" : "is_final";
+      updateStage.mutate(
+        { stageId: Number(id), body: { [apiKey]: !current[key] } },
+        { onError: () => toast.error("فشل تحديث المرحلة") },
+      );
+      return;
+    }
     wfStore.stages.update((arr) => arr.map((s) => (s.id === id ? { ...s, [key]: !s[key] } : s)));
   };
   return (
     <div className="space-y-6">
       <Card className="p-5">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-          <Input
-            placeholder="رمز المرحلة (مثال: REVIEW)"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-          />
-          <Input placeholder="اسم المرحلة" value={name} onChange={(e) => setName(e.target.value)} />
-          <Button onClick={add}>
-            <Plus className="ms-1 h-4 w-4" /> إضافة مرحلة
-          </Button>
-        </div>
+        {canEdit && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <Input
+              placeholder="رمز المرحلة (مثال: REVIEW)"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+            />
+            <Input
+              placeholder="اسم المرحلة"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <Button onClick={add} disabled={createStage.isPending}>
+              <Plus className="ms-1 h-4 w-4" /> إضافة مرحلة
+            </Button>
+          </div>
+        )}
+        {wfApi && !canEdit && (
+          <p className="mb-4 text-sm text-muted-foreground">
+            هذه النسخة منشورة — لا يمكن تعديل مراحلها. أنشئ نسخة جديدة للتعديل.
+          </p>
+        )}
         <Table>
           <TableHeader>
             <TableRow>
@@ -361,7 +513,7 @@ function StagesTab({ versionId }: { versionId: string }) {
               <TableHead>الاسم</TableHead>
               <TableHead>بداية</TableHead>
               <TableHead>نهاية</TableHead>
-              <TableHead></TableHead>
+              {canEdit && <TableHead></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -373,20 +525,24 @@ function StagesTab({ versionId }: { versionId: string }) {
                 <TableCell>
                   <Switch
                     checked={!!s.isInitial}
+                    disabled={!canEdit}
                     onCheckedChange={() => toggleFlag(s.id, "isInitial")}
                   />
                 </TableCell>
                 <TableCell>
                   <Switch
                     checked={!!s.isFinal}
+                    disabled={!canEdit}
                     onCheckedChange={() => toggleFlag(s.id, "isFinal")}
                   />
                 </TableCell>
-                <TableCell>
-                  <Button size="icon" variant="ghost" onClick={() => remove(s.id)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </TableCell>
+                {canEdit && (
+                  <TableCell>
+                    <Button size="icon" variant="ghost" onClick={() => remove(s.id)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>
@@ -410,9 +566,15 @@ function StageRoutingTab({ versionId }: { versionId: string }) {
     () => getEffectiveStageRoutingRules(versionId),
     [versionId, manualRules, assignments, stages],
   );
-  const orgs = orgsCell.use().filter((o) => o.active);
-  const teamsAll = teamsCell.use().filter((t) => t.active);
-  const rolesAll = roleCatalogCell.use().filter((r) => r.active);
+  const liveOrgs = isApiEnabled("organizations");
+  const liveTeams = isApiEnabled("teams");
+  const liveRoles = isApiEnabled("roles");
+  const orgsQuery = useOrganizationsQuery(liveOrgs);
+  const teamsQuery = useTeamsQuery(liveTeams);
+  const rolesQuery = useRolesQuery(liveRoles);
+  const orgs = (liveOrgs ? orgsQuery.data : orgsCell.use())?.filter((o) => o.active) ?? [];
+  const teamsAll = (liveTeams ? teamsQuery.data : teamsCell.use())?.filter((t) => t.active) ?? [];
+  const rolesAll = (liveRoles ? rolesQuery.data : roleCatalogCell.use())?.filter((r) => r.active) ?? [];
   const wfOrgs = wfStore.orgs.use();
   const wfRoles = wfStore.roles.use();
 
@@ -913,84 +1075,129 @@ function AudienceDialog({ group, onClose }: { group: StageGroup; onClose: () => 
 // ============================================================
 // Transitions
 // ============================================================
-function TransitionsTab({ versionId }: { versionId: string }) {
+function TransitionsTab({
+  versionId,
+  wfApi,
+  canEdit,
+}: {
+  versionId: string;
+  wfApi: boolean;
+  canEdit: boolean;
+}) {
   const stages = wfStore.stages.use().filter((s) => s.workflowVersionId === versionId);
   const actions = wfStore.actions.use();
   const transitions = wfStore.transitions.use().filter((t) => t.workflowVersionId === versionId);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [actCode, setActCode] = useState("");
+  const createTransition = useCreateTransition();
+  const deleteTransition = useDeleteTransition();
 
   const add = () => {
     if (!from || !to || !actCode) return toast.error("يجب اختيار: من، إلى، الإجراء");
     const action = actions.find((a) => a.code === actCode);
-    const t: WorkflowTransition = {
-      id: uid("t"),
-      workflowVersionId: versionId,
-      fromStageId: from,
-      toStageId: to,
-      actionCode: actCode,
-      actionName: action?.name ?? actCode,
-    };
-    wfStore.transitions.update((arr) => [...arr, t]);
+    if (wfApi) {
+      createTransition.mutate(
+        {
+          versionId: Number(versionId),
+          body: {
+            from_stage_id: Number(from),
+            to_stage_id: Number(to),
+            action_id: Number(action?.id),
+          },
+        },
+        {
+          onSuccess: () => toast.success("تم إضافة الانتقال"),
+          onError: () => toast.error("فشل إضافة الانتقال"),
+        },
+      );
+    } else {
+      const t: WorkflowTransition = {
+        id: uid("t"),
+        workflowVersionId: versionId,
+        fromStageId: from,
+        toStageId: to,
+        actionCode: actCode,
+        actionName: action?.name ?? actCode,
+      };
+      wfStore.transitions.update((arr) => [...arr, t]);
+    }
     setFrom("");
     setTo("");
     setActCode("");
   };
-  const remove = (id: string) =>
+  const remove = (id: string) => {
+    if (wfApi) {
+      deleteTransition.mutate(
+        { transitionId: Number(id) },
+        {
+          onSuccess: () => toast.success("تم حذف الانتقال"),
+          onError: () => toast.error("فشل حذف الانتقال"),
+        },
+      );
+      return;
+    }
     wfStore.transitions.update((arr) => arr.filter((t) => t.id !== id));
+  };
   const sName = (id: string) => stages.find((s) => s.id === id)?.name ?? id;
 
   return (
     <Card className="p-5">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-        <Select value={from} onValueChange={setFrom}>
-          <SelectTrigger>
-            <SelectValue placeholder="من مرحلة..." />
-          </SelectTrigger>
-          <SelectContent>
-            {stages.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {s.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={actCode} onValueChange={setActCode}>
-          <SelectTrigger>
-            <SelectValue placeholder="عند الإجراء..." />
-          </SelectTrigger>
-          <SelectContent>
-            {actions.map((a) => (
-              <SelectItem key={a.code} value={a.code}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={to} onValueChange={setTo}>
-          <SelectTrigger>
-            <SelectValue placeholder="إلى مرحلة..." />
-          </SelectTrigger>
-          <SelectContent>
-            {stages.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {s.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button onClick={add}>
-          <Plus className="ms-1 h-4 w-4" /> إضافة
-        </Button>
-      </div>
+      {canEdit && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+          <Select value={from} onValueChange={setFrom}>
+            <SelectTrigger>
+              <SelectValue placeholder="من مرحلة..." />
+            </SelectTrigger>
+            <SelectContent>
+              {stages.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={actCode} onValueChange={setActCode}>
+            <SelectTrigger>
+              <SelectValue placeholder="عند الإجراء..." />
+            </SelectTrigger>
+            <SelectContent>
+              {actions.map((a) => (
+                <SelectItem key={a.code} value={a.code}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={to} onValueChange={setTo}>
+            <SelectTrigger>
+              <SelectValue placeholder="إلى مرحلة..." />
+            </SelectTrigger>
+            <SelectContent>
+              {stages.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button onClick={add} disabled={createTransition.isPending}>
+            <Plus className="ms-1 h-4 w-4" /> إضافة
+          </Button>
+        </div>
+      )}
+      {!canEdit && (
+        <p className="mb-4 text-sm text-muted-foreground">
+          هذه النسخة منشورة — لا يمكن تعديل انتقالاتها. أنشئ نسخة جديدة للتعديل.
+        </p>
+      )}
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>من</TableHead>
             <TableHead>الإجراء</TableHead>
             <TableHead>إلى</TableHead>
-            <TableHead></TableHead>
+            {canEdit && <TableHead></TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -1001,11 +1208,13 @@ function TransitionsTab({ versionId }: { versionId: string }) {
                 <Badge variant="outline">{t.actionName}</Badge>
               </TableCell>
               <TableCell>{sName(t.toStageId)}</TableCell>
-              <TableCell>
-                <Button size="icon" variant="ghost" onClick={() => remove(t.id)}>
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </TableCell>
+              {canEdit && (
+                <TableCell>
+                  <Button size="icon" variant="ghost" onClick={() => remove(t.id)}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>
@@ -1017,15 +1226,31 @@ function TransitionsTab({ versionId }: { versionId: string }) {
 // ============================================================
 // Assignments
 // ============================================================
-function AssignmentsTab({ versionId }: { versionId: string }) {
+function AssignmentsTab({
+  versionId,
+  wfApi,
+  canEdit,
+}: {
+  versionId: string;
+  wfApi: boolean;
+  canEdit: boolean;
+}) {
   const stages = wfStore.stages.use().filter((s) => s.workflowVersionId === versionId);
-  const orgs = orgsCell.use().filter((o) => o.active);
-  const teamsAll = teamsCell.use().filter((t) => t.active);
-  const rolesAll = roleCatalogCell.use().filter((r) => r.active);
+  const orgsApi = isApiEnabled("organizations");
+  const teamsApiEnabled = isApiEnabled("teams");
+  const rolesApiEnabled = isApiEnabled("roles");
+  const orgsQuery = useOrganizationsQuery(wfApi && orgsApi);
+  const teamsQuery = useTeamsQuery(wfApi && teamsApiEnabled);
+  const rolesQuery = useRolesQuery(wfApi && rolesApiEnabled);
+  const orgs = (wfApi && orgsApi ? orgsQuery.data : orgsCell.use())?.filter((o) => o.active) ?? [];
+  const teamsAll = (wfApi && teamsApiEnabled ? teamsQuery.data : teamsCell.use())?.filter((t) => t.active) ?? [];
+  const rolesAll = (wfApi && rolesApiEnabled ? rolesQuery.data : roleCatalogCell.use())?.filter((r) => r.active) ?? [];
   const users = wfStore.users.use();
   const wfOrgs = wfStore.orgs.use();
   const wfRoles = wfStore.roles.use();
   const assigns = wfStore.assignments.use().filter((a) => stages.some((s) => s.id === a.stageId));
+  const createPermission = useCreateStagePermission();
+  const deletePermission = useDeleteStagePermission();
 
   const [stageId, setStageId] = useState("");
   const [orgId, setOrgId] = useState("");
@@ -1043,27 +1268,61 @@ function AssignmentsTab({ versionId }: { versionId: string }) {
   const NONE = "__none__";
   const add = () => {
     if (!stageId) return toast.error("اختر مرحلة");
-    const a: StageAssignment = {
-      id: uid("a"),
-      stageId,
-      organizationId: orgId && orgId !== NONE ? toEngineOrgId(orgId) : undefined,
-      teamId: teamId && teamId !== NONE ? teamId : undefined,
-      roleId: roleId && roleId !== NONE ? toEngineRoleId(roleId) : undefined,
-      userId: userId && userId !== NONE ? userId : undefined,
-      viewOnly,
-    };
-    if (!a.organizationId && !a.teamId && !a.roleId && !a.userId) {
+    const organizationId = orgId && orgId !== NONE ? toEngineOrgId(orgId) : undefined;
+    const finalTeamId = teamId && teamId !== NONE ? teamId : undefined;
+    const finalRoleId = roleId && roleId !== NONE ? toEngineRoleId(roleId) : undefined;
+    const finalUserId = userId && userId !== NONE ? userId : undefined;
+    if (!organizationId && !finalTeamId && !finalRoleId && !finalUserId) {
       return toast.error("حدّد على الأقل جهة/فريق/دور/مستخدم");
     }
-    wfStore.assignments.update((arr) => [...arr, a]);
+    if (wfApi) {
+      createPermission.mutate(
+        {
+          stageId: Number(stageId),
+          body: {
+            organization_id: organizationId ? Number(organizationId) : null,
+            team_id: finalTeamId ? Number(finalTeamId) : null,
+            role_id: finalRoleId ? Number(finalRoleId) : null,
+            user_id: finalUserId ? Number(finalUserId) : null,
+            access_level: viewOnly ? "VIEW" : "EXECUTE",
+          },
+        },
+        {
+          onSuccess: () => toast.success("تم إضافة الصلاحية"),
+          onError: () => toast.error("فشل إضافة الصلاحية"),
+        },
+      );
+    } else {
+      const a: StageAssignment = {
+        id: uid("a"),
+        stageId,
+        organizationId,
+        teamId: finalTeamId,
+        roleId: finalRoleId,
+        userId: finalUserId,
+        viewOnly,
+      };
+      wfStore.assignments.update((arr) => [...arr, a]);
+    }
     setOrgId("");
     setTeamId("");
     setRoleId("");
     setUserId("");
     setViewOnly(false);
   };
-  const remove = (id: string) =>
+  const remove = (id: string, stageIdForRow: string) => {
+    if (wfApi) {
+      deletePermission.mutate(
+        { stageId: Number(stageIdForRow), permissionId: Number(id) },
+        {
+          onSuccess: () => toast.success("تم حذف الصلاحية"),
+          onError: () => toast.error("فشل حذف الصلاحية"),
+        },
+      );
+      return;
+    }
     wfStore.assignments.update((arr) => arr.filter((x) => x.id !== id));
+  };
 
   const orgLabel = (id?: string) =>
     orgs.find((o) => o.id === id)?.label ?? wfOrgs.find((o) => o.id === id)?.name ?? "—";
@@ -1073,86 +1332,93 @@ function AssignmentsTab({ versionId }: { versionId: string }) {
 
   return (
     <Card className="p-5">
-      <div className="grid grid-cols-1 md:grid-cols-7 gap-3 mb-4 items-end">
-        <Select value={stageId} onValueChange={setStageId}>
-          <SelectTrigger>
-            <SelectValue placeholder="المرحلة..." />
-          </SelectTrigger>
-          <SelectContent>
-            {stages.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {s.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={orgId}
-          onValueChange={(v) => {
-            setOrgId(v);
-            setTeamId("");
-            setRoleId("");
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="الجهة" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>— أي —</SelectItem>
-            {orgs.map((o) => (
-              <SelectItem key={o.id} value={o.id}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={teamId} onValueChange={setTeamId}>
-          <SelectTrigger>
-            <SelectValue placeholder="الفريق" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>— أي —</SelectItem>
-            {teams.map((t) => (
-              <SelectItem key={t.id} value={t.id}>
-                {t.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={roleId} onValueChange={setRoleId}>
-          <SelectTrigger>
-            <SelectValue placeholder="الدور" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>— أي —</SelectItem>
-            {roles.map((r) => (
-              <SelectItem key={r.id} value={r.id}>
-                {r.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={userId} onValueChange={setUserId}>
-          <SelectTrigger>
-            <SelectValue placeholder="مستخدم محدّد" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>— أي —</SelectItem>
-            {users.map((u) => (
-              <SelectItem key={u.id} value={u.id}>
-                {u.fullName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div className="flex items-center gap-2">
-          <Switch checked={viewOnly} onCheckedChange={setViewOnly} />
-          <Label>عرض فقط</Label>
+      {canEdit && (
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-3 mb-4 items-end">
+          <Select value={stageId} onValueChange={setStageId}>
+            <SelectTrigger>
+              <SelectValue placeholder="المرحلة..." />
+            </SelectTrigger>
+            <SelectContent>
+              {stages.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={orgId}
+            onValueChange={(v) => {
+              setOrgId(v);
+              setTeamId("");
+              setRoleId("");
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="الجهة" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>— أي —</SelectItem>
+              {orgs.map((o) => (
+                <SelectItem key={o.id} value={o.id}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={teamId} onValueChange={setTeamId}>
+            <SelectTrigger>
+              <SelectValue placeholder="الفريق" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>— أي —</SelectItem>
+              {teams.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={roleId} onValueChange={setRoleId}>
+            <SelectTrigger>
+              <SelectValue placeholder="الدور" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>— أي —</SelectItem>
+              {roles.map((r) => (
+                <SelectItem key={r.id} value={r.id}>
+                  {r.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={userId} onValueChange={setUserId}>
+            <SelectTrigger>
+              <SelectValue placeholder="مستخدم محدّد" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>— أي —</SelectItem>
+              {users.map((u) => (
+                <SelectItem key={u.id} value={u.id}>
+                  {u.fullName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex items-center gap-2">
+            <Switch checked={viewOnly} onCheckedChange={setViewOnly} />
+            <Label>عرض فقط</Label>
+          </div>
+          <Button onClick={add} disabled={createPermission.isPending}>
+            <Plus className="ms-1 h-4 w-4" /> إضافة
+          </Button>
         </div>
-        <Button onClick={add}>
-          <Plus className="ms-1 h-4 w-4" /> إضافة
-        </Button>
-      </div>
+      )}
+      {!canEdit && (
+        <p className="mb-4 text-sm text-muted-foreground">
+          هذه النسخة منشورة — لا يمكن تعديل صلاحياتها. أنشئ نسخة جديدة للتعديل.
+        </p>
+      )}
       <Table>
         <TableHeader>
           <TableRow>
@@ -1162,7 +1428,7 @@ function AssignmentsTab({ versionId }: { versionId: string }) {
             <TableHead>الدور</TableHead>
             <TableHead>المستخدم</TableHead>
             <TableHead>النوع</TableHead>
-            <TableHead></TableHead>
+            {canEdit && <TableHead></TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -1176,11 +1442,13 @@ function AssignmentsTab({ versionId }: { versionId: string }) {
               <TableCell>
                 {a.viewOnly ? <Badge variant="outline">عرض</Badge> : <Badge>تنفيذ</Badge>}
               </TableCell>
-              <TableCell>
-                <Button size="icon" variant="ghost" onClick={() => remove(a.id)}>
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </TableCell>
+              {canEdit && (
+                <TableCell>
+                  <Button size="icon" variant="ghost" onClick={() => remove(a.id, a.stageId)}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>
@@ -1194,7 +1462,15 @@ function AssignmentsTab({ versionId }: { versionId: string }) {
 // ============================================================
 const NO_GROUP = "__none";
 
-function FieldsTab({ versionId }: { versionId: string }) {
+function FieldsTab({
+  versionId,
+  wfApi,
+  canEdit,
+}: {
+  versionId: string;
+  wfApi: boolean;
+  canEdit: boolean;
+}) {
   const fields = wfStore.fieldDefs.use().filter((f) => f.workflowVersionId === versionId);
   const groups = wfStore.fieldGroups
     .use()
@@ -1210,6 +1486,11 @@ function FieldsTab({ versionId }: { versionId: string }) {
   );
   const [groupId, setGroupId] = useState<string>(NO_GROUP);
   const [groupName, setGroupName] = useState("");
+  const createField = useCreateField();
+  const updateField = useUpdateField();
+  const deleteField = useDeleteField();
+  const createFieldGroup = useCreateFieldGroup();
+  const deleteFieldGroup = useDeleteFieldGroup();
   // Merchant name and linked company are derived from the tax number, so they
   // are not offered as dynamic-list sources — only reference tables are.
   const dynamicSourceOptions = useMemo(
@@ -1235,24 +1516,50 @@ function FieldsTab({ versionId }: { versionId: string }) {
       type === "dynamic_select" && isReferenceSourceValue(sourceValue)
         ? referenceKeyFromSourceValue(sourceValue)
         : undefined;
-    const f: FieldDefinition = {
-      id: uid("fd"),
-      workflowVersionId: versionId,
-      key,
-      label,
-      type,
-      options:
-        type === "select"
-          ? options
-              .split(",")
-              .map((o) => o.trim())
-              .filter(Boolean)
-          : undefined,
-      referenceTableKey: dynamicReferenceKey,
-      sourceTable: dynamicSource,
-      groupId: groupId === NO_GROUP ? undefined : groupId,
-    };
-    wfStore.fieldDefs.update((arr) => [...arr, f]);
+    const fieldOptions =
+      type === "select"
+        ? options
+            .split(",")
+            .map((o) => o.trim())
+            .filter(Boolean)
+        : undefined;
+    if (wfApi) {
+      const referenceTableId =
+        dynamicReferenceKey && isReferenceSourceValue(sourceValue)
+          ? referenceTables.find((t) => t.key === dynamicReferenceKey)?.id
+          : undefined;
+      createField.mutate(
+        {
+          versionId: Number(versionId),
+          body: {
+            field_group_id: groupId === NO_GROUP ? null : Number(groupId),
+            key,
+            label,
+            type: type.toUpperCase(),
+            options: fieldOptions ?? null,
+            reference_table_id: referenceTableId ? Number(referenceTableId) : null,
+            dynamic_source: dynamicSource === "reference_data" ? null : (dynamicSource ?? null),
+          },
+        },
+        {
+          onSuccess: () => toast.success("تم إضافة الحقل"),
+          onError: () => toast.error("فشل إضافة الحقل"),
+        },
+      );
+    } else {
+      const f: FieldDefinition = {
+        id: uid("fd"),
+        workflowVersionId: versionId,
+        key,
+        label,
+        type,
+        options: fieldOptions,
+        referenceTableKey: dynamicReferenceKey,
+        sourceTable: dynamicSource,
+        groupId: groupId === NO_GROUP ? undefined : groupId,
+      };
+      wfStore.fieldDefs.update((arr) => [...arr, f]);
+    }
     setKey("");
     setLabel("");
     setOptions("");
@@ -1266,10 +1573,27 @@ function FieldsTab({ versionId }: { versionId: string }) {
     const f = fields.find((x) => x.id === id);
     if (!f) return;
     if (f.system) return toast.error("لا يمكن حذف حقل افتراضي من النظام");
+    if (wfApi) {
+      deleteField.mutate(
+        { fieldId: Number(id) },
+        {
+          onSuccess: () => toast.success("تم حذف الحقل"),
+          onError: () => toast.error("فشل حذف الحقل (قد يكون مستخدما في قواعد الحقول)"),
+        },
+      );
+      return;
+    }
     wfStore.fieldDefs.update((arr) => arr.filter((x) => x.id !== id));
     wfStore.fieldRules.update((arr) => arr.filter((r) => r.fieldKey !== f.key));
   };
   const setFieldGroup = (id: string, gid: string) => {
+    if (wfApi) {
+      updateField.mutate(
+        { fieldId: Number(id), body: { field_group_id: gid === NO_GROUP ? null : Number(gid) } },
+        { onError: () => toast.error("فشل تحديث المجموعة") },
+      );
+      return;
+    }
     wfStore.fieldDefs.update((arr) =>
       arr.map((x) => (x.id === id ? { ...x, groupId: gid === NO_GROUP ? undefined : gid } : x)),
     );
@@ -1278,21 +1602,42 @@ function FieldsTab({ versionId }: { versionId: string }) {
   const addGroup = () => {
     if (!groupName.trim()) return toast.error("اسم المجموعة مطلوب");
     const max = groups.reduce((m, g) => Math.max(m, g.order), 0);
-    wfStore.fieldGroups.update((arr) => [
-      ...arr,
-      {
-        id: uid("fg"),
-        workflowVersionId: versionId,
-        name: groupName.trim(),
-        order: max + 1,
-      },
-    ]);
+    if (wfApi) {
+      const code = groupName.trim().toLowerCase().replace(/\s+/g, "_");
+      createFieldGroup.mutate(
+        { versionId: Number(versionId), body: { code, label: groupName.trim(), sort_order: max + 1 } },
+        {
+          onSuccess: () => toast.success("تمت إضافة المجموعة"),
+          onError: () => toast.error("فشل إضافة المجموعة"),
+        },
+      );
+    } else {
+      wfStore.fieldGroups.update((arr) => [
+        ...arr,
+        {
+          id: uid("fg"),
+          workflowVersionId: versionId,
+          name: groupName.trim(),
+          order: max + 1,
+        },
+      ]);
+      toast.success("تمت إضافة المجموعة");
+    }
     setGroupName("");
-    toast.success("تمت إضافة المجموعة");
   };
   const removeGroup = (id: string) => {
     const group = groups.find((g) => g.id === id);
     if (group?.system) return toast.error("لا يمكن حذف مجموعة حقول افتراضية من النظام");
+    if (wfApi) {
+      deleteFieldGroup.mutate(
+        { groupId: Number(id) },
+        {
+          onSuccess: () => toast.success("تم حذف المجموعة"),
+          onError: () => toast.error("فشل حذف المجموعة (قد تحتوي على حقول)"),
+        },
+      );
+      return;
+    }
     wfStore.fieldGroups.update((arr) => arr.filter((g) => g.id !== id));
     wfStore.fieldDefs.update((arr) =>
       arr.map((f) => (f.groupId === id ? { ...f, groupId: undefined } : f)),
@@ -1305,6 +1650,10 @@ function FieldsTab({ versionId }: { versionId: string }) {
     if (swap < 0 || swap >= groups.length) return;
     const a = groups[idx],
       b = groups[swap];
+    if (wfApi) {
+      toast.error("إعادة الترتيب غير متاحة عبر الواجهة بعد لهذا المصدر");
+      return;
+    }
     wfStore.fieldGroups.update((arr) =>
       arr.map((g) =>
         g.id === a.id ? { ...g, order: b.order } : g.id === b.id ? { ...g, order: a.order } : g,
@@ -1324,17 +1673,19 @@ function FieldsTab({ versionId }: { versionId: string }) {
           كل مجموعة تظهر كتبويب في شاشة الطلب (عرض/تعديل/إضافة). الحقول بدون مجموعة تظهر في تبويب
           «عام».
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-          <Input
-            placeholder="اسم المجموعة (مثال: بيانات مقدم الطلب)"
-            value={groupName}
-            onChange={(e) => setGroupName(e.target.value)}
-            className="md:col-span-3"
-          />
-          <Button onClick={addGroup}>
-            <Plus className="ms-1 h-4 w-4" /> إضافة مجموعة
-          </Button>
-        </div>
+        {canEdit && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+            <Input
+              placeholder="اسم المجموعة (مثال: بيانات مقدم الطلب)"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              className="md:col-span-3"
+            />
+            <Button onClick={addGroup} disabled={createFieldGroup.isPending}>
+              <Plus className="ms-1 h-4 w-4" /> إضافة مجموعة
+            </Button>
+          </div>
+        )}
         {groups.length === 0 ? (
           <p className="text-sm text-muted-foreground">لا توجد مجموعات بعد.</p>
         ) : (
@@ -1349,23 +1700,27 @@ function FieldsTab({ versionId }: { versionId: string }) {
                 <span className="text-xs text-muted-foreground">
                   {fields.filter((f) => f.groupId === g.id).length} حقل
                 </span>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => moveGroup(g.id, -1)}
-                  disabled={i === 0}
-                >
-                  <ChevronUp className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => moveGroup(g.id, 1)}
-                  disabled={i === groups.length - 1}
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-                {!g.system && (
+                {canEdit && !wfApi && (
+                  <>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => moveGroup(g.id, -1)}
+                      disabled={i === 0}
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => moveGroup(g.id, 1)}
+                      disabled={i === groups.length - 1}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+                {canEdit && !g.system && (
                   <Button size="icon" variant="ghost" onClick={() => removeGroup(g.id)}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -1378,69 +1733,80 @@ function FieldsTab({ versionId }: { versionId: string }) {
 
       {/* Fields */}
       <Card className="p-5">
-        <div className="grid grid-cols-1 md:grid-cols-7 gap-3 mb-4">
-          <Input
-            placeholder="مفتاح الحقل (مثال: amount)"
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-          />
-          <Input placeholder="اسم العرض" value={label} onChange={(e) => setLabel(e.target.value)} />
-          <Select value={type} onValueChange={(v) => setType(v as FieldDefinition["type"])}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {FIELD_TYPES.map((t) => (
-                <SelectItem key={t.value} value={t.value}>
-                  {t.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={groupId} onValueChange={setGroupId}>
-            <SelectTrigger>
-              <SelectValue placeholder="المجموعة" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_GROUP}>بدون مجموعة (عام)</SelectItem>
-              {groups.map((g) => (
-                <SelectItem key={g.id} value={g.id}>
-                  {g.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {type === "dynamic_select" ? (
-            <div className="md:col-span-2">
-              <Select
-                value={sourceValue}
-                onValueChange={(v) => setSourceValue(v as DynamicSourceOption)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="المصدر" />
-                </SelectTrigger>
-                <SelectContent>
-                  {dynamicSourceOptions.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : type === "select" ? (
+        {canEdit && (
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-3 mb-4">
             <Input
-              key="manual-options"
-              placeholder="خيارات (لـ القائمة، مفصولة بفواصل)"
-              value={options}
-              onChange={(e) => setOptions(e.target.value)}
-              className="md:col-span-2"
+              placeholder="مفتاح الحقل (مثال: amount)"
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
             />
-          ) : null}
-          <Button onClick={add}>
-            <Plus className="ms-1 h-4 w-4" /> إضافة حقل
-          </Button>
-        </div>
+            <Input
+              placeholder="اسم العرض"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+            />
+            <Select value={type} onValueChange={(v) => setType(v as FieldDefinition["type"])}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FIELD_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={groupId} onValueChange={setGroupId}>
+              <SelectTrigger>
+                <SelectValue placeholder="المجموعة" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_GROUP}>بدون مجموعة (عام)</SelectItem>
+                {groups.map((g) => (
+                  <SelectItem key={g.id} value={g.id}>
+                    {g.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {type === "dynamic_select" ? (
+              <div className="md:col-span-2">
+                <Select
+                  value={sourceValue}
+                  onValueChange={(v) => setSourceValue(v as DynamicSourceOption)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="المصدر" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dynamicSourceOptions.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : type === "select" ? (
+              <Input
+                key="manual-options"
+                placeholder="خيارات (لـ القائمة، مفصولة بفواصل)"
+                value={options}
+                onChange={(e) => setOptions(e.target.value)}
+                className="md:col-span-2"
+              />
+            ) : null}
+            <Button onClick={add} disabled={createField.isPending}>
+              <Plus className="ms-1 h-4 w-4" /> إضافة حقل
+            </Button>
+          </div>
+        )}
+        {!canEdit && (
+          <p className="mb-4 text-sm text-muted-foreground">
+            هذه النسخة منشورة — لا يمكن تعديل حقولها. أنشئ نسخة جديدة للتعديل.
+          </p>
+        )}
         <Table>
           <TableHeader>
             <TableRow>
@@ -1469,6 +1835,7 @@ function FieldsTab({ versionId }: { versionId: string }) {
                   <Select
                     value={f.groupId ?? NO_GROUP}
                     onValueChange={(v) => setFieldGroup(f.id, v)}
+                    disabled={!canEdit}
                   >
                     <SelectTrigger className="h-8 w-44 text-xs">
                       <SelectValue />
@@ -1491,7 +1858,7 @@ function FieldsTab({ versionId }: { versionId: string }) {
                     : (f.options?.join("، ") ?? "—")}
                 </TableCell>
                 <TableCell>
-                  {!f.system && (
+                  {canEdit && !f.system && (
                     <Button size="icon" variant="ghost" onClick={() => remove(f.id)}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
@@ -1509,7 +1876,15 @@ function FieldsTab({ versionId }: { versionId: string }) {
 // ============================================================
 // Rules grid (stage × field)
 // ============================================================
-function RulesTab({ versionId }: { versionId: string }) {
+function RulesTab({
+  versionId,
+  wfApi,
+  canEdit,
+}: {
+  versionId: string;
+  wfApi: boolean;
+  canEdit: boolean;
+}) {
   const stages = wfStore.stages
     .use()
     .filter((s) => s.workflowVersionId === versionId)
@@ -1518,11 +1893,27 @@ function RulesTab({ versionId }: { versionId: string }) {
   const rules = wfStore.fieldRules.use();
   const [stageId, setStageId] = useState(stages[0]?.id ?? "");
   if (stageId && !stages.find((s) => s.id === stageId)) setStageId(stages[0]?.id ?? "");
+  const updateStageFieldRules = useUpdateStageFieldRules();
 
   const ruleFor = (fieldKey: string): FieldRule | undefined =>
     rules.find((r) => r.stageId === stageId && r.fieldKey === fieldKey);
 
   const upsert = (fieldKey: string, patch: Partial<FieldRule>) => {
+    if (wfApi) {
+      const nextRules = fields.map((f) => {
+        const r = ruleFor(f.key);
+        const merged =
+          f.key === fieldKey
+            ? { visible: r?.visible ?? true, editable: r?.editable ?? true, required: r?.required ?? false, ...patch }
+            : { visible: r?.visible ?? true, editable: r?.editable ?? true, required: r?.required ?? false };
+        return { field_id: Number(f.id), is_visible: merged.visible, is_editable: merged.editable, is_required: merged.required };
+      });
+      updateStageFieldRules.mutate(
+        { stageId: Number(stageId), rules: nextRules },
+        { onError: () => toast.error("فشل تحديث قواعد الحقول") },
+      );
+      return;
+    }
     const existing = ruleFor(fieldKey);
     if (existing) {
       wfStore.fieldRules.update((arr) =>
@@ -1561,6 +1952,11 @@ function RulesTab({ versionId }: { versionId: string }) {
           </SelectContent>
         </Select>
       </div>
+      {!canEdit && (
+        <p className="mb-4 text-sm text-muted-foreground">
+          هذه النسخة منشورة — لا يمكن تعديل قواعد حقولها. أنشئ نسخة جديدة للتعديل.
+        </p>
+      )}
       <Table>
         <TableHeader>
           <TableRow>
@@ -1583,13 +1979,25 @@ function RulesTab({ versionId }: { versionId: string }) {
                   <div className="text-xs font-mono text-muted-foreground">{f.key}</div>
                 </TableCell>
                 <TableCell>
-                  <Switch checked={v} onCheckedChange={(c) => upsert(f.key, { visible: c })} />
+                  <Switch
+                    checked={v}
+                    disabled={!canEdit}
+                    onCheckedChange={(c) => upsert(f.key, { visible: c })}
+                  />
                 </TableCell>
                 <TableCell>
-                  <Switch checked={e} onCheckedChange={(c) => upsert(f.key, { editable: c })} />
+                  <Switch
+                    checked={e}
+                    disabled={!canEdit}
+                    onCheckedChange={(c) => upsert(f.key, { editable: c })}
+                  />
                 </TableCell>
                 <TableCell>
-                  <Switch checked={q} onCheckedChange={(c) => upsert(f.key, { required: c })} />
+                  <Switch
+                    checked={q}
+                    disabled={!canEdit}
+                    onCheckedChange={(c) => upsert(f.key, { required: c })}
+                  />
                 </TableCell>
               </TableRow>
             );
@@ -1603,19 +2011,43 @@ function RulesTab({ versionId }: { versionId: string }) {
 // ============================================================
 // Actions library
 // ============================================================
-function ActionsTab() {
+function ActionsTab({ wfApi }: { wfApi: boolean }) {
   const actions = wfStore.actions.use();
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const createAction = useCreateAction();
+  const deleteAction = useDeleteAction();
 
   const add = () => {
     if (!code || !name) return toast.error("الرمز والاسم مطلوبان");
-    const a: WorkflowAction = { id: uid("act"), code, name, kind: "custom" };
-    wfStore.actions.update((arr) => [...arr, a]);
+    if (wfApi) {
+      createAction.mutate(
+        { body: { code, name, kind: "CUSTOM" } },
+        {
+          onSuccess: () => toast.success("تم إضافة الإجراء"),
+          onError: () => toast.error("فشل إضافة الإجراء"),
+        },
+      );
+    } else {
+      const a: WorkflowAction = { id: uid("act"), code, name, kind: "custom" };
+      wfStore.actions.update((arr) => [...arr, a]);
+    }
     setCode("");
     setName("");
   };
-  const remove = (id: string) => wfStore.actions.update((arr) => arr.filter((x) => x.id !== id));
+  const remove = (id: string) => {
+    if (wfApi) {
+      deleteAction.mutate(
+        { actionId: Number(id) },
+        {
+          onSuccess: () => toast.success("تم حذف الإجراء"),
+          onError: () => toast.error("فشل حذف الإجراء (قد يكون مستخدما في انتقال)"),
+        },
+      );
+      return;
+    }
+    wfStore.actions.update((arr) => arr.filter((x) => x.id !== id));
+  };
 
   return (
     <Card className="p-5">
@@ -1627,7 +2059,7 @@ function ActionsTab() {
           onChange={(e) => setName(e.target.value)}
           className="md:col-span-2"
         />
-        <Button onClick={add}>
+        <Button onClick={add} disabled={createAction.isPending}>
           <Plus className="ms-1 h-4 w-4" /> إضافة
         </Button>
       </div>

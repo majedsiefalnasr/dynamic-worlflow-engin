@@ -29,6 +29,8 @@ import { logout as apiLogout } from "@/lib/api/auth";
 import { notificationsCell, markAllRead, screenPermsCell, type ScreenKey } from "@/lib/governance";
 import { canScreen } from "@/lib/workflow-bridge";
 import { wfStore } from "@/lib/workflow-engine";
+import { isApiEnabled } from "@/lib/api/client";
+import { useWorkflowSync } from "@/lib/api/workflow-designer";
 import { RoleSwitcher } from "@/components/workflow/RoleSwitcher";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -98,6 +100,7 @@ export function AppShell() {
     return <Outlet />;
   }
 
+  useWorkflowSync(isApiEnabled("workflows"));
   screenPermsCell.use();
   wfStore.assignments.use();
   wfStore.versions.use();

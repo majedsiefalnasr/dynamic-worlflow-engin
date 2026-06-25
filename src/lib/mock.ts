@@ -114,6 +114,7 @@ export type User = {
   teamId?: TeamId;
   _orgId?: string;
   _teamId?: string;
+  _roleId?: string;
   _version?: number;
 };
 

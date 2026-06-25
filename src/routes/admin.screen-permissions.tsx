@@ -22,6 +22,9 @@ import {
 } from "@/lib/governance";
 import { requestsAccessForRole } from "@/lib/workflow-bridge";
 import { wfStore } from "@/lib/workflow-engine";
+import { isApiEnabled } from "@/lib/api/client";
+import { useRolesQuery } from "@/lib/api/roles";
+import { useUsersQuery } from "@/lib/api/users";
 
 export const Route = createFileRoute("/admin/screen-permissions")({
   component: () => (
@@ -75,12 +78,29 @@ const GROUPS: Group[] = [
 function ScreenPermissionsAdmin() {
   const { user } = useAuth();
   screenPermsCell.use();
+  const wfApi = isApiEnabled("workflows");
+  const rolesQuery = useRolesQuery(wfApi);
+  const usersQuery = useUsersQuery(wfApi);
   const roleCatalog = roleCatalogCell.use();
+  const liveRoles = rolesQuery.data;
+  const liveUsers = usersQuery.data;
   wfStore.assignments.use();
   wfStore.versions.use();
   const roleRows = roleCatalog
     .filter((r) => r.active && r.id !== "rc_platform_admin")
     .sort((a, b) => `${a.orgId}-${a.name}`.localeCompare(`${b.orgId}-${b.name}`));
+  const liveRoleByCode = new Map(
+    (liveRoles ?? []).map((r) => [r.code, r]),
+  );
+  const roleTeamIds = new Map<string, string[]>();
+  if (liveUsers) {
+    for (const u of liveUsers) {
+      if (!u._teamId) continue;
+      const arr = roleTeamIds.get(u.roleId) ?? [];
+      if (!arr.includes(u._teamId)) arr.push(u._teamId);
+      roleTeamIds.set(u.roleId, arr);
+    }
+  }
 
   function toggle(
     screen: ManualScreenKey,
@@ -187,7 +207,8 @@ function ScreenPermissionsAdmin() {
             </thead>
             <tbody>
               {roleRows.map((role) => {
-                const reqAccess = requestsAccessForRole(role.id);
+                const liveEntry = liveRoleByCode.get(role.id);
+                const reqAccess = requestsAccessForRole(role.id, liveEntry, roleTeamIds.get(role.id));
                 return (
                   <tr key={role.id} className="border-t hover:bg-muted/20">
                     <th

@@ -19,6 +19,7 @@ import {
   manualScreenCan,
   roleCatalogCell,
   teamsCell,
+  type RoleCatalogEntry,
   type ScreenCapability,
   type ScreenKey,
 } from "@/lib/governance";
@@ -49,6 +50,16 @@ const BUILTIN_ACCOUNT_TO_WF_USER: Record<string, string> = {
  */
 export function wfUserFromAccount(user: User | null | undefined): WfUser | null {
   if (!user) return null;
+  if (user._orgId) {
+    return {
+      id: `wfu_${user.id}`,
+      fullName: user.name,
+      email: user.email,
+      organizationId: user._orgId,
+      teamIds: user._teamId ? [user._teamId] : [],
+      roleIds: user._roleId ? [user._roleId] : [],
+    };
+  }
   const orgRaw = user.orgKind ?? "bank";
   const organizationId = ORG_ID_ALIASES[orgRaw] ?? orgRaw;
   const roleEngine = ROLE_ID_ALIASES[user.roleId] ?? user.roleId;
@@ -199,8 +210,22 @@ function accessForWfUser(wfUser: WfUser | null, isAdmin: boolean): RequestsAcces
 }
 
 // Role-based view, used by the screen-permissions matrix (one row per role).
-export function requestsAccessForRole(roleId: RoleId): RequestsAccess {
-  return accessForWfUser(wfUserForRole(roleId), roleId === "rc_platform_admin");
+// When live data is available, pass the full RoleCatalogEntry so numeric ids
+// from the backend are used directly (matching live StagePermission rows).
+export function requestsAccessForRole(roleId: RoleId, roleEntry?: RoleCatalogEntry, liveTeamIds?: string[]): RequestsAccess {
+  const isAdmin = roleId === "rc_platform_admin" || roleEntry?.code === "rc_platform_admin";
+  if (roleEntry) {
+    const wfUser: WfUser = {
+      id: `role_preview_${roleEntry.id}`,
+      fullName: roleEntry.name,
+      email: `${roleEntry.id}@role.local`,
+      organizationId: roleEntry.orgId,
+      teamIds: liveTeamIds ?? [],
+      roleIds: [roleEntry.id],
+    };
+    return accessForWfUser(wfUser, isAdmin);
+  }
+  return accessForWfUser(wfUserForRole(roleId), isAdmin);
 }
 
 // User-based view: reflects the user's actual org/team/role assignment, so
@@ -227,12 +252,13 @@ export function stringValue(value: unknown): string {
 export function isDuplicateInvoice(
   data: Record<string, unknown>,
   excludeInstanceId?: string,
+  allInstances?: WorkflowInstance[],
 ): { duplicate: boolean; refs: string[] } {
   const invoiceNumber = stringValue(data.invoiceNumber).trim();
   if (!invoiceNumber) {
     return { duplicate: false, refs: [] };
   }
-  const instances = wfStore.instances.get();
+  const instances = allInstances ?? wfStore.instances.get();
   const currentInstance = instances.find((instance) => instance.id === excludeInstanceId);
   const matches = instances.filter((inst) => {
     if (inst.id === excludeInstanceId) return false;

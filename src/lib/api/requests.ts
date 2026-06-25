@@ -130,13 +130,28 @@ interface RequestDetailDto extends RequestDto {
   }[];
 }
 
-function toDetailInstance(d: RequestDetailDto): WorkflowInstance & { _version: number; _merchantName: string } {
+function toDetailInstance(d: RequestDetailDto): WorkflowInstance & {
+  _version: number;
+  _merchantName: string;
+  _stageName: string;
+  _bankName: string;
+  _createdByName: string;
+} {
   const base = toInstance(d);
   if (d.merchant?.name && !base.data.importerName) base.data.importerName = d.merchant.name;
+  if (d.goods_description && !base.data.goodsDescription) base.data.goodsDescription = d.goods_description;
+  if (d.port_of_entry && !base.data.arrivalPort) base.data.arrivalPort = d.port_of_entry;
+  if (d.payment_terms && !base.data.paymentTerms) base.data.paymentTerms = d.payment_terms;
+  if (d.country_of_origin && !base.data.originCountry) base.data.originCountry = d.country_of_origin;
+  if (d.invoice_date && !base.data.invoiceDate) base.data.invoiceDate = d.invoice_date;
+  if (d.shipping_port && !base.data.shippingPort) base.data.shippingPort = d.shipping_port;
   return {
     ...base,
     _version: d.version ?? 0,
     _merchantName: d.merchant?.name ?? "",
+    _stageName: d.current_stage?.name ?? "",
+    _bankName: d.bank_name ?? "",
+    _createdByName: "",
   };
 }
 
