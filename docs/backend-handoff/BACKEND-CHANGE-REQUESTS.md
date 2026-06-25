@@ -329,27 +329,25 @@ This matches the PM's acceptance criterion exactly: bank 1 and bank 2 can each r
 
 | ID | Title | Priority | Status | Blocks |
 |---|---|---|---|---|
-| CR-01 | Workflow authoring write endpoints | P0 | Open | Workflow Designer |
+| CR-01 | Workflow authoring write endpoints | P0 | ✅ Closed (fix-db: draft guards + stage update fields) | Workflow Designer |
 | CR-02 | `POST /users` role field | P0 | ✅ Closed | all user creation |
 | CR-03 | activate/deactivate/suspend → 406 (+team delete) | P0 | ✅ Closed | status toggle (merchant/user fully) |
 | CR-03b | Role deactivate blocked while linked to users (backend-added) | — | ✅ Confirmed | data integrity |
-| CR-04 | Document + populate permissions payload | P1 | ⚠️ Partial — payload populated, OpenAPI still missing `/users` + `/roles` entirely | screen/action gating, typed client |
+| CR-04 | Document + populate permissions payload | P1 | ⚠️ Mostly closed (fix-db: OpenAPI for users/roles exists; screen_permissions shape still undocumented) | screen/action gating |
 | CR-05 | Auth completeness (MFA/refresh/password) | P1 | Open | real sign-in |
-| CR-06 | Enrich `GET /requests` row | P1 → **P0** | Open — model has fields, resources don't expose them (3-line fix) | **PM priority #5 sole blocker** |
-| CR-07 | Optimistic locking (`version`) | P1 | Open | safe concurrent edits |
+| CR-06 | Enrich `GET /requests` row | P0 | ✅ Closed (fix-db: reference_number bug fixed, workflow_version_id + current_stage + merchant added) | requests list + runtime |
+| CR-07 | Optimistic locking (`version`) | P1 | ✅ Closed (fix-db: banks + merchants enforce version; orgs/teams/roles already did) | safe concurrent edits |
 | CR-08 | Document nested write payloads | P2 | Open | merchants/permissions writes |
 | CR-09 | Standardize `meta` shape | P2 | Open | contract consistency |
 | CR-10 | OpenAPI accuracy | P2 | Open | typed client |
-| CR-11 | Seed non-admin permissions | P1 | Open — no `ScreenPermission` seeding found in `DemoDataSeeder` | testing non-admin roles |
-| CR-12 | Grant supporting-resource READ for multi-resource screens | P0 | Open — no distinct lookup-read grant found in code | merchants/roles/teams/banks for non-admin roles |
-| CR-13 | Merchant `tax_number` unique globally — must be unique per bank | P0 | ✅ Closed — scoped to `bank_id` (commit `30e7b74`) | merchant onboarding (PM priority #4) |
+| CR-11 | Seed non-admin permissions | P1 | ✅ Closed (fix-db: seedScreenPermissions for all 8 roles) | testing non-admin roles |
+| CR-12 | Grant supporting-resource READ for multi-resource screens | P0 | ✅ Closed (fix-db: lookup VIEW grants seeded per role) | merchants/roles/teams/banks for non-admin roles |
+| CR-13 | Merchant `tax_number` unique globally — must be unique per bank | P0 | ✅ Closed | merchant onboarding (PM priority #4) |
 
-**PM minimum-viable order (overrides the CR priority grouping above):** login → bank management → users → merchants → request creation + stage progression. Items 1-4 are now fully unblocked on the backend side (CR-02, CR-03, CR-13 all closed). Item 5 (requests) depends on CR-06 (request row enrichment).
+**All PM priority items (1-5) now unblocked.** Backend `fix-db` branch closes CR-01 (quality), CR-06, CR-07, CR-11, CR-12. See [HANDOFF-FIX-DB.md](HANDOFF-FIX-DB.md) for full details.
 
-**What's actually closed as of 2026-06-25:** CR-02 (users `role_id`), CR-03 (status actions + team delete-via-deactivate), CR-03b (role-in-use guard, bonus). CR-04 is half-done — the payload works, the documentation doesn't exist for `/users`/`/roles` at all.
+**What's closed as of 2026-06-25 (fix-db):** CR-01 (workflow writes + quality fixes), CR-02, CR-03/03b, CR-06 (request enrichment + reference_number fix), CR-07 (version enforcement on all resources), CR-11 (permission seeding for all 8 roles), CR-12 (lookup READ grants), CR-13. Frontend proxy now points at `http://localhost:8000`.
 
-**What's closed as of 2026-06-25 (latest):** CR-02 (users role_id), CR-03 (status actions), CR-03b (role-in-use guard), **CR-13 (merchant tax_number per-bank)**. All four PM priority items (login, banks, users, merchants) are now unblocked backend-side.
+**What's still open:** CR-04 (screen_permissions OpenAPI shape), CR-05 (MFA/refresh/password), CR-08/09/10 (documentation quality).
 
-**What's still blocking `VITE_API_RESOURCES=*`:** CR-01 (workflow authoring), CR-06 (request enrichment), CR-11/CR-12 (non-admin permission seeding + lookup reads).
-
-**Order of work (revised):** CR-12 / CR-11 (non-admin roles unusable without these) → CR-04 OpenAPI gap (needed for typed client generation) → CR-06 (requests — PM priority #5) → CR-01 (workflow authoring) → CR-05 (auth), with CR-07/08/09/10 as ongoing quality passes.
+**What's still blocking `VITE_API_RESOURCES=*`:** Only CR-05 (auth completeness — MFA flow needed to remove the demo login). All data screens are unblocked.

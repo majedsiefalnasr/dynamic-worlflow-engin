@@ -16,9 +16,9 @@ export default defineConfig({
     server: {
       proxy: {
         "/api": {
-          target: "https://cby2.ultimate-dev2.com",
+          target: "http://localhost:8000",
           changeOrigin: true,
-          secure: true,
+          secure: false,
         },
       },
     },
