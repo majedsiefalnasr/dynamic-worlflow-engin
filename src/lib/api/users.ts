@@ -50,6 +50,7 @@ function toUser(d: UserDto): User {
     id: String(d.id),
     name: d.name,
     email: d.email,
+    // CR-04 risk: if backend returns no `role` and falsy/0 `role_id`, fallback string won't match ROLE_LABELS; flagged here since RoleId is open union.
     roleId: (d.role?.code ?? String(d.role_id)) as RoleId,
     entityId: d.bank_id != null ? String(d.bank_id) : null,
     org: d.organization?.name ?? d.bank?.name ?? "",
@@ -117,6 +118,7 @@ export function useUserMutations() {
         }),
       onSuccess: invalidate,
     }),
+    // Callers must pass `_version` from freshly fetched User, not stale cached — backend's optimistic-lock on PATCH /users/{id} rejects 409 if version mismatch.
     update: useMutation({
       mutationFn: (input: {
         id: string;
