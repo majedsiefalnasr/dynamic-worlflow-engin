@@ -7,15 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -52,10 +43,13 @@ import {
 } from "@/lib/workflow-bridge";
 import { ScreenGuard } from "@/components/workflow/ScreenGuard";
 import { toast } from "sonner";
-import { ApiError, isApiEnabled } from "@/lib/api/client";
+import { isApiEnabled, ApiError } from "@/lib/api/client";
 import { useRequestsQuery, useRequestMutations, useWorkflowStagesQuery } from "@/lib/api/requests";
-import { useBanksQuery } from "@/lib/api/banks";
 import { useMerchantsQuery } from "@/lib/api/merchants";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/workflows/")({
   component: () => (
@@ -85,6 +79,13 @@ function WorkflowsHome() {
   const [q, setQ] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
   const [openCreate, setOpenCreate] = useState(false);
+  const [selectedMerchant, setSelectedMerchant] = useState("");
+
+  const merchantsQuery = useMerchantsQuery(requestsApi);
+  const bankMerchants = (merchantsQuery.data ?? []).filter(
+    (m) => !user?.entityId || m.entityId === user.entityId,
+  );
+  const mutations = useRequestMutations();
 
   const selectedDef = defs[0];
   const publishedVer = selectedDef ? getPublishedVersion(selectedDef.id) : undefined;
@@ -154,8 +155,8 @@ function WorkflowsHome() {
                 <FilePlus2 className="ms-1 h-4 w-4" /> طلب جديد
               </Button>
             )}
-            {requestsApi && (
-              <Button onClick={() => setOpenCreate(true)} disabled={!publishedVer}>
+            {requestsApi && user && (
+              <Button onClick={() => { setSelectedMerchant(""); setOpenCreate(true); }} disabled={!publishedVer}>
                 <FilePlus2 className="ms-1 h-4 w-4" /> طلب جديد
               </Button>
             )}
@@ -277,181 +278,57 @@ function WorkflowsHome() {
         )}
       </Card>
 
-      {requestsApi && publishedVer && (
-        <CreateRequestDialog
-          open={openCreate}
-          onOpenChange={setOpenCreate}
-          workflowVersionId={Number(publishedVer.id)}
-        />
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// Live request creation dialog (API path only)
-// ============================================================
-
-const CURRENCIES = ["USD", "EUR", "SAR", "YER"] as const;
-
-function CreateRequestDialog({
-  open,
-  onOpenChange,
-  workflowVersionId,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  workflowVersionId: number;
-}) {
-  const nav = useNavigate();
-  const mutations = useRequestMutations();
-
-  const banksQ = useBanksQuery(open);
-  const merchantsQ = useMerchantsQuery(open);
-
-  const [bankId, setBankId] = useState("");
-  const [merchantId, setMerchantId] = useState("");
-  const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState("USD");
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-
-  const filteredMerchants = useMemo(
-    () => (merchantsQ.data ?? []).filter((m) => m.entityId === bankId),
-    [merchantsQ.data, bankId],
-  );
-
-  const resetForm = () => {
-    setBankId("");
-    setMerchantId("");
-    setAmount("");
-    setCurrency("USD");
-    setInvoiceNumber("");
-  };
-
-  const handleSubmit = async () => {
-    if (!bankId || !merchantId) {
-      toast.error("اختر البنك والتاجر");
-      return;
-    }
-    try {
-      const result = await mutations.create.mutateAsync({
-        workflowVersionId,
-        bankId: Number(bankId),
-        merchantId: Number(merchantId),
-        amount: amount ? Number(amount) : undefined,
-        currency: currency || undefined,
-        invoiceNumber: invoiceNumber || undefined,
-      });
-      toast.success("تم إنشاء الطلب");
-      onOpenChange(false);
-      resetForm();
-      const newId = (result as { id?: number }).id;
-      if (newId != null) {
-        nav({ to: "/workflows/instances/$id", params: { id: String(newId) } });
-      }
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "تعذّر إنشاء الطلب");
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md" dir="rtl">
-        <DialogHeader>
-          <DialogTitle>إنشاء طلب جديد</DialogTitle>
-          <DialogDescription>أدخل بيانات الطلب ثم اضغط إنشاء.</DialogDescription>
-        </DialogHeader>
-
-        <div className="grid gap-4 py-2">
-          {/* Bank */}
-          <div className="grid gap-1.5">
-            <Label>البنك</Label>
-            <Select
-              value={bankId}
-              onValueChange={(v) => {
-                setBankId(v);
-                setMerchantId(""); // reset merchant when bank changes
+      {/* Live create: pick merchant then POST /requests */}
+      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+        <DialogContent dir="rtl" className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>إنشاء طلب جديد</DialogTitle>
+            <DialogDescription>اختر التاجر لإنشاء طلب تمويل واردات جديد.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label>التاجر *</Label>
+              <Select value={selectedMerchant} onValueChange={setSelectedMerchant}>
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر التاجر..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {bankMerchants.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {bankMerchants.length === 0 && (
+                <p className="text-xs text-destructive">لا يوجد تجار مسجلون. أضف تاجراً أولاً.</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenCreate(false)}>إلغاء</Button>
+            <Button
+              disabled={!selectedMerchant || mutations.create.isPending}
+              onClick={async () => {
+                if (!publishedVer || !user) return;
+                try {
+                  const result = await mutations.create.mutateAsync({
+                    workflowVersionId: Number(publishedVer.id),
+                    bankId: Number(user.entityId ?? 0),
+                    merchantId: Number(selectedMerchant),
+                  });
+                  toast.success("تم إنشاء الطلب");
+                  setOpenCreate(false);
+                  const newId = (result as { id?: number })?.id;
+                  if (newId) nav({ to: "/workflows/instances/$id", params: { id: String(newId) } });
+                } catch (error) {
+                  toast.error(error instanceof ApiError ? error.message : "تعذّر إنشاء الطلب");
+                }
               }}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="اختر البنك" />
-              </SelectTrigger>
-              <SelectContent>
-                {(banksQ.data ?? []).map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Merchant */}
-          <div className="grid gap-1.5">
-            <Label>التاجر</Label>
-            <Select value={merchantId} onValueChange={setMerchantId} disabled={!bankId}>
-              <SelectTrigger>
-                <SelectValue placeholder={bankId ? "اختر التاجر" : "اختر البنك أولًا"} />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredMerchants.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Amount */}
-          <div className="grid gap-1.5">
-            <Label>المبلغ</Label>
-            <Input
-              type="number"
-              min={0}
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </div>
-
-          {/* Currency */}
-          <div className="grid gap-1.5">
-            <Label>العملة</Label>
-            <Select value={currency} onValueChange={setCurrency}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CURRENCIES.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Invoice number */}
-          <div className="grid gap-1.5">
-            <Label>رقم الفاتورة</Label>
-            <Input
-              placeholder="INV-001"
-              value={invoiceNumber}
-              onChange={(e) => setInvoiceNumber(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            إلغاء
-          </Button>
-          <Button onClick={handleSubmit} disabled={mutations.create.isPending}>
-            {mutations.create.isPending ? "جارٍ الإنشاء..." : "إنشاء"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              {mutations.create.isPending ? "جارٍ الإنشاء..." : "إنشاء"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
