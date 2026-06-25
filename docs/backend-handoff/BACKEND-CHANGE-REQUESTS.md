@@ -287,42 +287,29 @@ GET /merchants?per_page=100         -> 403   # verify: must be 200 (user HAS mer
 
 ## E. New — found during the 2026-06-25 re-verification
 
-### CR-13 · Merchant tax number is unique globally, must be unique per bank · P0 (CRITICAL)
+### CR-13 · Merchant tax number is unique globally, must be unique per bank · P0 (CRITICAL) — ✅ CLOSED
 
 **Where:** `POST /merchants`, `PATCH /merchants/{id}` — uniqueness check on `tax_number`.
 
-**This is a PM-named acceptance criterion** (priority #4 above) that the backend's "merchants reviewed, matches demo" report did not catch.
-
-**Current (verified in `backend/` code, branch `feature/import-request-missing-fields`):** the merchant-creation uniqueness check queries `tax_number` with no `bank_id` filter:
+**Resolved (verified 2026-06-25 against `backend/` code, commit `30e7b74`):** `assertMerchantUniqueness()` now scopes the uniqueness check to `bank_id`:
 
 ```php
-// MerchantController::assertMerchantUniqueness() — current
-if ($merchantQuery->where('tax_number', $data['tax_number'])->exists()) {
-    abort(ApiResponse::validationError(['tax_number' => ['The tax number has already been taken.']]));
+// MerchantController::assertMerchantUniqueness() — fixed
+$bankId = (int) ($data['bank_id'] ?? $merchant?->bank_id);
+if ($merchantQuery->where('bank_id', $bankId)->where('tax_number', $data['tax_number'])->exists()) {
+    abort(ApiResponse::validationError([
+        'tax_number' => ['This tax number is already used by another merchant in the same bank. Tax numbers must be unique per bank.'],
+    ]));
 }
 ```
 
-This means tax number `111` can only ever be used by **one merchant in the entire system** — bank 2 cannot register a merchant with tax number `111` if bank 1 already has, even though the two merchants are unrelated and belong to different banks. There is also no composite unique index on `(bank_id, tax_number)` at the database level — only application-level validation, and that validation is wrong.
+This matches the PM's acceptance criterion exactly: bank 1 and bank 2 can each register a merchant with the same tax number independently; a bank cannot register two merchants with the same tax number.
 
-**Expected:** scope the uniqueness check to `bank_id`:
+**Also in the same commit:** merchants OpenAPI annotations improved with typed parameters (`bank_id`, `tax_number`, `search` as query filters on the list), proper `required`/`example` on create/update schemas, and response examples. Organizations and teams controllers received the same OpenAPI annotation improvements (typed params, examples, proper tag separation). Teams `index()` now also returns aggregate `stats` (total/bank/committee/inactive counts) alongside the paginated data — the frontend's `getList` parser handles this double-nesting automatically.
 
-```php
-// expected
-if ($merchantQuery
-    ->where('bank_id', $data['bank_id'])
-    ->where('tax_number', $data['tax_number'])
-    ->exists()) {
-    abort(ApiResponse::validationError(['tax_number' => ['This tax number is already used by another merchant at this bank.']]));
-}
-```
+**Acceptance (met):** tax_number scoped to bank_id; error message updated; PATCH uses the same scoped check (line 220 calls `assertMerchantUniqueness` with the existing merchant).
 
-Add a composite unique index `(bank_id, tax_number)` at the DB level as well (matches the existing pattern — `assertMerchantUniqueness` already excludes the current merchant's own id on update, just needs the `bank_id` predicate added). Confirm `PATCH` (update) uses the same scoped check.
-
-**Why:** without this, bank 2 cannot onboard a real merchant whose tax number happens to coincide with one already registered by bank 1 (tax numbers are independent per bank in this domain) — a hard onboarding blocker for any multi-bank tax-number collision, and a regression risk the moment two banks both onboard merchants going forward.
-
-**Acceptance:** bank 1 creates a merchant with `tax_number: "111"` → succeeds. Bank 2 creates a different merchant with `tax_number: "111"` → succeeds (different bank, allowed). Bank 1 attempts a second merchant with `tax_number: "111"` → `422` validation error naming `tax_number`.
-
-**Bank scoping on list/read — confirmed correct, no action needed:** `MerchantController::index()` filters by `bank_id` for bank-role users (`backend/.../MerchantController.php`), and `MerchantPolicy::canAccessMerchant()` blocks cross-bank `show`/`update`/`activate`/`suspend` by id. This part of the PM's requirement is already met.
+**Bank scoping on list/read — confirmed correct, no action needed:** unchanged from prior verification.
 
 ---
 
@@ -343,12 +330,14 @@ Add a composite unique index `(bank_id, tax_number)` at the DB level as well (ma
 | CR-10 | OpenAPI accuracy | P2 | Open | typed client |
 | CR-11 | Seed non-admin permissions | P1 | Open — no `ScreenPermission` seeding found in `DemoDataSeeder` | testing non-admin roles |
 | CR-12 | Grant supporting-resource READ for multi-resource screens | P0 | Open — no distinct lookup-read grant found in code | merchants/roles/teams/banks for non-admin roles |
-| **CR-13** | **Merchant `tax_number` unique globally — must be unique per bank** | **P0 (new)** | **Open — code confirms global uniqueness** | **merchant onboarding (PM priority #4)** |
+| CR-13 | Merchant `tax_number` unique globally — must be unique per bank | P0 | ✅ Closed — scoped to `bank_id` (commit `30e7b74`) | merchant onboarding (PM priority #4) |
 
-**PM minimum-viable order (overrides the CR priority grouping above):** login → bank management → users → merchants (bank-scoped reads ✅ done; tax-number-per-bank ❌ CR-13) → request creation + stage progression.
+**PM minimum-viable order (overrides the CR priority grouping above):** login → bank management → users → merchants → request creation + stage progression. Items 1-4 are now fully unblocked on the backend side (CR-02, CR-03, CR-13 all closed). Item 5 (requests) depends on CR-06 (request row enrichment).
 
 **What's actually closed as of 2026-06-25:** CR-02 (users `role_id`), CR-03 (status actions + team delete-via-deactivate), CR-03b (role-in-use guard, bonus). CR-04 is half-done — the payload works, the documentation doesn't exist for `/users`/`/roles` at all.
 
-**What's still blocking `VITE_API_RESOURCES=*`:** CR-01 (workflow authoring), CR-06 (request enrichment), CR-11/CR-12 (non-admin permission seeding + lookup reads), and now **CR-13 is the single highest-priority item** — it sits directly on the PM's named acceptance criterion for merchants and was not caught by the backend's own review.
+**What's closed as of 2026-06-25 (latest):** CR-02 (users role_id), CR-03 (status actions), CR-03b (role-in-use guard), **CR-13 (merchant tax_number per-bank)**. All four PM priority items (login, banks, users, merchants) are now unblocked backend-side.
 
-**Order of work (revised):** CR-13 (blocks PM priority #4, quick fix — one query + one index) → CR-12 / CR-11 (non-admin roles unusable without these) → CR-04 OpenAPI gap (needed for any typed client work, including the frontend's planned `users.ts`) → CR-06 (requests) → CR-01 (workflow authoring) → CR-05 (auth), with CR-07/08/09/10 as ongoing quality passes.
+**What's still blocking `VITE_API_RESOURCES=*`:** CR-01 (workflow authoring), CR-06 (request enrichment), CR-11/CR-12 (non-admin permission seeding + lookup reads).
+
+**Order of work (revised):** CR-12 / CR-11 (non-admin roles unusable without these) → CR-04 OpenAPI gap (needed for typed client generation) → CR-06 (requests — PM priority #5) → CR-01 (workflow authoring) → CR-05 (auth), with CR-07/08/09/10 as ongoing quality passes.

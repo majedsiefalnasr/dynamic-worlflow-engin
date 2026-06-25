@@ -7,7 +7,7 @@
 // so we resolve label <-> id via the sector_activity reference values.
 //
 // CR-03 closed (2026-06-25): activate/suspend POST endpoints now return 200/403.
-// CR-13 (open): tax_number uniqueness is global, not per bank — backend fix pending.
+// CR-13 closed (2026-06-25): tax_number uniqueness now scoped to bank_id.
 // ============================================================
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -163,9 +163,7 @@ export function useMerchantMutations() {
   const qc = useQueryClient();
   const invalidate = () => qc.invalidateQueries({ queryKey: merchantKeys.all });
   return {
-    // CR-13 (backend, open): tax_number uniqueness is GLOBAL, not per bank_id.
-    // Once fixed, duplicate tax within same bank -> 422 (fields.tax_number);
-    // duplicate across different banks -> allowed. No frontend change needed.
+    // CR-13 closed: tax_number uniqueness now scoped to bank_id.
     create: useMutation({
       mutationFn: (input: { merchant: Merchant; sectors: SectorValue[] }) =>
         api.post("/merchants", toWriteBody(input.merchant, input.sectors)),
