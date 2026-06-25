@@ -150,26 +150,38 @@ So the element shape is confirmed: `{ screen: string, capabilities: ("VIEW"|"CRE
 
 **Acceptance:** login can challenge MFA and verify it; a self-service password change works; token lifetime/refresh is documented.
 
-### CR-06 · Enrich the `GET /requests` list row · P1
+### CR-06 · Enrich the `GET /requests` list row · P1 — ⬆️ NOW PM PRIORITY #5 BLOCKER
 
-**Where:** `GET /api/v1/requests`.
+**Where:** `GET /api/v1/requests` (`ImportRequestListResource`) and `GET /api/v1/requests/{id}` (`ImportRequestResource`).
 
-**Current (live):** the row added claim fields but still omits stage/version/applicant:
+**Re-verified (2026-06-25 against `backend/` code):** the `ImportRequest` model **already has** `workflow_version_id`, `current_stage_id`, and `merchant_id` as fillable fields with full Eloquent relationships (`workflowVersion()`, `currentStage()`, `merchant()`). The detail resource (`ImportRequestResource`) already includes `merchant: { id, name, commercial_register }`. **The data exists — the resources just don't expose it in the list.** This is now **the single remaining blocker** for PM priority #5 (request creation + stage progression).
 
-```json
-{ "id":1, "reference_number":null, "bank_id":1, "bank_name":"…", "status":"ACTIVE",
-  "current_owner_role":null, "is_claimed":false, "can_be_claimed":false,
-  "currency":"USD", "amount":120000, "supplier_name":null, "import_type":null,
-  "invoice_number":"INV-2026-10000", "created_at":"…" }
+**Current (`ImportRequestListResource`, `backend/` code):** still missing:
+- `workflow_version_id` — needed to show the workflow and fetch stage labels/progress
+- `current_stage: { id, name }` — needed for the "current stage" column and stage filter
+- `merchant: { id, name }` — needed for the applicant column
+
+**Suggested fix (3 lines in `ImportRequestListResource::toArray`):**
+
+```php
+'workflow_version_id' => $this->workflow_version_id,
+'current_stage' => $this->currentStage ? [
+    'id' => $this->currentStage->id,
+    'name' => $this->currentStage->name,
+] : null,
+'merchant' => $this->merchant ? [
+    'id' => $this->merchant->id,
+    'name' => $this->merchant->name,
+] : null,
 ```
 
-Missing: **`workflow_version_id`**, **`current_stage: { id, name }`**, **`merchant: { id, name }`** (applicant); and `reference_number` is `null` for seeded requests.
+Also add `workflow_version_id` and `current_stage` to `ImportRequestResource` (detail) — it has `merchant` but is missing these two.
 
-**Expected:** add those fields and populate `reference_number`.
+**Also still needed:** `reference_number` populated for seeded requests (currently `null`).
 
-**Why:** the requests list shows the **current stage** column + stage **filter** + **progress**, and the **applicant** column — all render empty in API mode today. This unblocks the full requests list and the request runtime binding.
+**Why:** this is the last backend change needed before the frontend can wire request creation + stage progression (PM priority #5). The request runtime endpoints (`POST /requests`, `PATCH /requests/{id}/draft`, `POST /requests/{id}/actions`, documents, history) are all confirmed working in the backend code — only the list/detail response shape is incomplete.
 
-**Acceptance:** each list row includes `workflow_version_id`, `current_stage`, `merchant`, and a non-null `reference_number`.
+**Acceptance:** each list row includes `workflow_version_id`, `current_stage: { id, name }`, `merchant: { id, name }`, and a non-null `reference_number`.
 
 ### CR-07 · Enforce optimistic locking (`version`) on sensitive updates · P1
 
@@ -323,7 +335,7 @@ This matches the PM's acceptance criterion exactly: bank 1 and bank 2 can each r
 | CR-03b | Role deactivate blocked while linked to users (backend-added) | — | ✅ Confirmed | data integrity |
 | CR-04 | Document + populate permissions payload | P1 | ⚠️ Partial — payload populated, OpenAPI still missing `/users` + `/roles` entirely | screen/action gating, typed client |
 | CR-05 | Auth completeness (MFA/refresh/password) | P1 | Open | real sign-in |
-| CR-06 | Enrich `GET /requests` row | P1 | Open | requests list + runtime |
+| CR-06 | Enrich `GET /requests` row | P1 → **P0** | Open — model has fields, resources don't expose them (3-line fix) | **PM priority #5 sole blocker** |
 | CR-07 | Optimistic locking (`version`) | P1 | Open | safe concurrent edits |
 | CR-08 | Document nested write payloads | P2 | Open | merchants/permissions writes |
 | CR-09 | Standardize `meta` shape | P2 | Open | contract consistency |
