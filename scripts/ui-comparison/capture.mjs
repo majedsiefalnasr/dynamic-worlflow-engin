@@ -58,7 +58,7 @@ async function gotoClientSide(page, path) {
 async function runSetupAction(page, step) {
   switch (step.action) {
     case "click-tab": {
-      const tab = page.getByRole("tab", { name: step.trigger });
+      const tab = page.getByRole("tab", { name: step.trigger }).first();
       await tab.click();
       await page.waitForTimeout(500);
       break;
