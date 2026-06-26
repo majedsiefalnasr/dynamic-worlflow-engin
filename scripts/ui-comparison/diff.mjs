@@ -67,9 +67,20 @@ function diffProbes(mainProbes, liveProbes) {
         liveResult: live?.result ?? "MISSING",
         match: false,
         status: "missing",
+        mainExpectedMatch: false,
+        liveExpectedMatch: false,
       });
     } else {
-      const match = main.result === live.result;
+      const isError = main.result.startsWith("ERROR:") || live.result.startsWith("ERROR:");
+      const match = !isError && main.result === live.result;
+      const status = isError ? "error" : "ok";
+
+      // Check whether each result satisfies the expected text (if declared).
+      // For kind "invalid" with text "submit-disabled", match the literal string.
+      const expected = main.expectedText;
+      const mainExpectedMatch = expected == null || main.result === expected;
+      const liveExpectedMatch = expected == null || live.result === expected;
+
       results.push({
         id,
         roleId: main.roleId,
@@ -79,7 +90,9 @@ function diffProbes(mainProbes, liveProbes) {
         expectedKind: main.expectedKind,
         expectedText: main.expectedText,
         match,
-        status: "ok",
+        status,
+        mainExpectedMatch,
+        liveExpectedMatch,
       });
     }
   }
@@ -186,17 +199,19 @@ async function main() {
   if (probeResults.length > 0) {
     lines.push("## Behavior Probe Results");
     lines.push("");
-    lines.push("| Probe ID | Role | Screen | Main Result | Live Result | Match |");
-    lines.push("|---|---|---|---|---|---|");
+    lines.push("| Probe ID | Role | Screen | Main Result | Live Result | Match | Expected |");
+    lines.push("|---|---|---|---|---|---|---|");
 
-    const mismatches = probeResults.filter((p) => !p.match);
+    const errors = probeResults.filter((p) => p.status === "error");
+    const mismatches = probeResults.filter((p) => !p.match && p.status !== "error");
     const matches = probeResults.filter((p) => p.match);
 
-    for (const p of [...mismatches, ...matches]) {
-      const icon = p.match ? "✅" : "❌";
+    for (const p of [...errors, ...mismatches, ...matches]) {
+      const icon = p.status === "error" ? "⚠️" : p.match ? "✅" : "❌";
       const mainText = p.mainResult.length > 60 ? p.mainResult.slice(0, 57) + "..." : p.mainResult;
       const liveText = p.liveResult.length > 60 ? p.liveResult.slice(0, 57) + "..." : p.liveResult;
-      lines.push(`| ${p.id} | ${p.roleId} | ${p.screenKey} | ${mainText} | ${liveText} | ${icon} |`);
+      const expectedIcon = (p.mainExpectedMatch && p.liveExpectedMatch) ? "✅" : "❌";
+      lines.push(`| ${p.id} | ${p.roleId} | ${p.screenKey} | ${mainText} | ${liveText} | ${icon} | ${expectedIcon} |`);
     }
     lines.push("");
   }

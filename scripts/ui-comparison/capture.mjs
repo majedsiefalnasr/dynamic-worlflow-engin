@@ -177,7 +177,7 @@ async function runProbes(page, screen, roleId, mode, baseUrl, probeResults, fail
       if (mode === "mock") {
         await gotoClientSide(page, screen.path);
       } else {
-        await page.goto(`http://localhost:${new URL(page.url()).port}${screen.path}`, { waitUntil: "networkidle", timeout: 15_000 });
+        await page.goto(`${baseUrl}${screen.path}`, { waitUntil: "networkidle", timeout: 15_000 });
       }
       await page.waitForTimeout(500);
 
@@ -296,11 +296,15 @@ async function main() {
       }
     }
 
-    // Run probes at desktop only, after all viewports are captured
-    await page.setViewportSize(VIEWPORTS.desktop);
-    for (const screen of role.screens) {
-      if (screen.probes) {
-        await runProbes(page, screen, role.roleId, mode, baseUrl, probeResults, failures);
+    // Run probes at desktop only, after all viewports are captured.
+    // Probes run for rc_platform_admin only — other roles would produce
+    // duplicate probe IDs that silently overwrite each other in diffProbes.
+    if (role.roleId === "rc_platform_admin") {
+      await page.setViewportSize(VIEWPORTS.desktop);
+      for (const screen of role.screens) {
+        if (screen.probes) {
+          await runProbes(page, screen, role.roleId, mode, baseUrl, probeResults, failures);
+        }
       }
     }
 
