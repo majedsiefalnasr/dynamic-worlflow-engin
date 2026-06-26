@@ -14,10 +14,19 @@ async function ensureDir(path) {
 }
 
 async function readPng(path) {
+  let buf;
   try {
-    const buf = await readFile(path);
+    buf = await readFile(path);
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    console.warn(`Corrupt or unreadable PNG at ${path}: ${error.message}`);
+    return null;
+  }
+
+  try {
     return PNG.sync.read(buf);
-  } catch {
+  } catch (error) {
+    console.warn(`Corrupt or unreadable PNG at ${path}: ${error.message}`);
     return null;
   }
 }
@@ -43,7 +52,6 @@ async function diffPair(roleId, viewportName, screenKey) {
     return { roleId, viewportName, screenKey, status: "missing", mainPath, livePath, diffPath: null, diffPercent: null };
   }
 
-  const { width, height } = VIEWPORTS[viewportName];
   // pixelmatch requires equal dimensions; full-page screenshots can differ
   // in height, so clamp to the smaller of the two heights actually captured.
   const w = Math.min(mainPng.width, livePng.width);
@@ -57,10 +65,6 @@ async function diffPair(roleId, viewportName, screenKey) {
   await writeFile(diffPath, PNG.sync.write(diff));
 
   return { roleId, viewportName, screenKey, status: "ok", mainPath, livePath, diffPath, diffPercent: Number(diffPercent) };
-}
-
-function relPath(absoluteRoot, path) {
-  return path.replace(`${absoluteRoot}/`, "");
 }
 
 async function main() {
