@@ -52,13 +52,19 @@ async function diffPair(roleId, viewportName, screenKey) {
     return { roleId, viewportName, screenKey, status: "missing", mainPath, livePath, diffPath: null, diffPercent: null };
   }
 
-  // pixelmatch requires equal dimensions; full-page screenshots can differ
-  // in height, so clamp to the smaller of the two heights actually captured.
+  // pixelmatch requires both buffers to be exactly w*h*4 bytes; full-page
+  // screenshots can differ in height, so crop both to the smaller of the
+  // two dimensions actually captured before handing them to pixelmatch.
   const w = Math.min(mainPng.width, livePng.width);
   const h = Math.min(mainPng.height, livePng.height);
 
+  const mainCropped = new PNG({ width: w, height: h });
+  PNG.bitblt(mainPng, mainCropped, 0, 0, w, h, 0, 0);
+  const liveCropped = new PNG({ width: w, height: h });
+  PNG.bitblt(livePng, liveCropped, 0, 0, w, h, 0, 0);
+
   const diff = new PNG({ width: w, height: h });
-  const numDiffPixels = pixelmatch(mainPng.data, livePng.data, diff.data, w, h, { threshold: 0.1 });
+  const numDiffPixels = pixelmatch(mainCropped.data, liveCropped.data, diff.data, w, h, { threshold: 0.1 });
   const diffPercent = ((numDiffPixels / (w * h)) * 100).toFixed(2);
 
   await ensureDir(diffPath);
