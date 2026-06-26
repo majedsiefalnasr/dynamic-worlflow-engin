@@ -40,6 +40,52 @@ async function loadFailures(branch) {
   }
 }
 
+async function loadProbes(branch) {
+  try {
+    const raw = await readFile(`output/ui-comparison/${branch}/probes.json`, "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function diffProbes(mainProbes, liveProbes) {
+  const mainMap = new Map(mainProbes.map((p) => [p.id, p]));
+  const liveMap = new Map(liveProbes.map((p) => [p.id, p]));
+  const allIds = new Set([...mainMap.keys(), ...liveMap.keys()]);
+  const results = [];
+
+  for (const id of allIds) {
+    const main = mainMap.get(id);
+    const live = liveMap.get(id);
+    if (!main || !live) {
+      results.push({
+        id,
+        roleId: (main ?? live).roleId,
+        screenKey: (main ?? live).screenKey,
+        mainResult: main?.result ?? "MISSING",
+        liveResult: live?.result ?? "MISSING",
+        match: false,
+        status: "missing",
+      });
+    } else {
+      const match = main.result === live.result;
+      results.push({
+        id,
+        roleId: main.roleId,
+        screenKey: main.screenKey,
+        mainResult: main.result,
+        liveResult: live.result,
+        expectedKind: main.expectedKind,
+        expectedText: main.expectedText,
+        match,
+        status: "ok",
+      });
+    }
+  }
+  return results;
+}
+
 async function diffPair(roleId, viewportName, screenKey) {
   const mainPath = `output/ui-comparison/main/${roleId}/${viewportName}/${screenKey}.png`;
   const livePath = `output/ui-comparison/live/${roleId}/${viewportName}/${screenKey}.png`;
@@ -82,6 +128,12 @@ async function main() {
     for (const viewportName of Object.keys(VIEWPORTS)) {
       for (const screen of role.screens) {
         results.push(await diffPair(role.roleId, viewportName, screen.key));
+        // Also diff interaction sub-states
+        if (screen.interactions) {
+          for (const interaction of screen.interactions) {
+            results.push(await diffPair(role.roleId, viewportName, `${screen.key}__${interaction.key}`));
+          }
+        }
       }
     }
   }
@@ -126,8 +178,31 @@ async function main() {
   }
   lines.push("");
 
+  // --- Probe comparison ---
+  const mainProbes = await loadProbes("main");
+  const liveProbes = await loadProbes("live");
+  const probeResults = diffProbes(mainProbes, liveProbes);
+
+  if (probeResults.length > 0) {
+    lines.push("## Behavior Probe Results");
+    lines.push("");
+    lines.push("| Probe ID | Role | Screen | Main Result | Live Result | Match |");
+    lines.push("|---|---|---|---|---|---|");
+
+    const mismatches = probeResults.filter((p) => !p.match);
+    const matches = probeResults.filter((p) => p.match);
+
+    for (const p of [...mismatches, ...matches]) {
+      const icon = p.match ? "✅" : "❌";
+      const mainText = p.mainResult.length > 60 ? p.mainResult.slice(0, 57) + "..." : p.mainResult;
+      const liveText = p.liveResult.length > 60 ? p.liveResult.slice(0, 57) + "..." : p.liveResult;
+      lines.push(`| ${p.id} | ${p.roleId} | ${p.screenKey} | ${mainText} | ${liveText} | ${icon} |`);
+    }
+    lines.push("");
+  }
+
   await writeFile("docs/ui-comparison-report.md", lines.join("\n"));
-  console.log(`Report written to docs/ui-comparison-report.md (${sorted.length} pairs, ${missing.length} missing, ${mainFailures.length + liveFailures.length} capture failures)`);
+  console.log(`Report written to docs/ui-comparison-report.md (${sorted.length} screenshot pairs, ${missing.length} missing, ${mainFailures.length + liveFailures.length} capture failures, ${probeResults.length} probes [${probeResults.filter(p => !p.match).length} mismatches])`);
 }
 
 main();
