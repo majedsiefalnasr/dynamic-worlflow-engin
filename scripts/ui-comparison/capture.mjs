@@ -28,7 +28,7 @@ async function ensureDir(path) {
 
 async function loginMock(page, baseUrl, role) {
   await page.goto(`${baseUrl}/login`, { waitUntil: "networkidle" });
-  await page.getByText(role.name, { exact: false }).first().click();
+  await page.getByText(role.name, { exact: true }).first().click();
   await page.getByRole("button", { name: "متابعة إلى التحقق" }).click();
   await page.getByRole("button", { name: "تسجيل الدخول" }).click();
   await page.waitForURL(`${baseUrl}/`, { timeout: 10_000 });
