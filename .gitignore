@@ -38,3 +38,8 @@ dist-ssr
 .playwright-cli/
 .playwright-mcp/
 backend/
+
+# UI comparison capture output (regenerable)
+/output/ui-comparison/main/
+/output/ui-comparison/live/
+/output/ui-comparison/diff/
