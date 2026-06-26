@@ -42,6 +42,19 @@ async function loginApi(page, baseUrl, role) {
   await page.waitForURL(`${baseUrl}/`, { timeout: 15_000 });
 }
 
+// Mock auth on `main` lives in an in-memory module variable (src/lib/mock.ts),
+// not localStorage/sessionStorage, so a full page navigation (page.goto)
+// resets it and bounces every subsequent screen back to /login. Navigate
+// client-side instead so TanStack Router's history-mode routing handles it
+// without reloading the page/module state.
+async function gotoClientSide(page, path) {
+  await page.evaluate((p) => {
+    window.history.pushState({}, "", p);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, path);
+  await page.waitForLoadState("networkidle");
+}
+
 async function main() {
   const { branch, port, mode } = parseArgs();
   const baseUrl = `http://localhost:${port}`;
@@ -73,7 +86,11 @@ async function main() {
         const url = `${baseUrl}${screen.path}`;
         const outPath = `${outRoot}/${role.roleId}/${viewportName}/${screen.key}.png`;
         try {
-          await page.goto(url, { waitUntil: "networkidle", timeout: 15_000 });
+          if (mode === "mock") {
+            await gotoClientSide(page, screen.path);
+          } else {
+            await page.goto(url, { waitUntil: "networkidle", timeout: 15_000 });
+          }
           await ensureDir(outPath);
           await page.screenshot({ path: outPath, fullPage: true });
         } catch (error) {

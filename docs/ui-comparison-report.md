@@ -1,121 +1,116 @@
 # UI Comparison Report: main vs live
 
-Generated: 2026-06-26T10:50:08.595Z
-
-## Failures / Missing Captures
-
-| Branch | Role | Screen | Viewport | URL | Error |
-|---|---|---|---|---|---|
-| both | rc_platform_admin | dashboard | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | requests | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | notifications | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | profile | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | merchants | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | reports | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | audit | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | admin-workflows | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | admin-reference-data | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | admin-screen-permissions | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | admin-entities | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | admin-orgs | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | admin-staff | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | admin-teams | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | admin-roles | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | settings | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | dashboard | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | requests | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | notifications | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | profile | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | merchants | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | reports | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | audit | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | admin-workflows | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | admin-reference-data | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | admin-screen-permissions | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | admin-entities | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | admin-orgs | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | admin-staff | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | admin-teams | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | admin-roles | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_platform_admin | settings | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_admin | dashboard | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_admin | requests | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_admin | notifications | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_admin | profile | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_admin | merchants | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_admin | reports | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_admin | audit | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_admin | dashboard | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_admin | requests | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_admin | notifications | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_admin | profile | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_admin | merchants | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_admin | reports | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_admin | audit | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_intake | dashboard | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_intake | requests | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_intake | notifications | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_intake | profile | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_intake | merchants | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_intake | dashboard | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_intake | requests | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_intake | notifications | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_intake | profile | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_intake | merchants | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_reviewer | dashboard | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_reviewer | requests | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_reviewer | notifications | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_reviewer | profile | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_reviewer | dashboard | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_reviewer | requests | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_reviewer | notifications | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_reviewer | profile | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_swift | dashboard | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_swift | requests | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_swift | notifications | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_swift | profile | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_swift | dashboard | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_swift | requests | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_swift | notifications | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_bank_swift | profile | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_support_member | dashboard | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_support_member | requests | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_support_member | notifications | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_support_member | profile | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_support_member | reports | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_support_member | audit | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_support_member | dashboard | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_support_member | requests | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_support_member | notifications | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_support_member | profile | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_support_member | reports | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_support_member | audit | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_executive_member | dashboard | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_executive_member | requests | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_executive_member | notifications | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_executive_member | profile | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_executive_member | reports | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_executive_member | audit | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_executive_member | dashboard | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_executive_member | requests | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_executive_member | notifications | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_executive_member | profile | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_executive_member | reports | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_executive_member | audit | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_committee_manager | dashboard | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_committee_manager | requests | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_committee_manager | notifications | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_committee_manager | profile | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_committee_manager | reports | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_committee_manager | audit | desktop | n/a | screenshot pair missing, see capture failures above |
-| both | rc_committee_manager | dashboard | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_committee_manager | requests | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_committee_manager | notifications | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_committee_manager | profile | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_committee_manager | reports | mobile | n/a | screenshot pair missing, see capture failures above |
-| both | rc_committee_manager | audit | mobile | n/a | screenshot pair missing, see capture failures above |
+Generated: 2026-06-26T11:31:36.971Z
 
 ## Diff Results (sorted by diff % descending)
 
 | Role | Screen | Viewport | Diff % | Main | Live | Diff |
 |---|---|---|---|---|---|---|
+| rc_committee_manager | reports | desktop | 6.61% | [main](../output/ui-comparison/main/rc_committee_manager/desktop/reports.png) | [live](../output/ui-comparison/live/rc_committee_manager/desktop/reports.png) | [diff](../output/ui-comparison/diff/rc_committee_manager/desktop/reports.png) |
+| rc_platform_admin | admin-workflows | mobile | 6.44% | [main](../output/ui-comparison/main/rc_platform_admin/mobile/admin-workflows.png) | [live](../output/ui-comparison/live/rc_platform_admin/mobile/admin-workflows.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/mobile/admin-workflows.png) |
+| rc_platform_admin | admin-staff | mobile | 6.36% | [main](../output/ui-comparison/main/rc_platform_admin/mobile/admin-staff.png) | [live](../output/ui-comparison/live/rc_platform_admin/mobile/admin-staff.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/mobile/admin-staff.png) |
+| rc_platform_admin | reports | mobile | 6.04% | [main](../output/ui-comparison/main/rc_platform_admin/mobile/reports.png) | [live](../output/ui-comparison/live/rc_platform_admin/mobile/reports.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/mobile/reports.png) |
+| rc_executive_member | reports | desktop | 5.76% | [main](../output/ui-comparison/main/rc_executive_member/desktop/reports.png) | [live](../output/ui-comparison/live/rc_executive_member/desktop/reports.png) | [diff](../output/ui-comparison/diff/rc_executive_member/desktop/reports.png) |
+| rc_support_member | reports | desktop | 5.75% | [main](../output/ui-comparison/main/rc_support_member/desktop/reports.png) | [live](../output/ui-comparison/live/rc_support_member/desktop/reports.png) | [diff](../output/ui-comparison/diff/rc_support_member/desktop/reports.png) |
+| rc_platform_admin | reports | desktop | 5.56% | [main](../output/ui-comparison/main/rc_platform_admin/desktop/reports.png) | [live](../output/ui-comparison/live/rc_platform_admin/desktop/reports.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/desktop/reports.png) |
+| rc_bank_admin | reports | desktop | 4.97% | [main](../output/ui-comparison/main/rc_bank_admin/desktop/reports.png) | [live](../output/ui-comparison/live/rc_bank_admin/desktop/reports.png) | [diff](../output/ui-comparison/diff/rc_bank_admin/desktop/reports.png) |
+| rc_executive_member | reports | mobile | 4.61% | [main](../output/ui-comparison/main/rc_executive_member/mobile/reports.png) | [live](../output/ui-comparison/live/rc_executive_member/mobile/reports.png) | [diff](../output/ui-comparison/diff/rc_executive_member/mobile/reports.png) |
+| rc_committee_manager | reports | mobile | 4.61% | [main](../output/ui-comparison/main/rc_committee_manager/mobile/reports.png) | [live](../output/ui-comparison/live/rc_committee_manager/mobile/reports.png) | [diff](../output/ui-comparison/diff/rc_committee_manager/mobile/reports.png) |
+| rc_bank_admin | reports | mobile | 4.6% | [main](../output/ui-comparison/main/rc_bank_admin/mobile/reports.png) | [live](../output/ui-comparison/live/rc_bank_admin/mobile/reports.png) | [diff](../output/ui-comparison/diff/rc_bank_admin/mobile/reports.png) |
+| rc_support_member | reports | mobile | 4.6% | [main](../output/ui-comparison/main/rc_support_member/mobile/reports.png) | [live](../output/ui-comparison/live/rc_support_member/mobile/reports.png) | [diff](../output/ui-comparison/diff/rc_support_member/mobile/reports.png) |
+| rc_platform_admin | admin-roles | mobile | 3.94% | [main](../output/ui-comparison/main/rc_platform_admin/mobile/admin-roles.png) | [live](../output/ui-comparison/live/rc_platform_admin/mobile/admin-roles.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/mobile/admin-roles.png) |
+| rc_platform_admin | audit | mobile | 3.8% | [main](../output/ui-comparison/main/rc_platform_admin/mobile/audit.png) | [live](../output/ui-comparison/live/rc_platform_admin/mobile/audit.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/mobile/audit.png) |
+| rc_bank_intake | requests | mobile | 3.79% | [main](../output/ui-comparison/main/rc_bank_intake/mobile/requests.png) | [live](../output/ui-comparison/live/rc_bank_intake/mobile/requests.png) | [diff](../output/ui-comparison/diff/rc_bank_intake/mobile/requests.png) |
+| rc_platform_admin | admin-staff | desktop | 3.72% | [main](../output/ui-comparison/main/rc_platform_admin/desktop/admin-staff.png) | [live](../output/ui-comparison/live/rc_platform_admin/desktop/admin-staff.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/desktop/admin-staff.png) |
+| rc_bank_intake | dashboard | mobile | 3.71% | [main](../output/ui-comparison/main/rc_bank_intake/mobile/dashboard.png) | [live](../output/ui-comparison/live/rc_bank_intake/mobile/dashboard.png) | [diff](../output/ui-comparison/diff/rc_bank_intake/mobile/dashboard.png) |
+| rc_platform_admin | audit | desktop | 3.62% | [main](../output/ui-comparison/main/rc_platform_admin/desktop/audit.png) | [live](../output/ui-comparison/live/rc_platform_admin/desktop/audit.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/desktop/audit.png) |
+| rc_platform_admin | admin-workflows | desktop | 3.46% | [main](../output/ui-comparison/main/rc_platform_admin/desktop/admin-workflows.png) | [live](../output/ui-comparison/live/rc_platform_admin/desktop/admin-workflows.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/desktop/admin-workflows.png) |
+| rc_support_member | notifications | desktop | 3.23% | [main](../output/ui-comparison/main/rc_support_member/desktop/notifications.png) | [live](../output/ui-comparison/live/rc_support_member/desktop/notifications.png) | [diff](../output/ui-comparison/diff/rc_support_member/desktop/notifications.png) |
+| rc_committee_manager | requests | mobile | 3.21% | [main](../output/ui-comparison/main/rc_committee_manager/mobile/requests.png) | [live](../output/ui-comparison/live/rc_committee_manager/mobile/requests.png) | [diff](../output/ui-comparison/diff/rc_committee_manager/mobile/requests.png) |
+| rc_bank_intake | requests | desktop | 3.17% | [main](../output/ui-comparison/main/rc_bank_intake/desktop/requests.png) | [live](../output/ui-comparison/live/rc_bank_intake/desktop/requests.png) | [diff](../output/ui-comparison/diff/rc_bank_intake/desktop/requests.png) |
+| rc_platform_admin | admin-teams | mobile | 3.14% | [main](../output/ui-comparison/main/rc_platform_admin/mobile/admin-teams.png) | [live](../output/ui-comparison/live/rc_platform_admin/mobile/admin-teams.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/mobile/admin-teams.png) |
+| rc_committee_manager | requests | desktop | 2.92% | [main](../output/ui-comparison/main/rc_committee_manager/desktop/requests.png) | [live](../output/ui-comparison/live/rc_committee_manager/desktop/requests.png) | [diff](../output/ui-comparison/diff/rc_committee_manager/desktop/requests.png) |
+| rc_bank_admin | requests | desktop | 2.9% | [main](../output/ui-comparison/main/rc_bank_admin/desktop/requests.png) | [live](../output/ui-comparison/live/rc_bank_admin/desktop/requests.png) | [diff](../output/ui-comparison/diff/rc_bank_admin/desktop/requests.png) |
+| rc_support_member | requests | desktop | 2.85% | [main](../output/ui-comparison/main/rc_support_member/desktop/requests.png) | [live](../output/ui-comparison/live/rc_support_member/desktop/requests.png) | [diff](../output/ui-comparison/diff/rc_support_member/desktop/requests.png) |
+| rc_bank_swift | requests | desktop | 2.84% | [main](../output/ui-comparison/main/rc_bank_swift/desktop/requests.png) | [live](../output/ui-comparison/live/rc_bank_swift/desktop/requests.png) | [diff](../output/ui-comparison/diff/rc_bank_swift/desktop/requests.png) |
+| rc_executive_member | requests | desktop | 2.84% | [main](../output/ui-comparison/main/rc_executive_member/desktop/requests.png) | [live](../output/ui-comparison/live/rc_executive_member/desktop/requests.png) | [diff](../output/ui-comparison/diff/rc_executive_member/desktop/requests.png) |
+| rc_bank_reviewer | requests | desktop | 2.83% | [main](../output/ui-comparison/main/rc_bank_reviewer/desktop/requests.png) | [live](../output/ui-comparison/live/rc_bank_reviewer/desktop/requests.png) | [diff](../output/ui-comparison/diff/rc_bank_reviewer/desktop/requests.png) |
+| rc_platform_admin | notifications | mobile | 2.46% | [main](../output/ui-comparison/main/rc_platform_admin/mobile/notifications.png) | [live](../output/ui-comparison/live/rc_platform_admin/mobile/notifications.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/mobile/notifications.png) |
+| rc_bank_admin | notifications | desktop | 2.45% | [main](../output/ui-comparison/main/rc_bank_admin/desktop/notifications.png) | [live](../output/ui-comparison/live/rc_bank_admin/desktop/notifications.png) | [diff](../output/ui-comparison/diff/rc_bank_admin/desktop/notifications.png) |
+| rc_committee_manager | notifications | desktop | 2.41% | [main](../output/ui-comparison/main/rc_committee_manager/desktop/notifications.png) | [live](../output/ui-comparison/live/rc_committee_manager/desktop/notifications.png) | [diff](../output/ui-comparison/diff/rc_committee_manager/desktop/notifications.png) |
+| rc_executive_member | notifications | desktop | 2.39% | [main](../output/ui-comparison/main/rc_executive_member/desktop/notifications.png) | [live](../output/ui-comparison/live/rc_executive_member/desktop/notifications.png) | [diff](../output/ui-comparison/diff/rc_executive_member/desktop/notifications.png) |
+| rc_platform_admin | requests | desktop | 2.26% | [main](../output/ui-comparison/main/rc_platform_admin/desktop/requests.png) | [live](../output/ui-comparison/live/rc_platform_admin/desktop/requests.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/desktop/requests.png) |
+| rc_platform_admin | merchants | mobile | 2.26% | [main](../output/ui-comparison/main/rc_platform_admin/mobile/merchants.png) | [live](../output/ui-comparison/live/rc_platform_admin/mobile/merchants.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/mobile/merchants.png) |
+| rc_platform_admin | admin-entities | mobile | 2.25% | [main](../output/ui-comparison/main/rc_platform_admin/mobile/admin-entities.png) | [live](../output/ui-comparison/live/rc_platform_admin/mobile/admin-entities.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/mobile/admin-entities.png) |
+| rc_bank_swift | requests | mobile | 2.25% | [main](../output/ui-comparison/main/rc_bank_swift/mobile/requests.png) | [live](../output/ui-comparison/live/rc_bank_swift/mobile/requests.png) | [diff](../output/ui-comparison/diff/rc_bank_swift/mobile/requests.png) |
+| rc_support_member | requests | mobile | 2.25% | [main](../output/ui-comparison/main/rc_support_member/mobile/requests.png) | [live](../output/ui-comparison/live/rc_support_member/mobile/requests.png) | [diff](../output/ui-comparison/diff/rc_support_member/mobile/requests.png) |
+| rc_bank_admin | requests | mobile | 2.24% | [main](../output/ui-comparison/main/rc_bank_admin/mobile/requests.png) | [live](../output/ui-comparison/live/rc_bank_admin/mobile/requests.png) | [diff](../output/ui-comparison/diff/rc_bank_admin/mobile/requests.png) |
+| rc_bank_reviewer | requests | mobile | 2.24% | [main](../output/ui-comparison/main/rc_bank_reviewer/mobile/requests.png) | [live](../output/ui-comparison/live/rc_bank_reviewer/mobile/requests.png) | [diff](../output/ui-comparison/diff/rc_bank_reviewer/mobile/requests.png) |
+| rc_platform_admin | admin-entities | desktop | 2.23% | [main](../output/ui-comparison/main/rc_platform_admin/desktop/admin-entities.png) | [live](../output/ui-comparison/live/rc_platform_admin/desktop/admin-entities.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/desktop/admin-entities.png) |
+| rc_executive_member | requests | mobile | 2.23% | [main](../output/ui-comparison/main/rc_executive_member/mobile/requests.png) | [live](../output/ui-comparison/live/rc_executive_member/mobile/requests.png) | [diff](../output/ui-comparison/diff/rc_executive_member/mobile/requests.png) |
+| rc_platform_admin | admin-orgs | desktop | 1.83% | [main](../output/ui-comparison/main/rc_platform_admin/desktop/admin-orgs.png) | [live](../output/ui-comparison/live/rc_platform_admin/desktop/admin-orgs.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/desktop/admin-orgs.png) |
+| rc_platform_admin | dashboard | mobile | 1.82% | [main](../output/ui-comparison/main/rc_platform_admin/mobile/dashboard.png) | [live](../output/ui-comparison/live/rc_platform_admin/mobile/dashboard.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/mobile/dashboard.png) |
+| rc_bank_admin | notifications | mobile | 1.65% | [main](../output/ui-comparison/main/rc_bank_admin/mobile/notifications.png) | [live](../output/ui-comparison/live/rc_bank_admin/mobile/notifications.png) | [diff](../output/ui-comparison/diff/rc_bank_admin/mobile/notifications.png) |
+| rc_support_member | notifications | mobile | 1.65% | [main](../output/ui-comparison/main/rc_support_member/mobile/notifications.png) | [live](../output/ui-comparison/live/rc_support_member/mobile/notifications.png) | [diff](../output/ui-comparison/diff/rc_support_member/mobile/notifications.png) |
+| rc_bank_intake | notifications | mobile | 1.64% | [main](../output/ui-comparison/main/rc_bank_intake/mobile/notifications.png) | [live](../output/ui-comparison/live/rc_bank_intake/mobile/notifications.png) | [diff](../output/ui-comparison/diff/rc_bank_intake/mobile/notifications.png) |
+| rc_bank_reviewer | notifications | mobile | 1.64% | [main](../output/ui-comparison/main/rc_bank_reviewer/mobile/notifications.png) | [live](../output/ui-comparison/live/rc_bank_reviewer/mobile/notifications.png) | [diff](../output/ui-comparison/diff/rc_bank_reviewer/mobile/notifications.png) |
+| rc_bank_swift | notifications | mobile | 1.64% | [main](../output/ui-comparison/main/rc_bank_swift/mobile/notifications.png) | [live](../output/ui-comparison/live/rc_bank_swift/mobile/notifications.png) | [diff](../output/ui-comparison/diff/rc_bank_swift/mobile/notifications.png) |
+| rc_executive_member | notifications | mobile | 1.64% | [main](../output/ui-comparison/main/rc_executive_member/mobile/notifications.png) | [live](../output/ui-comparison/live/rc_executive_member/mobile/notifications.png) | [diff](../output/ui-comparison/diff/rc_executive_member/mobile/notifications.png) |
+| rc_committee_manager | notifications | mobile | 1.64% | [main](../output/ui-comparison/main/rc_committee_manager/mobile/notifications.png) | [live](../output/ui-comparison/live/rc_committee_manager/mobile/notifications.png) | [diff](../output/ui-comparison/diff/rc_committee_manager/mobile/notifications.png) |
+| rc_bank_intake | notifications | desktop | 1.56% | [main](../output/ui-comparison/main/rc_bank_intake/desktop/notifications.png) | [live](../output/ui-comparison/live/rc_bank_intake/desktop/notifications.png) | [diff](../output/ui-comparison/diff/rc_bank_intake/desktop/notifications.png) |
+| rc_bank_reviewer | notifications | desktop | 1.56% | [main](../output/ui-comparison/main/rc_bank_reviewer/desktop/notifications.png) | [live](../output/ui-comparison/live/rc_bank_reviewer/desktop/notifications.png) | [diff](../output/ui-comparison/diff/rc_bank_reviewer/desktop/notifications.png) |
+| rc_bank_swift | notifications | desktop | 1.56% | [main](../output/ui-comparison/main/rc_bank_swift/desktop/notifications.png) | [live](../output/ui-comparison/live/rc_bank_swift/desktop/notifications.png) | [diff](../output/ui-comparison/diff/rc_bank_swift/desktop/notifications.png) |
+| rc_committee_manager | dashboard | mobile | 1.54% | [main](../output/ui-comparison/main/rc_committee_manager/mobile/dashboard.png) | [live](../output/ui-comparison/live/rc_committee_manager/mobile/dashboard.png) | [diff](../output/ui-comparison/diff/rc_committee_manager/mobile/dashboard.png) |
+| rc_committee_manager | dashboard | desktop | 1.51% | [main](../output/ui-comparison/main/rc_committee_manager/desktop/dashboard.png) | [live](../output/ui-comparison/live/rc_committee_manager/desktop/dashboard.png) | [diff](../output/ui-comparison/diff/rc_committee_manager/desktop/dashboard.png) |
+| rc_executive_member | dashboard | mobile | 1.46% | [main](../output/ui-comparison/main/rc_executive_member/mobile/dashboard.png) | [live](../output/ui-comparison/live/rc_executive_member/mobile/dashboard.png) | [diff](../output/ui-comparison/diff/rc_executive_member/mobile/dashboard.png) |
+| rc_support_member | dashboard | mobile | 1.43% | [main](../output/ui-comparison/main/rc_support_member/mobile/dashboard.png) | [live](../output/ui-comparison/live/rc_support_member/mobile/dashboard.png) | [diff](../output/ui-comparison/diff/rc_support_member/mobile/dashboard.png) |
+| rc_bank_admin | dashboard | mobile | 1.41% | [main](../output/ui-comparison/main/rc_bank_admin/mobile/dashboard.png) | [live](../output/ui-comparison/live/rc_bank_admin/mobile/dashboard.png) | [diff](../output/ui-comparison/diff/rc_bank_admin/mobile/dashboard.png) |
+| rc_platform_admin | requests | mobile | 1.36% | [main](../output/ui-comparison/main/rc_platform_admin/mobile/requests.png) | [live](../output/ui-comparison/live/rc_platform_admin/mobile/requests.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/mobile/requests.png) |
+| rc_bank_swift | dashboard | mobile | 1.33% | [main](../output/ui-comparison/main/rc_bank_swift/mobile/dashboard.png) | [live](../output/ui-comparison/live/rc_bank_swift/mobile/dashboard.png) | [diff](../output/ui-comparison/diff/rc_bank_swift/mobile/dashboard.png) |
+| rc_bank_reviewer | dashboard | mobile | 1.32% | [main](../output/ui-comparison/main/rc_bank_reviewer/mobile/dashboard.png) | [live](../output/ui-comparison/live/rc_bank_reviewer/mobile/dashboard.png) | [diff](../output/ui-comparison/diff/rc_bank_reviewer/mobile/dashboard.png) |
+| rc_bank_admin | merchants | desktop | 1.13% | [main](../output/ui-comparison/main/rc_bank_admin/desktop/merchants.png) | [live](../output/ui-comparison/live/rc_bank_admin/desktop/merchants.png) | [diff](../output/ui-comparison/diff/rc_bank_admin/desktop/merchants.png) |
+| rc_platform_admin | notifications | desktop | 1.12% | [main](../output/ui-comparison/main/rc_platform_admin/desktop/notifications.png) | [live](../output/ui-comparison/live/rc_platform_admin/desktop/notifications.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/desktop/notifications.png) |
+| rc_bank_admin | audit | desktop | 0.94% | [main](../output/ui-comparison/main/rc_bank_admin/desktop/audit.png) | [live](../output/ui-comparison/live/rc_bank_admin/desktop/audit.png) | [diff](../output/ui-comparison/diff/rc_bank_admin/desktop/audit.png) |
+| rc_committee_manager | profile | desktop | 0.93% | [main](../output/ui-comparison/main/rc_committee_manager/desktop/profile.png) | [live](../output/ui-comparison/live/rc_committee_manager/desktop/profile.png) | [diff](../output/ui-comparison/diff/rc_committee_manager/desktop/profile.png) |
+| rc_platform_admin | merchants | desktop | 0.92% | [main](../output/ui-comparison/main/rc_platform_admin/desktop/merchants.png) | [live](../output/ui-comparison/live/rc_platform_admin/desktop/merchants.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/desktop/merchants.png) |
+| rc_platform_admin | dashboard | desktop | 0.89% | [main](../output/ui-comparison/main/rc_platform_admin/desktop/dashboard.png) | [live](../output/ui-comparison/live/rc_platform_admin/desktop/dashboard.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/desktop/dashboard.png) |
+| rc_support_member | audit | desktop | 0.89% | [main](../output/ui-comparison/main/rc_support_member/desktop/audit.png) | [live](../output/ui-comparison/live/rc_support_member/desktop/audit.png) | [diff](../output/ui-comparison/diff/rc_support_member/desktop/audit.png) |
+| rc_executive_member | audit | desktop | 0.89% | [main](../output/ui-comparison/main/rc_executive_member/desktop/audit.png) | [live](../output/ui-comparison/live/rc_executive_member/desktop/audit.png) | [diff](../output/ui-comparison/diff/rc_executive_member/desktop/audit.png) |
+| rc_bank_intake | dashboard | desktop | 0.85% | [main](../output/ui-comparison/main/rc_bank_intake/desktop/dashboard.png) | [live](../output/ui-comparison/live/rc_bank_intake/desktop/dashboard.png) | [diff](../output/ui-comparison/diff/rc_bank_intake/desktop/dashboard.png) |
+| rc_platform_admin | profile | mobile | 0.76% | [main](../output/ui-comparison/main/rc_platform_admin/mobile/profile.png) | [live](../output/ui-comparison/live/rc_platform_admin/mobile/profile.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/mobile/profile.png) |
+| rc_bank_admin | dashboard | desktop | 0.59% | [main](../output/ui-comparison/main/rc_bank_admin/desktop/dashboard.png) | [live](../output/ui-comparison/live/rc_bank_admin/desktop/dashboard.png) | [diff](../output/ui-comparison/diff/rc_bank_admin/desktop/dashboard.png) |
+| rc_executive_member | dashboard | desktop | 0.57% | [main](../output/ui-comparison/main/rc_executive_member/desktop/dashboard.png) | [live](../output/ui-comparison/live/rc_executive_member/desktop/dashboard.png) | [diff](../output/ui-comparison/diff/rc_executive_member/desktop/dashboard.png) |
+| rc_platform_admin | admin-orgs | mobile | 0.56% | [main](../output/ui-comparison/main/rc_platform_admin/mobile/admin-orgs.png) | [live](../output/ui-comparison/live/rc_platform_admin/mobile/admin-orgs.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/mobile/admin-orgs.png) |
+| rc_support_member | dashboard | desktop | 0.55% | [main](../output/ui-comparison/main/rc_support_member/desktop/dashboard.png) | [live](../output/ui-comparison/live/rc_support_member/desktop/dashboard.png) | [diff](../output/ui-comparison/diff/rc_support_member/desktop/dashboard.png) |
+| rc_bank_swift | dashboard | desktop | 0.53% | [main](../output/ui-comparison/main/rc_bank_swift/desktop/dashboard.png) | [live](../output/ui-comparison/live/rc_bank_swift/desktop/dashboard.png) | [diff](../output/ui-comparison/diff/rc_bank_swift/desktop/dashboard.png) |
+| rc_bank_reviewer | dashboard | desktop | 0.51% | [main](../output/ui-comparison/main/rc_bank_reviewer/desktop/dashboard.png) | [live](../output/ui-comparison/live/rc_bank_reviewer/desktop/dashboard.png) | [diff](../output/ui-comparison/diff/rc_bank_reviewer/desktop/dashboard.png) |
+| rc_bank_admin | merchants | mobile | 0.48% | [main](../output/ui-comparison/main/rc_bank_admin/mobile/merchants.png) | [live](../output/ui-comparison/live/rc_bank_admin/mobile/merchants.png) | [diff](../output/ui-comparison/diff/rc_bank_admin/mobile/merchants.png) |
+| rc_platform_admin | admin-roles | desktop | 0.43% | [main](../output/ui-comparison/main/rc_platform_admin/desktop/admin-roles.png) | [live](../output/ui-comparison/live/rc_platform_admin/desktop/admin-roles.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/desktop/admin-roles.png) |
+| rc_platform_admin | admin-teams | desktop | 0.42% | [main](../output/ui-comparison/main/rc_platform_admin/desktop/admin-teams.png) | [live](../output/ui-comparison/live/rc_platform_admin/desktop/admin-teams.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/desktop/admin-teams.png) |
+| rc_platform_admin | profile | desktop | 0.41% | [main](../output/ui-comparison/main/rc_platform_admin/desktop/profile.png) | [live](../output/ui-comparison/live/rc_platform_admin/desktop/profile.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/desktop/profile.png) |
+| rc_bank_reviewer | profile | mobile | 0.38% | [main](../output/ui-comparison/main/rc_bank_reviewer/mobile/profile.png) | [live](../output/ui-comparison/live/rc_bank_reviewer/mobile/profile.png) | [diff](../output/ui-comparison/diff/rc_bank_reviewer/mobile/profile.png) |
+| rc_bank_swift | profile | mobile | 0.38% | [main](../output/ui-comparison/main/rc_bank_swift/mobile/profile.png) | [live](../output/ui-comparison/live/rc_bank_swift/mobile/profile.png) | [diff](../output/ui-comparison/diff/rc_bank_swift/mobile/profile.png) |
+| rc_bank_admin | profile | mobile | 0.36% | [main](../output/ui-comparison/main/rc_bank_admin/mobile/profile.png) | [live](../output/ui-comparison/live/rc_bank_admin/mobile/profile.png) | [diff](../output/ui-comparison/diff/rc_bank_admin/mobile/profile.png) |
+| rc_bank_intake | profile | mobile | 0.31% | [main](../output/ui-comparison/main/rc_bank_intake/mobile/profile.png) | [live](../output/ui-comparison/live/rc_bank_intake/mobile/profile.png) | [diff](../output/ui-comparison/diff/rc_bank_intake/mobile/profile.png) |
+| rc_bank_admin | profile | desktop | 0.27% | [main](../output/ui-comparison/main/rc_bank_admin/desktop/profile.png) | [live](../output/ui-comparison/live/rc_bank_admin/desktop/profile.png) | [diff](../output/ui-comparison/diff/rc_bank_admin/desktop/profile.png) |
+| rc_bank_reviewer | profile | desktop | 0.21% | [main](../output/ui-comparison/main/rc_bank_reviewer/desktop/profile.png) | [live](../output/ui-comparison/live/rc_bank_reviewer/desktop/profile.png) | [diff](../output/ui-comparison/diff/rc_bank_reviewer/desktop/profile.png) |
+| rc_bank_swift | profile | desktop | 0.2% | [main](../output/ui-comparison/main/rc_bank_swift/desktop/profile.png) | [live](../output/ui-comparison/live/rc_bank_swift/desktop/profile.png) | [diff](../output/ui-comparison/diff/rc_bank_swift/desktop/profile.png) |
+| rc_bank_intake | profile | desktop | 0.17% | [main](../output/ui-comparison/main/rc_bank_intake/desktop/profile.png) | [live](../output/ui-comparison/live/rc_bank_intake/desktop/profile.png) | [diff](../output/ui-comparison/diff/rc_bank_intake/desktop/profile.png) |
+| rc_platform_admin | settings | mobile | 0.15% | [main](../output/ui-comparison/main/rc_platform_admin/mobile/settings.png) | [live](../output/ui-comparison/live/rc_platform_admin/mobile/settings.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/mobile/settings.png) |
+| rc_support_member | profile | desktop | 0.09% | [main](../output/ui-comparison/main/rc_support_member/desktop/profile.png) | [live](../output/ui-comparison/live/rc_support_member/desktop/profile.png) | [diff](../output/ui-comparison/diff/rc_support_member/desktop/profile.png) |
+| rc_executive_member | profile | desktop | 0.09% | [main](../output/ui-comparison/main/rc_executive_member/desktop/profile.png) | [live](../output/ui-comparison/live/rc_executive_member/desktop/profile.png) | [diff](../output/ui-comparison/diff/rc_executive_member/desktop/profile.png) |
+| rc_committee_manager | audit | desktop | 0.07% | [main](../output/ui-comparison/main/rc_committee_manager/desktop/audit.png) | [live](../output/ui-comparison/live/rc_committee_manager/desktop/audit.png) | [diff](../output/ui-comparison/diff/rc_committee_manager/desktop/audit.png) |
+| rc_support_member | profile | mobile | 0.06% | [main](../output/ui-comparison/main/rc_support_member/mobile/profile.png) | [live](../output/ui-comparison/live/rc_support_member/mobile/profile.png) | [diff](../output/ui-comparison/diff/rc_support_member/mobile/profile.png) |
+| rc_executive_member | profile | mobile | 0.06% | [main](../output/ui-comparison/main/rc_executive_member/mobile/profile.png) | [live](../output/ui-comparison/live/rc_executive_member/mobile/profile.png) | [diff](../output/ui-comparison/diff/rc_executive_member/mobile/profile.png) |
+| rc_bank_intake | merchants | desktop | 0.04% | [main](../output/ui-comparison/main/rc_bank_intake/desktop/merchants.png) | [live](../output/ui-comparison/live/rc_bank_intake/desktop/merchants.png) | [diff](../output/ui-comparison/diff/rc_bank_intake/desktop/merchants.png) |
+| rc_committee_manager | profile | mobile | 0.04% | [main](../output/ui-comparison/main/rc_committee_manager/mobile/profile.png) | [live](../output/ui-comparison/live/rc_committee_manager/mobile/profile.png) | [diff](../output/ui-comparison/diff/rc_committee_manager/mobile/profile.png) |
+| rc_platform_admin | admin-screen-permissions | desktop | 0.02% | [main](../output/ui-comparison/main/rc_platform_admin/desktop/admin-screen-permissions.png) | [live](../output/ui-comparison/live/rc_platform_admin/desktop/admin-screen-permissions.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/desktop/admin-screen-permissions.png) |
+| rc_platform_admin | settings | desktop | 0.02% | [main](../output/ui-comparison/main/rc_platform_admin/desktop/settings.png) | [live](../output/ui-comparison/live/rc_platform_admin/desktop/settings.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/desktop/settings.png) |
+| rc_bank_admin | audit | mobile | 0.02% | [main](../output/ui-comparison/main/rc_bank_admin/mobile/audit.png) | [live](../output/ui-comparison/live/rc_bank_admin/mobile/audit.png) | [diff](../output/ui-comparison/diff/rc_bank_admin/mobile/audit.png) |
+| rc_bank_intake | merchants | mobile | 0.02% | [main](../output/ui-comparison/main/rc_bank_intake/mobile/merchants.png) | [live](../output/ui-comparison/live/rc_bank_intake/mobile/merchants.png) | [diff](../output/ui-comparison/diff/rc_bank_intake/mobile/merchants.png) |
+| rc_support_member | audit | mobile | 0.02% | [main](../output/ui-comparison/main/rc_support_member/mobile/audit.png) | [live](../output/ui-comparison/live/rc_support_member/mobile/audit.png) | [diff](../output/ui-comparison/diff/rc_support_member/mobile/audit.png) |
+| rc_executive_member | audit | mobile | 0.02% | [main](../output/ui-comparison/main/rc_executive_member/mobile/audit.png) | [live](../output/ui-comparison/live/rc_executive_member/mobile/audit.png) | [diff](../output/ui-comparison/diff/rc_executive_member/mobile/audit.png) |
+| rc_platform_admin | admin-reference-data | desktop | 0.01% | [main](../output/ui-comparison/main/rc_platform_admin/desktop/admin-reference-data.png) | [live](../output/ui-comparison/live/rc_platform_admin/desktop/admin-reference-data.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/desktop/admin-reference-data.png) |
+| rc_platform_admin | admin-reference-data | mobile | 0.01% | [main](../output/ui-comparison/main/rc_platform_admin/mobile/admin-reference-data.png) | [live](../output/ui-comparison/live/rc_platform_admin/mobile/admin-reference-data.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/mobile/admin-reference-data.png) |
+| rc_platform_admin | admin-screen-permissions | mobile | 0.01% | [main](../output/ui-comparison/main/rc_platform_admin/mobile/admin-screen-permissions.png) | [live](../output/ui-comparison/live/rc_platform_admin/mobile/admin-screen-permissions.png) | [diff](../output/ui-comparison/diff/rc_platform_admin/mobile/admin-screen-permissions.png) |
+| rc_committee_manager | audit | mobile | 0.01% | [main](../output/ui-comparison/main/rc_committee_manager/mobile/audit.png) | [live](../output/ui-comparison/live/rc_committee_manager/mobile/audit.png) | [diff](../output/ui-comparison/diff/rc_committee_manager/mobile/audit.png) |
