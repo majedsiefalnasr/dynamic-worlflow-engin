@@ -1,6 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Edit, Power, Search, Trash2, Building2, Network, Landmark } from "lucide-react";
+import {
+  Plus,
+  Edit,
+  Power,
+  Search,
+  Trash2,
+  Building2,
+  Network,
+  Landmark,
+  Loader2,
+} from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,13 +30,13 @@ import {
 import { toast } from "sonner";
 import {
   getOrgCategory,
-  orgsCell,
   teamsCell,
   roleCatalogCell,
-  logAudit,
   type OrgCategory,
   type OrgRecord,
 } from "@/lib/governance";
+import { useOrganizations, useOrgMutations } from "@/lib/data/organizations";
+import { isDomainError } from "@/lib/data/errors";
 import { DEMO_USERS, useAuth } from "@/lib/mock";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
 
@@ -63,81 +73,78 @@ const ORG_CATEGORIES: {
 
 function OrgsAdmin() {
   const { user } = useAuth();
-  const orgs = orgsCell.use();
+  const { data: orgs, isLoading } = useOrganizations();
   const teams = teamsCell.use();
   const roles = roleCatalogCell.use();
+  const mutations = useOrgMutations(
+    user ? { userId: String(user.id), userName: user.name, role: user.roleId } : undefined,
+  );
   const [q, setQ] = useState("");
   const [openAdd, setOpenAdd] = useState(false);
   const [editing, setEditing] = useState<OrgRecord | null>(null);
 
   const list = useMemo(() => {
+    if (!orgs) return [];
     const s = q.trim().toLowerCase();
     return orgs.filter(
       (o) => !s || o.label.toLowerCase().includes(s) || o.code.toLowerCase().includes(s),
     );
   }, [orgs, q]);
 
-  function audit(action: string, ref: string, notes?: string) {
-    if (user)
-      logAudit({
-        userId: String(user.id),
-        userName: user.name,
-        role: user.roleId,
-        action,
-        ref,
-        notes,
-      });
-  }
-
-  function slug(s: string) {
-    const base = s
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "_")
-      .replace(/[^a-z0-9_]/g, "");
-    return base || `org_${Date.now()}`;
-  }
-
-  function add(p: Payload) {
-    let code = slug(p.label);
-    if (orgs.some((o) => o.code === code)) code = `${code}_${Date.now().toString(36)}`;
-    const nextId = Math.max(0, ...orgs.map((o) => o.id)) + 1;
-    orgsCell.set((prev) => [
-      ...prev,
-      { id: nextId, code, label: p.label, active: true, category: p.category, builtin: false },
-    ]);
-    audit("إضافة جهة", code, p.label);
-    toast.success(`تمت إضافة الجهة "${p.label}"`);
-    setOpenAdd(false);
-  }
-
-  function update(target: OrgRecord, p: Payload) {
-    orgsCell.set((prev) =>
-      prev.map((o) =>
-        o.code === target.code ? { ...o, label: p.label, category: p.category } : o,
-      ),
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
     );
-    audit("تعديل جهة", target.code, p.label);
-    toast.success("تم حفظ التعديلات");
-    setEditing(null);
   }
 
-  function toggle(o: OrgRecord) {
-    orgsCell.set((prev) => prev.map((x) => (x.code === o.code ? { ...x, active: !x.active } : x)));
-    audit(o.active ? "إلغاء تفعيل جهة" : "تفعيل جهة", o.code, o.label);
-    toast.success(o.active ? `تم إلغاء تفعيل "${o.label}"` : `تم تفعيل "${o.label}"`);
+  async function add(p: Payload) {
+    try {
+      await mutations.createOrg.mutate({ name: p.label, metadata: { category: p.category } });
+      toast.success(`تمت إضافة الجهة "${p.label}"`);
+      setOpenAdd(false);
+    } catch (e) {
+      toast.error(isDomainError(e) ? e.message : "فشلت العملية.");
+    }
   }
 
-  function remove(o: OrgRecord) {
+  async function update(target: OrgRecord, p: Payload) {
+    try {
+      await mutations.updateOrg.mutate({
+        id: target.id,
+        name: p.label,
+        metadata: { category: p.category },
+      });
+      toast.success("تم حفظ التعديلات");
+      setEditing(null);
+    } catch (e) {
+      toast.error(isDomainError(e) ? e.message : "فشلت العملية.");
+    }
+  }
+
+  async function toggle(o: OrgRecord) {
+    try {
+      await mutations.toggleOrg.mutate({ id: o.id, is_active: !o.active });
+      toast.success(o.active ? `تم إلغاء تفعيل "${o.label}"` : `تم تفعيل "${o.label}"`);
+    } catch (e) {
+      toast.error(isDomainError(e) ? e.message : "فشلت العملية.");
+    }
+  }
+
+  async function remove(o: OrgRecord) {
     if (o.builtin) return toast.error("لا يمكن حذف جهة افتراضية.");
     const usedByTeams = teams.filter((t) => t.orgCode === o.code).length;
     const usedByRoles = roles.filter((r) => r.orgCode === o.code).length;
     if (usedByTeams || usedByRoles) {
       return toast.error(`لا يمكن الحذف، الجهة مرتبطة بـ ${usedByTeams} فريق و${usedByRoles} دور.`);
     }
-    orgsCell.set((prev) => prev.filter((x) => x.code !== o.code));
-    audit("حذف جهة", o.code, o.label);
-    toast.success(`تم حذف "${o.label}"`);
+    try {
+      await mutations.deleteOrg.mutate({ id: o.id });
+      toast.success(`تم حذف "${o.label}"`);
+    } catch (e) {
+      toast.error(isDomainError(e) ? e.message : "فشلت العملية.");
+    }
   }
 
   return (
@@ -278,7 +285,7 @@ function OrgsAdmin() {
               {list.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-4 py-12 text-center">
-                    {orgs.length === 0 ? (
+                    {(orgs?.length ?? 0) === 0 ? (
                       <div className="flex flex-col items-center gap-3">
                         <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary grid place-items-center">
                           <Network className="h-5 w-5" />
