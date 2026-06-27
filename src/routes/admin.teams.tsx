@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Plus,
   Users as UsersIcon,
@@ -10,6 +10,7 @@ import {
   Landmark,
   ShieldCheck,
   Trash2,
+  Loader2,
   type LucideIcon,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -35,7 +36,10 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { teamsCell, orgsCell, getOrgLabel, logAudit, type TeamRecord } from "@/lib/governance";
+import { getOrgLabel, type TeamRecord } from "@/lib/governance";
+import { useTeams, useTeamMutations } from "@/lib/data/teams";
+import { useOrganizations } from "@/lib/data/organizations";
+import { isDomainError } from "@/lib/data/errors";
 import { DEMO_USERS, useAuth } from "@/lib/mock";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
 import { cn } from "@/lib/utils";
@@ -55,93 +59,91 @@ type Payload = {
 
 function TeamsAdmin() {
   const { user } = useAuth();
-  const teams = teamsCell.use();
-  const orgs = orgsCell.use();
+  const { data: teams, isLoading: teamsLoading } = useTeams();
+  const { data: orgs } = useOrganizations();
+  const mutations = useTeamMutations(
+    user ? { userId: String(user.id), userName: user.name, role: user.roleId } : undefined,
+  );
   const [q, setQ] = useState("");
   const [orgFilter, setOrgFilter] = useState<string>("all");
   const [openAdd, setOpenAdd] = useState(false);
   const [editing, setEditing] = useState<TeamRecord | null>(null);
 
-  const list = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    return teams
-      .filter((t) => orgFilter === "all" || t.orgCode === orgFilter)
-      .filter((t) => !s || t.label.toLowerCase().includes(s) || t.code.toLowerCase().includes(s));
-  }, [teams, q, orgFilter]);
-
-  const stats = useMemo(
-    () => ({
-      total: teams.length,
-      bank: teams.filter((t) => t.orgCode === "bank").length,
-      committee: teams.filter((t) => t.orgCode === "committee").length,
-      inactive: teams.filter((t) => !t.active).length,
-    }),
-    [teams],
-  );
-
-  function audit(action: string, ref: string, notes?: string) {
-    if (user)
-      logAudit({
-        userId: String(user.id),
-        userName: user.name,
-        role: user.roleId,
-        action,
-        ref,
-        notes,
-      });
-  }
-
-  function add(p: Payload) {
-    const code = `team_${Date.now()}`;
-    const org = orgs.find((o) => o.code === p.orgCode);
-    const t: TeamRecord = {
-      id: Date.now(),
-      code,
-      label: p.label,
-      orgId: org?.id ?? 0,
-      orgCode: p.orgCode,
-      roleCode: "rc_bank_intake",
-      active: true,
-      builtin: false,
-    };
-    teamsCell.set((prev) => [...prev, t]);
-    audit("إضافة فريق", code, p.label);
-    toast.success(`تمت إضافة الفريق "${p.label}"`);
-    setOpenAdd(false);
-  }
-
-  function update(target: TeamRecord, p: Payload) {
-    const org = orgs.find((o) => o.code === p.orgCode);
-    teamsCell.set((prev) =>
-      prev.map((t) =>
-        t.code === target.code
-          ? { ...t, label: p.label, orgCode: p.orgCode, orgId: org?.id ?? t.orgId }
-          : t,
-      ),
+  if (teamsLoading || !teams || !orgs) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
     );
-    audit("تعديل فريق", target.code, p.label);
-    toast.success("تم حفظ التعديلات");
-    setEditing(null);
   }
 
-  function toggleActive(t: TeamRecord) {
+  const list = teams
+    .filter((t) => orgFilter === "all" || t.orgCode === orgFilter)
+    .filter((t) => {
+      const s = q.trim().toLowerCase();
+      return !s || t.label.toLowerCase().includes(s) || t.code.toLowerCase().includes(s);
+    });
+
+  const stats = {
+    total: teams.length,
+    bank: teams.filter((t) => t.orgCode === "bank").length,
+    committee: teams.filter((t) => t.orgCode === "committee").length,
+    inactive: teams.filter((t) => !t.active).length,
+  };
+
+  async function add(p: Payload) {
+    try {
+      const org = orgs?.find((o) => o.code === p.orgCode);
+      await mutations.createTeam.mutate({
+        name: p.label,
+        organization_id: org?.id ?? 0,
+      });
+      toast.success(`تمت إضافة الفريق "${p.label}"`);
+      setOpenAdd(false);
+    } catch (e) {
+      toast.error(isDomainError(e) ? e.message : "حدث خطأ أثناء الإضافة");
+    }
+  }
+
+  async function update(target: TeamRecord, p: Payload) {
+    try {
+      const org = orgs?.find((o) => o.code === p.orgCode);
+      await mutations.updateTeam.mutate({
+        id: target.id,
+        name: p.label,
+        organization_id: org?.id,
+      });
+      toast.success("تم حفظ التعديلات");
+      setEditing(null);
+    } catch (e) {
+      toast.error(isDomainError(e) ? e.message : "حدث خطأ أثناء التعديل");
+    }
+  }
+
+  async function toggleActive(t: TeamRecord) {
     const usersInTeam = DEMO_USERS.filter((u) => u.team?.code === t.code).length;
     if (t.active && usersInTeam > 0) {
       toast.info(`تنبيه: ${usersInTeam} مستخدماً مرتبطاً بهذا الفريق`);
     }
-    teamsCell.set((prev) => prev.map((x) => (x.code === t.code ? { ...x, active: !x.active } : x)));
-    audit(t.active ? "إلغاء تفعيل فريق" : "تفعيل فريق", t.code, t.label);
-    toast.success(t.active ? `تم إلغاء تفعيل "${t.label}"` : `تم تفعيل "${t.label}"`);
+    try {
+      await mutations.toggleTeam.mutate({ id: t.id, is_active: !t.active });
+      toast.success(t.active ? `تم إلغاء تفعيل "${t.label}"` : `تم تفعيل "${t.label}"`);
+    } catch (e) {
+      toast.error(isDomainError(e) ? e.message : "حدث خطأ أثناء تغيير الحالة");
+    }
   }
 
-  function remove(t: TeamRecord) {
+  async function remove(t: TeamRecord) {
     if (t.builtin) return toast.error("لا يمكن حذف فريق افتراضي. يمكنك إلغاء تفعيله بدلاً من ذلك.");
     const usersInTeam = DEMO_USERS.filter((u) => u.team?.code === t.code).length;
     if (usersInTeam > 0)
       return toast.error(`لا يمكن حذف الفريق، يوجد ${usersInTeam} مستخدماً مرتبطاً به.`);
-    teamsCell.set((prev) => prev.filter((x) => x.code !== t.code));
-    audit("حذف فريق", t.code, t.label);
-    toast.success(`تم حذف "${t.label}"`);
+    try {
+      await mutations.deleteTeam.mutate({ id: t.id });
+      toast.success(`تم حذف "${t.label}"`);
+    } catch (e) {
+      toast.error(isDomainError(e) ? e.message : "حدث خطأ أثناء الحذف");
+    }
   }
 
   function orgIcon(orgCode: string) {
