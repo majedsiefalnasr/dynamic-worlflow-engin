@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
-import { useAuth } from "@/lib/mock";
+import { useAuth, type RoleId } from "@/lib/mock";
 import {
   MANAGED_SCREENS,
   SCREEN_CAP_LABELS,
@@ -79,8 +79,8 @@ function ScreenPermissionsAdmin() {
   wfStore.assignments.use();
   wfStore.versions.use();
   const roleRows = roleCatalog
-    .filter((r) => r.active && r.id !== "rc_platform_admin")
-    .sort((a, b) => `${a.orgId}-${a.name}`.localeCompare(`${b.orgId}-${b.name}`));
+    .filter((r) => r.active && r.code !== "rc_platform_admin")
+    .sort((a, b) => `${a.orgCode}-${a.name}`.localeCompare(`${b.orgCode}-${b.name}`));
 
   function toggle(
     screen: ManualScreenKey,
@@ -89,14 +89,14 @@ function ScreenPermissionsAdmin() {
     cap: ScreenCapability,
     enabled: boolean,
   ) {
-    setScreenPermission(screen, role.id, cap, enabled);
+    setScreenPermission(screen, role.code as RoleId, cap, enabled);
     if (user) {
       logAudit({
         userId: String(user.id),
         userName: user.name,
         role: user.roleId,
         action: `${enabled ? "منح" : "إلغاء"} صلاحية ${SCREEN_CAP_LABELS[cap]}`,
-        ref: `${screen}:${role.id}`,
+        ref: `${screen}:${role.code}`,
         notes: `${label}، ${role.name}`,
       });
     }
@@ -187,7 +187,7 @@ function ScreenPermissionsAdmin() {
             </thead>
             <tbody>
               {roleRows.map((role) => {
-                const reqAccess = requestsAccessForRole(role.id);
+                const reqAccess = requestsAccessForRole(role.code as RoleId);
                 return (
                   <tr key={role.id} className="border-t hover:bg-muted/20">
                     <th
@@ -197,7 +197,7 @@ function ScreenPermissionsAdmin() {
                       <div>{role.name}</div>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
                         <Badge variant="secondary" className="text-xs font-normal">
-                          {getOrgLabel(role.orgId)}
+                          {getOrgLabel(role.orgCode)}
                         </Badge>
                       </div>
                     </th>
@@ -224,9 +224,10 @@ function ScreenPermissionsAdmin() {
                               </>
                             ) : (
                               (() => {
-                                const checked = manualScreenCan(role.id, g.key, c.cap);
+                                const checked = manualScreenCan(role.code as RoleId, g.key, c.cap);
                                 const viewLockedByAdd =
-                                  c.cap === "view" && manualScreenCan(role.id, g.key, "add");
+                                  c.cap === "view" &&
+                                  manualScreenCan(role.code as RoleId, g.key, "add");
                                 return (
                                   <Switch
                                     checked={checked}

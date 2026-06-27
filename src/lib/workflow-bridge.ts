@@ -156,17 +156,17 @@ export function dashboardBuckets(instances: WorkflowInstance[]) {
 }
 
 function wfUserForRole(roleId: RoleId): WfUser | null {
-  const role = roleCatalogCell.get().find((item) => item.id === roleId);
+  const role = roleCatalogCell.get().find((item) => item.code === roleId);
   if (!role) return null;
   return {
     id: `role_preview_${roleId}`,
     fullName: role.name,
     email: `${roleId}@role.local`,
-    organizationId: ORG_ID_ALIASES[role.orgId] ?? role.orgId,
+    organizationId: ORG_ID_ALIASES[role.orgCode] ?? role.orgCode,
     teamIds: teamsCell
       .get()
       .filter((team) => team.roleCode === roleId)
-      .map((team) => team.id),
+      .map((team) => team.code),
     roleIds: [ROLE_ID_ALIASES[roleId] ?? roleId],
   };
 }

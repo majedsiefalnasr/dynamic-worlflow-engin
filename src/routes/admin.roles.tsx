@@ -42,7 +42,7 @@ export const Route = createFileRoute("/admin/roles")({
   ),
 });
 
-type Payload = { name: string; orgId: string };
+type Payload = { name: string; orgCode: string };
 
 function RolesAdmin() {
   const { user } = useAuth();
@@ -56,7 +56,7 @@ function RolesAdmin() {
   const list = useMemo(() => {
     const s = q.trim().toLowerCase();
     return roles
-      .filter((r) => orgFilter === "all" || r.orgId === orgFilter)
+      .filter((r) => orgFilter === "all" || r.orgCode === orgFilter)
       .filter((r) => !s || r.name.toLowerCase().includes(s));
   }, [roles, q, orgFilter]);
 
@@ -79,32 +79,52 @@ function RolesAdmin() {
   }
 
   function add(p: Payload) {
-    const id = `rc_${Date.now()}`;
-    roleCatalogCell.set((prev) => [...prev, { id, ...p, active: true }]);
-    audit("إضافة دور", id, p.name);
+    const code = `rc_${Date.now()}`;
+    const org = orgs.find((o) => o.code === p.orgCode);
+    const nextId = Math.max(0, ...roles.map((r) => r.id)) + 1;
+    roleCatalogCell.set((prev) => [
+      ...prev,
+      {
+        id: nextId,
+        code,
+        name: p.name,
+        orgId: org?.id ?? 0,
+        orgCode: p.orgCode,
+        active: true,
+        builtin: false,
+      },
+    ]);
+    audit("إضافة دور", code, p.name);
     toast.success(`تمت إضافة الدور "${p.name}"`);
     setOpenAdd(false);
   }
 
   function update(target: RoleCatalogEntry, p: Payload) {
-    roleCatalogCell.set((prev) => prev.map((r) => (r.id === target.id ? { ...r, ...p } : r)));
-    audit("تعديل دور", target.id, p.name);
+    const org = orgs.find((o) => o.code === p.orgCode);
+    roleCatalogCell.set((prev) =>
+      prev.map((r) =>
+        r.code === target.code
+          ? { ...r, name: p.name, orgCode: p.orgCode, orgId: org?.id ?? r.orgId }
+          : r,
+      ),
+    );
+    audit("تعديل دور", target.code, p.name);
     toast.success("تم حفظ التعديلات");
     setEditing(null);
   }
 
   function toggle(r: RoleCatalogEntry) {
     roleCatalogCell.set((prev) =>
-      prev.map((x) => (x.id === r.id ? { ...x, active: !x.active } : x)),
+      prev.map((x) => (x.code === r.code ? { ...x, active: !x.active } : x)),
     );
-    audit(r.active ? "إلغاء تفعيل دور" : "تفعيل دور", r.id, r.name);
+    audit(r.active ? "إلغاء تفعيل دور" : "تفعيل دور", r.code, r.name);
     toast.success(r.active ? `تم إلغاء تفعيل "${r.name}"` : `تم تفعيل "${r.name}"`);
   }
 
   function remove(r: RoleCatalogEntry) {
     if (r.builtin) return toast.error("لا يمكن حذف دور افتراضي. يمكنك إلغاء تفعيله.");
-    roleCatalogCell.set((prev) => prev.filter((x) => x.id !== r.id));
-    audit("حذف دور", r.id, r.name);
+    roleCatalogCell.set((prev) => prev.filter((x) => x.code !== r.code));
+    audit("حذف دور", r.code, r.name);
     toast.success(`تم حذف "${r.name}"`);
   }
 
@@ -144,7 +164,7 @@ function RolesAdmin() {
           <SelectContent>
             <SelectItem value="all">كل الجهات</SelectItem>
             {orgs.map((o) => (
-              <SelectItem key={o.id} value={o.id}>
+              <SelectItem key={o.id} value={o.code}>
                 {o.label}
               </SelectItem>
             ))}
@@ -179,7 +199,7 @@ function RolesAdmin() {
             </thead>
             <tbody>
               {list.map((r) => {
-                const userCount = usersByRole[r.id] ?? 0;
+                const userCount = usersByRole[r.code] ?? 0;
                 return (
                   <tr key={r.id} className="border-t hover:bg-muted/30">
                     <td className="px-4 py-3">
@@ -190,7 +210,7 @@ function RolesAdmin() {
                         <div className="font-medium">{r.name}</div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs">{getOrgLabel(r.orgId)}</td>
+                    <td className="px-4 py-3 text-xs">{getOrgLabel(r.orgCode)}</td>
                     <td className="px-4 py-3 text-xs tabular-nums">{userCount}</td>
                     <td className="px-4 py-3">
                       {r.builtin ? (
@@ -289,12 +309,12 @@ function RoleDialog({
 }: {
   title: string;
   initial?: RoleCatalogEntry;
-  orgs: { id: string; label: string }[];
+  orgs: { id: number; code: string; label: string }[];
   onSave: (p: Payload) => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [orgId, setOrgId] = useState<string>(initial?.orgId ?? orgs[0]?.id ?? "bank");
-  const valid = name.trim().length > 0 && orgId;
+  const [orgCode, setOrgCode] = useState<string>(initial?.orgCode ?? orgs[0]?.code ?? "bank");
+  const valid = name.trim().length > 0 && orgCode;
   return (
     <DialogContent dir="rtl" className="sm:max-w-md">
       <DialogHeader>
@@ -312,13 +332,13 @@ function RoleDialog({
         </div>
         <div className="space-y-1.5">
           <Label>الجهة *</Label>
-          <Select value={orgId} onValueChange={setOrgId}>
+          <Select value={orgCode} onValueChange={setOrgCode}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {orgs.map((o) => (
-                <SelectItem key={o.id} value={o.id}>
+                <SelectItem key={o.id} value={o.code}>
                   {o.label}
                 </SelectItem>
               ))}
@@ -327,7 +347,7 @@ function RoleDialog({
         </div>
       </div>
       <DialogFooter>
-        <Button disabled={!valid} onClick={() => valid && onSave({ name: name.trim(), orgId })}>
+        <Button disabled={!valid} onClick={() => valid && onSave({ name: name.trim(), orgCode })}>
           {initial ? "حفظ التعديلات" : "إضافة الدور"}
         </Button>
       </DialogFooter>

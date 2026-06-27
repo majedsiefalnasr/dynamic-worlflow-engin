@@ -113,14 +113,14 @@ function SystemUsers() {
   }
 
   function buildUserFields(p: Payload) {
-    const team = teams.find((t) => t.id === p.teamId);
-    const org = orgs.find((o) => o.id === p.orgId);
+    const team = teams.find((t) => t.code === p.teamId);
+    const org = orgs.find((o) => o.code === p.orgId);
     const bankIndex =
       p.orgId === "bank" && p.entityId ? banks.findIndex((e) => e.id === p.entityId) : -1;
     const bankEntity = bankIndex >= 0 ? banks[bankIndex] : undefined;
     return {
-      organization: org ? { id: 0, code: org.id, name: org.label } : null,
-      team: team ? { id: 0, code: team.id, name: team.label } : null,
+      organization: org ? { id: org.id, code: org.code, name: org.label } : null,
+      team: team ? { id: team.id, code: team.code, name: team.label } : null,
       bank: bankEntity ? { id: bankIndex + 1, code: bankEntity.id, name: bankEntity.name } : null,
       bankId: bankEntity ? bankIndex + 1 : null,
     };
@@ -133,7 +133,7 @@ function SystemUsers() {
       email: p.email,
       phone: p.phone,
       roleId: p.roleId,
-      roleLabel: roles.find((r) => r.id === p.roleId)?.name ?? getRoleLabel(p.roleId),
+      roleLabel: roles.find((r) => r.code === p.roleId)?.name ?? getRoleLabel(p.roleId),
       role: null,
       ...buildUserFields(p),
       avatar: computeAvatar(p.name),
@@ -167,7 +167,7 @@ function SystemUsers() {
       email: p.email,
       phone: p.phone,
       roleId: p.roleId,
-      roleLabel: roles.find((r) => r.id === p.roleId)?.name ?? getRoleLabel(p.roleId),
+      roleLabel: roles.find((r) => r.code === p.roleId)?.name ?? getRoleLabel(p.roleId),
       ...buildUserFields(p),
       avatar: computeAvatar(p.name),
     };
@@ -207,11 +207,11 @@ function SystemUsers() {
   }
 
   function deriveInitialRoleId(u: User): string {
-    return roles.some((r) => r.id === u.roleId) ? u.roleId : (roles[0]?.id ?? "");
+    return roles.some((r) => r.code === u.roleId) ? u.roleId : (roles[0]?.code ?? "");
   }
 
   function roleLabelFor(u: User): string {
-    return roles.find((r) => r.id === u.roleId)?.name ?? u.roleId;
+    return roles.find((r) => r.code === u.roleId)?.name ?? u.roleId;
   }
 
   return (
@@ -284,7 +284,7 @@ function SystemUsers() {
           <SelectContent>
             <SelectItem value="all">كل الجهات</SelectItem>
             {orgs.map((o) => (
-              <SelectItem key={o.id} value={o.id}>
+              <SelectItem key={o.id} value={o.code}>
                 {o.label}
               </SelectItem>
             ))}
@@ -491,12 +491,12 @@ function UserDialog({
   initial?: User;
   initialRoleId?: string;
   banks: { id: string; name: string }[];
-  orgs: { id: string; label: string }[];
-  teams: { id: string; label: string; orgKind: string }[];
-  roles: { id: string; name: string; orgId: string }[];
+  orgs: { id: number; code: string; label: string }[];
+  teams: { id: number; code: string; label: string; orgCode: string }[];
+  roles: { id: number; code: string; name: string; orgCode: string }[];
   onSave: (p: Payload) => void;
 }) {
-  const defaultOrg = initial?.organization?.code ?? orgs[0]?.id ?? "bank";
+  const defaultOrg = initial?.organization?.code ?? orgs[0]?.code ?? "bank";
   const [name, setName] = useState(initial?.name ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
@@ -506,18 +506,18 @@ function UserDialog({
       (defaultOrg === "bank" ? (banks[0]?.id ?? null) : null),
   );
 
-  const teamsForOrg = teams.filter((t) => t.orgKind === orgId);
-  const rolesForOrg = roles.filter((r) => r.orgId === orgId);
+  const teamsForOrg = teams.filter((t) => t.orgCode === orgId);
+  const rolesForOrg = roles.filter((r) => r.orgCode === orgId);
 
-  const [teamId, setTeamId] = useState<string>(initial?.team?.code ?? teamsForOrg[0]?.id ?? "");
-  const [roleId, setRoleId] = useState<string>(initialRoleId ?? rolesForOrg[0]?.id ?? "");
+  const [teamId, setTeamId] = useState<string>(initial?.team?.code ?? teamsForOrg[0]?.code ?? "");
+  const [roleId, setRoleId] = useState<string>(initialRoleId ?? rolesForOrg[0]?.code ?? "");
 
   function switchOrg(next: string) {
     setOrgId(next);
-    const nt = teams.filter((t) => t.orgKind === next);
-    const nr = roles.filter((r) => r.orgId === next);
-    setTeamId(nt[0]?.id ?? "");
-    setRoleId(nr[0]?.id ?? "");
+    const nt = teams.filter((t) => t.orgCode === next);
+    const nr = roles.filter((r) => r.orgCode === next);
+    setTeamId(nt[0]?.code ?? "");
+    setRoleId(nr[0]?.code ?? "");
     if (next === "bank") {
       if (!entityId) setEntityId(banks[0]?.id ?? null);
     } else {
@@ -568,7 +568,7 @@ function UserDialog({
             </SelectTrigger>
             <SelectContent>
               {orgs.map((o) => (
-                <SelectItem key={o.id} value={o.id}>
+                <SelectItem key={o.id} value={o.code}>
                   {o.label}
                 </SelectItem>
               ))}
@@ -608,7 +608,7 @@ function UserDialog({
               </SelectTrigger>
               <SelectContent>
                 {teamsForOrg.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
+                  <SelectItem key={t.id} value={t.code}>
                     {t.label}
                   </SelectItem>
                 ))}
@@ -629,7 +629,7 @@ function UserDialog({
               </SelectTrigger>
               <SelectContent>
                 {rolesForOrg.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
+                  <SelectItem key={r.id} value={r.code}>
                     {r.name}
                   </SelectItem>
                 ))}

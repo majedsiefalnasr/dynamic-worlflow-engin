@@ -73,7 +73,7 @@ function OrgsAdmin() {
   const list = useMemo(() => {
     const s = q.trim().toLowerCase();
     return orgs.filter(
-      (o) => !s || o.label.toLowerCase().includes(s) || o.id.toLowerCase().includes(s),
+      (o) => !s || o.label.toLowerCase().includes(s) || o.code.toLowerCase().includes(s),
     );
   }, [orgs, q]);
 
@@ -99,10 +99,14 @@ function OrgsAdmin() {
   }
 
   function add(p: Payload) {
-    let id = slug(p.label);
-    if (orgs.some((o) => o.id === id)) id = `${id}_${Date.now().toString(36)}`;
-    orgsCell.set((prev) => [...prev, { id, label: p.label, active: true, category: p.category }]);
-    audit("إضافة جهة", id, p.label);
+    let code = slug(p.label);
+    if (orgs.some((o) => o.code === code)) code = `${code}_${Date.now().toString(36)}`;
+    const nextId = Math.max(0, ...orgs.map((o) => o.id)) + 1;
+    orgsCell.set((prev) => [
+      ...prev,
+      { id: nextId, code, label: p.label, active: true, category: p.category, builtin: false },
+    ]);
+    audit("إضافة جهة", code, p.label);
     toast.success(`تمت إضافة الجهة "${p.label}"`);
     setOpenAdd(false);
   }
@@ -110,29 +114,29 @@ function OrgsAdmin() {
   function update(target: OrgRecord, p: Payload) {
     orgsCell.set((prev) =>
       prev.map((o) =>
-        o.id === target.id ? { ...o, label: p.label, category: p.category, isBank: undefined } : o,
+        o.code === target.code ? { ...o, label: p.label, category: p.category } : o,
       ),
     );
-    audit("تعديل جهة", target.id, p.label);
+    audit("تعديل جهة", target.code, p.label);
     toast.success("تم حفظ التعديلات");
     setEditing(null);
   }
 
   function toggle(o: OrgRecord) {
-    orgsCell.set((prev) => prev.map((x) => (x.id === o.id ? { ...x, active: !x.active } : x)));
-    audit(o.active ? "إلغاء تفعيل جهة" : "تفعيل جهة", o.id, o.label);
+    orgsCell.set((prev) => prev.map((x) => (x.code === o.code ? { ...x, active: !x.active } : x)));
+    audit(o.active ? "إلغاء تفعيل جهة" : "تفعيل جهة", o.code, o.label);
     toast.success(o.active ? `تم إلغاء تفعيل "${o.label}"` : `تم تفعيل "${o.label}"`);
   }
 
   function remove(o: OrgRecord) {
     if (o.builtin) return toast.error("لا يمكن حذف جهة افتراضية.");
-    const usedByTeams = teams.filter((t) => t.orgKind === o.id).length;
-    const usedByRoles = roles.filter((r) => r.orgId === o.id).length;
+    const usedByTeams = teams.filter((t) => t.orgCode === o.code).length;
+    const usedByRoles = roles.filter((r) => r.orgCode === o.code).length;
     if (usedByTeams || usedByRoles) {
       return toast.error(`لا يمكن الحذف، الجهة مرتبطة بـ ${usedByTeams} فريق و${usedByRoles} دور.`);
     }
-    orgsCell.set((prev) => prev.filter((x) => x.id !== o.id));
-    audit("حذف جهة", o.id, o.label);
+    orgsCell.set((prev) => prev.filter((x) => x.code !== o.code));
+    audit("حذف جهة", o.code, o.label);
     toast.success(`تم حذف "${o.label}"`);
   }
 
@@ -200,9 +204,9 @@ function OrgsAdmin() {
             </thead>
             <tbody>
               {list.map((o) => {
-                const teamCount = teams.filter((t) => t.orgKind === o.id).length;
-                const roleCount = roles.filter((r) => r.orgId === o.id).length;
-                const userCount = DEMO_USERS.filter((u) => u.organization?.code === o.id).length;
+                const teamCount = teams.filter((t) => t.orgCode === o.code).length;
+                const roleCount = roles.filter((r) => r.orgCode === o.code).length;
+                const userCount = DEMO_USERS.filter((u) => u.organization?.code === o.code).length;
                 return (
                   <tr key={o.id} className="border-t hover:bg-muted/30">
                     <td className="px-4 py-3">
@@ -213,7 +217,7 @@ function OrgsAdmin() {
                         <div>
                           <div className="font-medium">{o.label}</div>
                           <div className="text-xs text-muted-foreground" dir="ltr">
-                            {o.id}
+                            {o.code}
                           </div>
                         </div>
                       </div>

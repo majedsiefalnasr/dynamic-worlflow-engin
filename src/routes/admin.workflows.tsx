@@ -395,10 +395,13 @@ function StageRoutingTab({ versionId }: { versionId: string }) {
   const wfRoles = wfStore.roles.use();
 
   const orgLabel = (id?: string) =>
-    orgs.find((x) => x.id === id)?.label ?? wfOrgs.find((x) => x.id === id)?.name ?? id ?? "—";
-  const teamLabel = (id?: string) => teamsAll.find((x) => x.id === id)?.label ?? id ?? "—";
+    orgs.find((x) => x.code === id)?.label ?? wfOrgs.find((x) => x.id === id)?.name ?? id ?? "—";
+  const teamLabel = (id?: string) => teamsAll.find((x) => x.code === id)?.label ?? id ?? "—";
   const roleLabel = (id?: string) =>
-    rolesAll.find((x) => x.id === id)?.name ?? wfRoles.find((x) => x.id === id)?.name ?? id ?? "—";
+    rolesAll.find((x) => x.code === id)?.name ??
+    wfRoles.find((x) => x.id === id)?.name ??
+    id ??
+    "—";
   const remove = (id: string) => {
     if (isAssignmentBackedStageRoutingRule(id)) {
       return toast.error("هذه القاعدة إلزامية لأنها مشتقة من صلاحيات المرحلة");
@@ -459,8 +462,8 @@ function StageRoutingSection({
   const [roleId, setRoleId] = useState("");
   const [processLabel, setProcessLabel] = useState(stage.name);
   const NONE = "__none__";
-  const teams = orgId && orgId !== NONE ? teamsAll.filter((t) => t.orgKind === orgId) : teamsAll;
-  const roles = orgId && orgId !== NONE ? rolesAll.filter((r) => r.orgId === orgId) : rolesAll;
+  const teams = orgId && orgId !== NONE ? teamsAll.filter((t) => t.orgCode === orgId) : teamsAll;
+  const roles = orgId && orgId !== NONE ? rolesAll.filter((r) => r.orgCode === orgId) : rolesAll;
 
   const add = () => {
     if (!processLabel.trim()) return toast.error("المسمى مطلوب");
@@ -507,7 +510,7 @@ function StageRoutingSection({
           <SelectContent>
             <SelectItem value={NONE}>— أي —</SelectItem>
             {orgs.map((o) => (
-              <SelectItem key={o.id} value={o.id}>
+              <SelectItem key={o.id} value={o.code}>
                 {o.label}
               </SelectItem>
             ))}
@@ -520,7 +523,7 @@ function StageRoutingSection({
           <SelectContent>
             <SelectItem value={NONE}>— أي —</SelectItem>
             {teams.map((t) => (
-              <SelectItem key={t.id} value={t.id}>
+              <SelectItem key={t.id} value={t.code}>
                 {t.label}
               </SelectItem>
             ))}
@@ -533,7 +536,7 @@ function StageRoutingSection({
           <SelectContent>
             <SelectItem value={NONE}>— أي —</SelectItem>
             {roles.map((r) => (
-              <SelectItem key={r.id} value={r.id}>
+              <SelectItem key={r.id} value={r.code}>
                 {r.name}
               </SelectItem>
             ))}
@@ -644,9 +647,9 @@ function StageGroupsManager({ versionId }: { versionId: string }) {
     );
   };
 
-  const orgLabel = (id?: string) => orgs.find((x) => x.id === id)?.label ?? id ?? "";
-  const teamLabel = (id?: string) => teams.find((x) => x.id === id)?.label ?? id ?? "";
-  const roleLabel = (id?: string) => roles.find((x) => x.id === id)?.name ?? id ?? "";
+  const orgLabel = (id?: string) => orgs.find((x) => x.code === id)?.label ?? id ?? "";
+  const teamLabel = (id?: string) => teams.find((x) => x.code === id)?.label ?? id ?? "";
+  const roleLabel = (id?: string) => roles.find((x) => x.code === id)?.name ?? id ?? "";
 
   const ruleLabel = (r: StageGroupAudience) => {
     const parts = [
@@ -694,9 +697,7 @@ function StageGroupsManager({ versionId }: { versionId: string }) {
               </Badge>
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-sm">{g.name}</div>
-                <div className="text-xs text-muted-foreground truncate">
-                  {audienceSummary(g)}
-                </div>
+                <div className="text-xs text-muted-foreground truncate">{audienceSummary(g)}</div>
               </div>
               <span className="text-xs text-muted-foreground">
                 {stages.filter((s) => s.groupId === g.id).length} مرحلة
@@ -748,12 +749,12 @@ function AudienceDialog({ group, onClose }: { group: StageGroup; onClose: () => 
   const [teamId, setTeamId] = useState(AUD_ANY);
   const [roleId, setRoleId] = useState(AUD_ANY);
 
-  const teamsForOrg = orgId !== AUD_ANY ? teams.filter((t) => t.orgKind === orgId) : teams;
-  const rolesForOrg = orgId !== AUD_ANY ? roles.filter((r) => r.orgId === orgId) : roles;
+  const teamsForOrg = orgId !== AUD_ANY ? teams.filter((t) => t.orgCode === orgId) : teams;
+  const rolesForOrg = orgId !== AUD_ANY ? roles.filter((r) => r.orgCode === orgId) : roles;
 
-  const orgLabel = (id?: string) => orgs.find((x) => x.id === id)?.label ?? id ?? "";
-  const teamLabel = (id?: string) => teams.find((x) => x.id === id)?.label ?? id ?? "";
-  const roleLabel = (id?: string) => roles.find((x) => x.id === id)?.name ?? id ?? "";
+  const orgLabel = (id?: string) => orgs.find((x) => x.code === id)?.label ?? id ?? "";
+  const teamLabel = (id?: string) => teams.find((x) => x.code === id)?.label ?? id ?? "";
+  const roleLabel = (id?: string) => roles.find((x) => x.code === id)?.name ?? id ?? "";
 
   const addRow = () => {
     if (orgId === AUD_ANY && teamId === AUD_ANY && roleId === AUD_ANY) {
@@ -813,7 +814,7 @@ function AudienceDialog({ group, onClose }: { group: StageGroup; onClose: () => 
             <SelectContent>
               <SelectItem value={AUD_ANY}>أي جهة</SelectItem>
               {orgs.map((o) => (
-                <SelectItem key={o.id} value={o.id}>
+                <SelectItem key={o.id} value={o.code}>
                   {o.label}
                 </SelectItem>
               ))}
@@ -829,7 +830,7 @@ function AudienceDialog({ group, onClose }: { group: StageGroup; onClose: () => 
             <SelectContent>
               <SelectItem value={AUD_ANY}>أي فريق</SelectItem>
               {teamsForOrg.map((t) => (
-                <SelectItem key={t.id} value={t.id}>
+                <SelectItem key={t.id} value={t.code}>
                   {t.label}
                 </SelectItem>
               ))}
@@ -845,7 +846,7 @@ function AudienceDialog({ group, onClose }: { group: StageGroup; onClose: () => 
             <SelectContent>
               <SelectItem value={AUD_ANY}>أي دور</SelectItem>
               {rolesForOrg.map((r) => (
-                <SelectItem key={r.id} value={r.id}>
+                <SelectItem key={r.id} value={r.code}>
                   {r.name}
                 </SelectItem>
               ))}
@@ -1016,9 +1017,9 @@ function AssignmentsTab({ versionId }: { versionId: string }) {
 
   // Cascade: teams/roles filter by selected org
   const teams =
-    orgId && orgId !== "__none__" ? teamsAll.filter((t) => t.orgKind === orgId) : teamsAll;
+    orgId && orgId !== "__none__" ? teamsAll.filter((t) => t.orgCode === orgId) : teamsAll;
   const roles =
-    orgId && orgId !== "__none__" ? rolesAll.filter((r) => r.orgId === orgId) : rolesAll;
+    orgId && orgId !== "__none__" ? rolesAll.filter((r) => r.orgCode === orgId) : rolesAll;
 
   const NONE = "__none__";
   const add = () => {
@@ -1046,10 +1047,10 @@ function AssignmentsTab({ versionId }: { versionId: string }) {
     wfStore.assignments.update((arr) => arr.filter((x) => x.id !== id));
 
   const orgLabel = (id?: string) =>
-    orgs.find((o) => o.id === id)?.label ?? wfOrgs.find((o) => o.id === id)?.name ?? "—";
-  const teamLabel = (id?: string) => teamsAll.find((t) => t.id === id)?.label ?? "—";
+    orgs.find((o) => o.code === id)?.label ?? wfOrgs.find((o) => o.id === id)?.name ?? "—";
+  const teamLabel = (id?: string) => teamsAll.find((t) => t.code === id)?.label ?? "—";
   const roleLabel = (id?: string) =>
-    rolesAll.find((r) => r.id === id)?.name ?? wfRoles.find((r) => r.id === id)?.name ?? "—";
+    rolesAll.find((r) => r.code === id)?.name ?? wfRoles.find((r) => r.id === id)?.name ?? "—";
 
   return (
     <Card className="p-5">
@@ -1080,7 +1081,7 @@ function AssignmentsTab({ versionId }: { versionId: string }) {
           <SelectContent>
             <SelectItem value={NONE}>— أي —</SelectItem>
             {orgs.map((o) => (
-              <SelectItem key={o.id} value={o.id}>
+              <SelectItem key={o.id} value={o.code}>
                 {o.label}
               </SelectItem>
             ))}
@@ -1093,7 +1094,7 @@ function AssignmentsTab({ versionId }: { versionId: string }) {
           <SelectContent>
             <SelectItem value={NONE}>— أي —</SelectItem>
             {teams.map((t) => (
-              <SelectItem key={t.id} value={t.id}>
+              <SelectItem key={t.id} value={t.code}>
                 {t.label}
               </SelectItem>
             ))}
@@ -1106,7 +1107,7 @@ function AssignmentsTab({ versionId }: { versionId: string }) {
           <SelectContent>
             <SelectItem value={NONE}>— أي —</SelectItem>
             {roles.map((r) => (
-              <SelectItem key={r.id} value={r.id}>
+              <SelectItem key={r.id} value={r.code}>
                 {r.name}
               </SelectItem>
             ))}
@@ -1185,8 +1186,8 @@ function FieldsTab({ versionId }: { versionId: string }) {
   const [label, setLabel] = useState("");
   const [type, setType] = useState<FieldDefinition["type"]>("text");
   const [options, setOptions] = useState("");
-  const [sourceValue, setSourceValue] = useState<DynamicSourceOption>(
-    () => (referenceTables[0] ? referenceSourceValue(referenceTables[0].key) : ("" as DynamicSourceOption)),
+  const [sourceValue, setSourceValue] = useState<DynamicSourceOption>(() =>
+    referenceTables[0] ? referenceSourceValue(referenceTables[0].key) : ("" as DynamicSourceOption),
   );
   const [groupId, setGroupId] = useState<string>(NO_GROUP);
   const [groupName, setGroupName] = useState("");
@@ -1236,7 +1237,11 @@ function FieldsTab({ versionId }: { versionId: string }) {
     setKey("");
     setLabel("");
     setOptions("");
-    setSourceValue(referenceTables[0] ? referenceSourceValue(referenceTables[0].key) : ("" as DynamicSourceOption));
+    setSourceValue(
+      referenceTables[0]
+        ? referenceSourceValue(referenceTables[0].key)
+        : ("" as DynamicSourceOption),
+    );
   };
   const remove = (id: string) => {
     const f = fields.find((x) => x.id === id);

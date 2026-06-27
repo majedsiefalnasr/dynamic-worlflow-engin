@@ -52,7 +52,7 @@ function BankUsers() {
   const [openAdd, setOpenAdd] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [q, setQ] = useState("");
-  const roles = roleCatalogCell.use().filter((role) => role.active && role.orgId === "bank");
+  const roles = roleCatalogCell.use().filter((role) => role.active && role.orgCode === "bank");
   const teams = teamsCell.use();
   const [roleFilter, setRoleFilter] = useState<"all" | RoleId>("all");
   const bankId = user?.bankId ?? null;
@@ -132,7 +132,7 @@ function BankUsers() {
                   roleLabel: getRoleLabel(payload.roleId),
                   role: null,
                   organization: user!.organization,
-                  team: team ? { id: 0, code: team.id, name: team.label } : null,
+                  team: team ? { id: team.id, code: team.code, name: team.label } : null,
                   bank: user!.bank,
                   bankId: user!.bankId,
                   isActive: true,
@@ -149,7 +149,7 @@ function BankUsers() {
                   role: user!.roleId,
                   action: "إضافة موظف للجهة",
                   ref: u.email,
-                  notes: `${u.name}، ${roles.find((role) => role.id === u.roleId)?.name ?? u.roleId}`,
+                  notes: `${u.name}، ${roles.find((role) => role.code === u.roleId)?.name ?? u.roleId}`,
                 });
                 toast.success(`تمت إضافة ${u.name}`);
                 refresh();
@@ -199,7 +199,7 @@ function BankUsers() {
           <SelectContent>
             <SelectItem value="all">كل الأدوار</SelectItem>
             {roles.map((role) => (
-              <SelectItem key={role.id} value={role.id}>
+              <SelectItem key={role.id} value={role.code}>
                 {role.name}
               </SelectItem>
             ))}
@@ -246,7 +246,7 @@ function BankUsers() {
                   <td className="px-4 py-3 text-xs">{u.email}</td>
                   <td className="px-4 py-3">
                     <Badge variant="secondary">
-                      {roles.find((role) => role.id === u.roleId)?.name ?? u.roleId}
+                      {roles.find((role) => role.code === u.roleId)?.name ?? u.roleId}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
@@ -318,7 +318,7 @@ function BankUsers() {
                   ...DEMO_USERS[idx],
                   ...payload,
                   roleLabel: getRoleLabel(payload.roleId),
-                  team: team ? { id: 0, code: team.id, name: team.label } : null,
+                  team: team ? { id: team.id, code: team.code, name: team.label } : null,
                   avatar: computeAvatar(payload.name),
                 };
                 upsertWorkflowUser(DEMO_USERS[idx]);
@@ -375,13 +375,15 @@ function UserDialog({
 }: {
   title: string;
   initial?: User;
-  roles: { id: string; name: string }[];
+  roles: { id: number; code: string; name: string }[];
   onSave: (u: UserPayload) => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
-  const [roleId, setRoleId] = useState<RoleId>(initial?.roleId ?? roles[0]?.id ?? "rc_bank_intake");
+  const [roleId, setRoleId] = useState<RoleId>(
+    initial?.roleId ?? (roles[0]?.code as RoleId) ?? "rc_bank_intake",
+  );
   const valid = name.trim() && /\S+@\S+\.\S+/.test(email);
 
   return (
@@ -413,7 +415,7 @@ function UserDialog({
             </SelectTrigger>
             <SelectContent>
               {roles.map((role) => (
-                <SelectItem key={role.id} value={role.id}>
+                <SelectItem key={role.id} value={role.code}>
                   {role.name}
                 </SelectItem>
               ))}

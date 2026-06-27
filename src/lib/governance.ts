@@ -187,118 +187,143 @@ export function referenceLabels(tableKey: string): string[] {
 export type OrgCategory = "bank" | "committee" | "other";
 
 export type OrgRecord = {
-  id: string;
+  id: number;
+  code: string;
   label: string;
+  category: OrgCategory;
   active: boolean;
-  builtin?: boolean;
-  category?: OrgCategory;
-  /** Legacy value kept for stored records created before categories existed. */
-  isBank?: boolean;
+  builtin: boolean;
+  _version?: number;
 };
 
 const DEFAULT_ORGS: OrgRecord[] = [
-  { id: "bank", label: "البنوك التجارية", active: true, builtin: true, category: "bank" },
+  { id: 1, code: "bank", label: "البنوك التجارية", active: true, builtin: true, category: "bank" },
   {
-    id: "committee",
+    id: 2,
+    code: "committee",
     label: "اللجنة الوطنية لتمويل الواردات",
     active: true,
     builtin: true,
     category: "committee",
   },
-  { id: "platform", label: "إدارة النظام", active: true, builtin: true, category: "other" },
+  {
+    id: 3,
+    code: "platform",
+    label: "إدارة النظام",
+    active: true,
+    builtin: true,
+    category: "other",
+  },
 ];
 
 export const orgsCell = cell<OrgRecord[]>("orgs", DEFAULT_ORGS);
-
-export function getOrgCategory(org: OrgRecord | string | null | undefined): OrgCategory {
-  const record = typeof org === "string" ? orgsCell.get().find((item) => item.id === org) : org;
-  if (!record) return "other";
-  if (record.category) return record.category;
-  if (record.isBank || record.id === "bank") return "bank";
-  if (record.id === "committee") return "committee";
-  return "other";
+if (orgsCell.get().some((o) => typeof o.id === "string")) {
+  orgsCell.set(DEFAULT_ORGS);
 }
 
-export function getOrgLabel(id: string | null | undefined): string {
-  if (!id) return "—";
-  return orgsCell.get().find((o) => o.id === id)?.label ?? id;
+export function getOrgCategory(org: OrgRecord | string | null | undefined): OrgCategory {
+  const record = typeof org === "string" ? orgsCell.get().find((item) => item.code === org) : org;
+  return record?.category ?? "other";
+}
+
+export function getOrgLabel(code: string | null | undefined): string {
+  if (!code) return "—";
+  return orgsCell.get().find((o) => o.code === code)?.label ?? code;
 }
 
 export function activeOrgs(): OrgRecord[] {
   return orgsCell.get().filter((o) => o.active);
 }
 
-export type TeamOrgKind = string;
 export type TeamRecord = {
-  id: string;
+  id: number;
+  code: string;
   label: string;
-  orgKind: TeamOrgKind;
-  roleCode: RoleId;
+  orgId: number;
+  orgCode: string;
+  roleCode?: RoleId;
   active: boolean;
-  builtin?: boolean;
+  builtin: boolean;
+  _version?: number;
 };
 
 const DEFAULT_TEAMS: TeamRecord[] = [
   {
-    id: "team_entry",
+    id: 1,
+    code: "team_entry",
     label: "فريق الإدخال",
-    orgKind: "bank",
+    orgId: 1,
+    orgCode: "bank",
     roleCode: "rc_bank_intake",
     active: true,
     builtin: true,
   },
   {
-    id: "team_internal",
+    id: 2,
+    code: "team_internal",
     label: "فريق المراجعة الداخلية",
-    orgKind: "bank",
+    orgId: 1,
+    orgCode: "bank",
     roleCode: "rc_bank_reviewer",
     active: true,
     builtin: true,
   },
   {
-    id: "team_fx",
+    id: 3,
+    code: "team_fx",
     label: "فريق العمليات الخارجية",
-    orgKind: "bank",
+    orgId: 1,
+    orgCode: "bank",
     roleCode: "rc_bank_swift",
     active: true,
     builtin: true,
   },
   {
-    id: "team_admin_bank",
+    id: 4,
+    code: "team_admin_bank",
     label: "فريق الإدارة (البنك)",
-    orgKind: "bank",
+    orgId: 1,
+    orgCode: "bank",
     roleCode: "rc_bank_admin",
     active: true,
     builtin: true,
   },
   {
-    id: "team_support",
+    id: 5,
+    code: "team_support",
     label: "فريق اللجنة المساندة",
-    orgKind: "committee",
+    orgId: 2,
+    orgCode: "committee",
     roleCode: "rc_support_member",
     active: true,
     builtin: true,
   },
   {
-    id: "team_exec",
+    id: 6,
+    code: "team_exec",
     label: "فريق اللجنة التنفيذية",
-    orgKind: "committee",
+    orgId: 2,
+    orgCode: "committee",
     roleCode: "rc_executive_member",
     active: true,
     builtin: true,
   },
   {
-    id: "team_fx_confirm",
+    id: 7,
+    code: "team_fx_confirm",
     label: "فريق تأكيد العمليات",
-    orgKind: "committee",
+    orgId: 2,
+    orgCode: "committee",
     roleCode: "rc_committee_manager",
     active: true,
     builtin: true,
   },
   {
-    id: "team_platform_admin",
+    id: 8,
+    code: "team_platform_admin",
     label: "إدارة النظام",
-    orgKind: "platform",
+    orgId: 3,
+    orgCode: "platform",
     roleCode: "rc_platform_admin",
     active: true,
     builtin: true,
@@ -306,113 +331,125 @@ const DEFAULT_TEAMS: TeamRecord[] = [
 ];
 
 export const teamsCell = cell<TeamRecord[]>("teams", DEFAULT_TEAMS);
-
-export function getTeam(id: string | undefined | null): TeamRecord | undefined {
-  if (!id) return undefined;
-  return teamsCell.get().find((t) => t.id === id);
+if (teamsCell.get().some((t) => typeof t.id === "string")) {
+  teamsCell.set(DEFAULT_TEAMS);
 }
 
-export function getTeamLabel(id: string | undefined | null): string {
-  return getTeam(id)?.label ?? "—";
+export function getTeam(code: string | undefined | null): TeamRecord | undefined {
+  if (!code) return undefined;
+  return teamsCell.get().find((t) => t.code === code);
 }
 
-export function getTeamRole(id: string | undefined | null): RoleId | undefined {
-  return getTeam(id)?.roleCode;
+export function getTeamLabel(code: string | undefined | null): string {
+  return getTeam(code)?.label ?? "—";
 }
 
-export function activeTeamsByKind(kind: TeamOrgKind): TeamRecord[] {
-  return teamsCell.get().filter((t) => t.active && t.orgKind === kind);
+export function getTeamRole(code: string | undefined | null): RoleId | undefined {
+  return getTeam(code)?.roleCode;
+}
+
+export function activeTeamsByKind(orgCode: string): TeamRecord[] {
+  return teamsCell.get().filter((t) => t.active && t.orgCode === orgCode);
 }
 
 export type RoleCatalogEntry = {
-  id: string;
+  id: number;
+  code: string;
   name: string;
-  orgId: string;
+  orgId: number;
+  orgCode: string;
   active: boolean;
-  builtin?: boolean;
+  builtin: boolean;
+  _version?: number;
 };
 
 const DEFAULT_ROLE_CATALOG: RoleCatalogEntry[] = [
   {
-    id: "rc_platform_admin",
+    id: 1,
+    code: "rc_platform_admin",
     name: getRoleLabel("rc_platform_admin"),
-    orgId: "platform",
+    orgId: 3,
+    orgCode: "platform",
     active: true,
     builtin: true,
   },
   {
-    id: "rc_bank_admin",
+    id: 2,
+    code: "rc_bank_admin",
     name: getRoleLabel("rc_bank_admin"),
-    orgId: "bank",
+    orgId: 1,
+    orgCode: "bank",
     active: true,
     builtin: true,
   },
   {
-    id: "rc_bank_intake",
+    id: 3,
+    code: "rc_bank_intake",
     name: getRoleLabel("rc_bank_intake"),
-    orgId: "bank",
+    orgId: 1,
+    orgCode: "bank",
     active: true,
     builtin: true,
   },
   {
-    id: "rc_bank_reviewer",
+    id: 4,
+    code: "rc_bank_reviewer",
     name: getRoleLabel("rc_bank_reviewer"),
-    orgId: "bank",
+    orgId: 1,
+    orgCode: "bank",
     active: true,
     builtin: true,
   },
   {
-    id: "rc_bank_swift",
+    id: 5,
+    code: "rc_bank_swift",
     name: getRoleLabel("rc_bank_swift"),
-    orgId: "bank",
+    orgId: 1,
+    orgCode: "bank",
     active: true,
     builtin: true,
   },
   {
-    id: "rc_support_member",
+    id: 6,
+    code: "rc_support_member",
     name: getRoleLabel("rc_support_member"),
-    orgId: "committee",
+    orgId: 2,
+    orgCode: "committee",
     active: true,
     builtin: true,
   },
   {
-    id: "rc_executive_member",
+    id: 7,
+    code: "rc_executive_member",
     name: getRoleLabel("rc_executive_member"),
-    orgId: "committee",
+    orgId: 2,
+    orgCode: "committee",
     active: true,
     builtin: true,
   },
   {
-    id: "rc_committee_manager",
+    id: 8,
+    code: "rc_committee_manager",
     name: getRoleLabel("rc_committee_manager"),
-    orgId: "committee",
+    orgId: 2,
+    orgCode: "committee",
     active: true,
     builtin: true,
   },
 ];
 
 export const roleCatalogCell = cell<RoleCatalogEntry[]>("roleCatalog", DEFAULT_ROLE_CATALOG);
-
-// Normalize previously persisted records to the current role schema.
-if (
-  roleCatalogCell
-    .get()
-    .some((role) =>
-      Object.keys(role).some((key) => !["id", "name", "orgId", "active", "builtin"].includes(key)),
-    )
-) {
-  roleCatalogCell.set((roles) =>
-    roles.map(({ id, name, orgId, active, builtin }) => ({ id, name, orgId, active, builtin })),
-  );
+if (roleCatalogCell.get().some((r) => typeof r.id === "string")) {
+  roleCatalogCell.set(DEFAULT_ROLE_CATALOG);
 }
 
-export function activeRolesByOrg(orgId: string): RoleCatalogEntry[] {
-  return roleCatalogCell.get().filter((r) => r.active && r.orgId === orgId);
+export function activeRolesByOrg(orgCode: string): RoleCatalogEntry[] {
+  return roleCatalogCell.get().filter((r) => r.active && r.orgCode === orgCode);
 }
 
-export function getRoleCatalog(id: string | undefined | null): RoleCatalogEntry | undefined {
-  if (!id) return undefined;
-  return roleCatalogCell.get().find((r) => r.id === id);
+export function getRoleCatalog(code: string | undefined | null): RoleCatalogEntry | undefined {
+  if (!code) return undefined;
+  return roleCatalogCell.get().find((r) => r.code === code);
 }
 
 export type Permission =
