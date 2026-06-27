@@ -10,10 +10,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { syncWorkflowUser } from "@/lib/workflow-bridge";
+import { hasApiBase } from "@/lib/data/source";
 
 export function RoleSwitcher() {
   const { user } = useAuth();
-  if (!user) return null;
+  if (!user || hasApiBase()) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

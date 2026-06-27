@@ -8,12 +8,15 @@ import {
   useRouterState,
   useNavigate,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 import appCss from "../styles.css?url";
 import { AppShell } from "@/components/layout/AppShell";
 import { useAuth } from "@/lib/mock";
 import { Toaster } from "@/components/ui/sonner";
 import { seedIfEmpty } from "@/lib/workflow-engine";
+import { fetchMe, isLive } from "@/lib/data/auth";
+import { tokenStore } from "@/lib/data/http";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -25,8 +28,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         name: "description",
         content: "منصة رقمية لإدارة ومراجعة طلبات تمويل الواردات للجنة الوطنية لتمويل الواردات",
       },
-      { property: "og:title", content: "منصة إدارة وتمويل الواردات | اللجنة الوطنية لتمويل الواردات" },
-      { name: "twitter:title", content: "منصة إدارة وتمويل الواردات | اللجنة الوطنية لتمويل الواردات" },
+      {
+        property: "og:title",
+        content: "منصة إدارة وتمويل الواردات | اللجنة الوطنية لتمويل الواردات",
+      },
+      {
+        name: "twitter:title",
+        content: "منصة إدارة وتمويل الواردات | اللجنة الوطنية لتمويل الواردات",
+      },
       {
         property: "og:description",
         content: "منصة رقمية لإدارة ومراجعة طلبات تمويل الواردات للجنة الوطنية لتمويل الواردات",
@@ -98,9 +107,27 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const [rehydrating, setRehydrating] = useState(() => isLive() && !!tokenStore.get());
+
   useEffect(() => {
     seedIfEmpty();
   }, []);
+
+  useEffect(() => {
+    if (!rehydrating) return;
+    fetchMe()
+      .catch(() => {})
+      .finally(() => setRehydrating(false));
+  }, [rehydrating]);
+
+  if (rehydrating) {
+    return (
+      <div className="flex h-screen items-center justify-center" dir="rtl">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <DirectionProvider dir="rtl">

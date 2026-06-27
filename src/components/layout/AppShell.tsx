@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth, auth, type RoleId } from "@/lib/mock";
+import { logout as authLogout, isLive } from "@/lib/data/auth";
 import { notificationsCell, markAllRead, screenPermsCell, type ScreenKey } from "@/lib/governance";
 import { canScreen } from "@/lib/workflow-bridge";
 import { wfStore } from "@/lib/workflow-engine";
@@ -318,8 +319,9 @@ export function AppShell() {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onSelect={() => {
-                    auth.logout();
+                  onSelect={async () => {
+                    if (isLive()) await authLogout();
+                    else auth.logout();
                     nav({ to: "/login" });
                   }}
                   className="text-destructive"
