@@ -65,6 +65,13 @@ function primaryCompany(m: Merchant) {
   return linkedCompanies(m)[0];
 }
 
+// Entity/bank reconciliation is deferred to the banks adapter (Task 7).
+// Until then, ENTITIES ids ("e1", "e2", ...) line up 1:1 with the seeded
+// DEMO_USERS bank ids (1, 2, ...), so bridge numeric bankId -> entity id here.
+function bankIdToEntityId(bankId?: number | null): string | undefined {
+  return bankId != null ? `e${bankId}` : undefined;
+}
+
 function Merchants() {
   const { user } = useAuth();
   const merchants = merchantsCell.use();
@@ -80,13 +87,15 @@ function Merchants() {
   const isBankAdmin = user?.roleId === "rc_bank_admin";
   const canManage = !isPlatform && canScreen(user, "merchants", "add");
 
+  const userEntityId = bankIdToEntityId(user?.bankId);
+
   // Bank admins see only their own bank's merchants
   const scoped = useMemo(
     () =>
-      isBankAdmin && user?.bankId
-        ? merchants.filter((m) => m.entityId === String(user.bankId))
+      isBankAdmin && userEntityId
+        ? merchants.filter((m) => m.entityId === userEntityId)
         : merchants,
-    [merchants, isBankAdmin, user?.bankId],
+    [merchants, isBankAdmin, userEntityId],
   );
 
   const filtered = useMemo(() => {
@@ -135,7 +144,7 @@ function Merchants() {
               </DialogTrigger>
               <MerchantDialog
                 title="تسجيل تاجر جديد"
-                defaultEntityId={user?.bankId != null ? String(user.bankId) : undefined}
+                defaultEntityId={userEntityId}
                 onSave={(m) => {
                   merchantsCell.set((prev) => [m, ...prev]);
                   logAudit({
@@ -388,7 +397,7 @@ function Merchants() {
           <MerchantDialog
             title="تعديل بيانات التاجر"
             initial={editing}
-            defaultEntityId={user?.bankId != null ? String(user.bankId) : undefined}
+            defaultEntityId={userEntityId}
             onSave={(m) => {
               merchantsCell.set((prev) =>
                 prev.map((x) =>
