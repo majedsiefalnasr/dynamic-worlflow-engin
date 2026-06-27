@@ -1,11 +1,11 @@
-import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { assertResourceEnv } from "@/lib/data/source";
+import { makeQueryClient } from "@/lib/data/query";
 import { routeTree } from "./routeTree.gen";
 
 export const getRouter = () => {
   assertResourceEnv();
-  const queryClient = new QueryClient();
+  const queryClient = makeQueryClient();
 
   const router = createRouter({
     routeTree,
