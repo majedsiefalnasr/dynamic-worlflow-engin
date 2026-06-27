@@ -62,8 +62,13 @@ const ADMIN_SCREENS = [
     ],
     probes: [
       {
+        // The active workflow version may be published (read-only); stage
+        // editing is gated by canEdit = !isPublished (admin.workflows.tsx:362,
+        // 503-505). Click "نسخة جديدة" first to create/switch to an editable
+        // draft version before reaching for the add-stage button.
         id: "wf-stages-add-empty",
         setup: [
+          { action: "click", trigger: "نسخة جديدة" },
           { action: "click-tab", trigger: "المراحل" },
           { action: "click", trigger: "إضافة مرحلة" },
         ],
@@ -76,8 +81,10 @@ const ADMIN_SCREENS = [
         // page.getByLabel() cannot find these inputs regardless of the
         // string used. Toast text fixed to "تم إضافة المرحلة" (line 434);
         // matrix previously had "تمت إضافة المرحلة" which does not exist.
+        // Same published-version lock as wf-stages-add-empty above.
         id: "wf-stages-add-valid",
         setup: [
+          { action: "click", trigger: "نسخة جديدة" },
           { action: "click-tab", trigger: "المراحل" },
           { action: "fill", label: "رمز المرحلة", value: "TEST_PROBE" },
           { action: "fill", label: "اسم المرحلة", value: "مرحلة اختبار" },
@@ -91,7 +98,9 @@ const ADMIN_SCREENS = [
       },
       {
         // Button text fixed: ActionsTab's add button is "إضافة" (no
-        // "إجراء" suffix) — admin.workflows.tsx:2062-2064.
+        // "إجراء" suffix) — admin.workflows.tsx:2062-2064. Unlike the
+        // stages tab, the actions tab has no canEdit/isPublished gate
+        // (admin.workflows.tsx:2051-2063), so no version-draft step needed.
         id: "wf-actions-add-empty",
         setup: [
           { action: "click-tab", trigger: "الإجراءات" },
@@ -105,7 +114,8 @@ const ADMIN_SCREENS = [
         // all on this form — page.getByLabel() cannot find these inputs.
         // Button text fixed to "إضافة" (line 2062-2064) and toast fixed to
         // "تم إضافة الإجراء" (line 2027); matrix previously had
-        // "إضافة إجراء"/"تمت إضافة الإجراء" which do not exist.
+        // "إضافة إجراء"/"تمت إضافة الإجراء" which do not exist. No
+        // version-draft step needed (see wf-actions-add-empty above).
         id: "wf-actions-add-valid",
         setup: [
           { action: "click-tab", trigger: "الإجراءات" },
@@ -340,58 +350,11 @@ const MERCHANTS_SCREEN = {
   interactions: [
     { key: "dialog-view", type: "dialog", trigger: "عرض" },
   ],
-  probes: [
-    {
-      // Button text fixed: the dialog's submit button is "حفظ التاجر"
-      // (merchants.tsx:892), not "تسجيل" ("تسجيل" only appears in the
-      // dialog title "تسجيل تاجر جديد" at line 243). Click-only probe
-      // (no fill), so once the trigger text is correct this should work,
-      // modulo capture.mjs's click handler failing on a disabled button
-      // (out of this file's scope).
-      id: "merchants-add-empty",
-      setup: [
-        { action: "click", trigger: "تاجر جديد" },
-        { action: "click", trigger: "حفظ التاجر" },
-      ],
-      expect: { kind: "invalid", text: "submit-disabled" },
-    },
-    {
-      // NOTE (unverified): "اسم التاجر *"/"الرقم الضريبي *"/
-      // "تاريخ انتهاء البطاقة الضريبية *" are <Label> text (merchants.tsx
-      // Field() component, used at lines 683,690,693) with no htmlFor,
-      // sibling to an unconnected <Input> — page.getByLabel() cannot find
-      // them. Added the "*" suffix present in source.
-      // Additionally, "اسم الشركة"/"رقم السجل التجاري" are NOT labels at
-      // all — they are placeholder text on raw <Input> elements inside the
-      // "الشركات المرتبطة" (linked companies) repeater (lines 834,862,
-      // plus an unlabeled date input at 866). A default empty company row
-      // is already rendered (lines 629-641) without needing to click
-      // "إضافة شركة" first, but page.getByLabel() still cannot reach these
-      // 3 inputs regardless of the string used. These 3 fields ARE
-      // required for `valid` (merchants.tsx:643-648 requires at least one
-      // company with name+cr+crExpiry), so they cannot simply be dropped —
-      // left in place as the closest-to-correct setup, though this probe
-      // cannot pass without a capture.mjs change (e.g. locating inputs by
-      // placeholder) which is out of this file's scope.
-      // Button text fixed to "حفظ التاجر" (merchants.tsx:892).
-      id: "merchants-add-valid",
-      setup: [
-        { action: "click", trigger: "تاجر جديد" },
-        { action: "fill", label: "اسم التاجر *", value: "تاجر اختبار الفحص" },
-        { action: "fill", label: "الرقم الضريبي *", value: "PROBE-TAX-999" },
-        { action: "fill-date", label: "تاريخ انتهاء البطاقة الضريبية *", value: "2027-12-31" },
-        { action: "fill", label: "اسم الشركة", value: "شركة اختبار" },
-        { action: "fill", label: "رقم السجل التجاري", value: "CR-PROBE-999" },
-        { action: "fill-date", label: "تاريخ انتهاء السجل", value: "2027-12-31" },
-        { action: "click", trigger: "حفظ التاجر" },
-      ],
-      expect: {
-        kind: "valid",
-        text: "تم تسجيل التاجر",
-        cleanup: [{ action: "close-dialog" }, { action: "delete-row", text: "تاجر اختبار الفحص" }],
-      },
-    },
-  ],
+  // No add-merchant probes: the "تاجر جديد" button is gated by
+  // canManage = !isPlatform && canScreen(...) (merchants.tsx:171,235), so
+  // rc_platform_admin — the only role probes run under (capture.mjs) — never
+  // sees it. Probing merchant creation would require running probes under a
+  // bank-level role instead, which is out of scope here.
 };
 
 export const ROLES = [

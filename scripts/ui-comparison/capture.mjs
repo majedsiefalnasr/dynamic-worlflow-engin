@@ -65,6 +65,13 @@ async function runSetupAction(page, step) {
     }
     case "click": {
       const btn = page.getByRole("button", { name: step.trigger }).first();
+      await btn.waitFor({ state: "visible", timeout: 10_000 });
+      // A disabled submit button (the point of the "submit-disabled"
+      // probes) never becomes actionable, so skip the click rather than
+      // let Playwright's actionability wait stall the whole probe —
+      // runProbes' isSubmitDisabled check re-reads this same button after
+      // the setup loop returns.
+      if (await btn.isDisabled()) break;
       await btn.click();
       await page.waitForTimeout(500);
       break;
@@ -169,72 +176,80 @@ async function runInteractions(page, screen, roleId, viewportName, outRoot, fail
   }
 }
 
+async function runOneProbe(page, screen, roleId, mode, baseUrl, probe, failures) {
+  // Navigate back to the screen's base state before each probe
+  if (mode === "mock") {
+    await gotoClientSide(page, screen.path);
+  } else {
+    await page.goto(`${baseUrl}${screen.path}`, { waitUntil: "networkidle", timeout: 15_000 });
+  }
+  await page.waitForTimeout(500);
+
+  // Run setup steps
+  for (const step of probe.setup) {
+    await runSetupAction(page, step);
+  }
+
+  // Capture result
+  let result;
+  if (probe.expect.kind === "invalid") {
+    const toastText = await captureToastText(page);
+    if (toastText) {
+      result = toastText;
+    } else {
+      const lastClickStep = [...probe.setup].reverse().find((s) => s.action === "click");
+      if (lastClickStep) {
+        const disabled = await isSubmitDisabled(page, lastClickStep.trigger);
+        result = disabled ? "submit-disabled" : "no-error-shown";
+      } else {
+        result = "no-error-shown";
+      }
+    }
+  } else {
+    const toastText = await captureToastText(page);
+    result = toastText || "no-toast";
+
+    if (probe.expect.cleanup) {
+      await page.waitForTimeout(500);
+      for (const step of probe.expect.cleanup) {
+        try {
+          await runSetupAction(page, step);
+        } catch (cleanupErr) {
+          const probeInput = probe.setup.find((s) => s.action === "fill");
+          failures.push({
+            roleId,
+            screenKey: screen.key,
+            viewport: "desktop",
+            url: page.url(),
+            error: `Cleanup failed for probe ${probe.id} (created: ${probeInput?.value ?? "unknown"}): ${String(cleanupErr)}`,
+          });
+        }
+      }
+    }
+  }
+
+  return {
+    id: probe.id,
+    roleId,
+    screenKey: screen.key,
+    result,
+    expectedKind: probe.expect.kind,
+    expectedText: probe.expect.text ?? null,
+  };
+}
+
 async function runProbes(page, screen, roleId, mode, baseUrl, probeResults, failures) {
   if (!screen.probes) return;
   for (const probe of screen.probes) {
     try {
-      // Navigate back to the screen's base state before each probe
-      if (mode === "mock") {
-        await gotoClientSide(page, screen.path);
-      } else {
-        await page.goto(`${baseUrl}${screen.path}`, { waitUntil: "networkidle", timeout: 15_000 });
-      }
-      await page.waitForTimeout(500);
-
-      // Run setup steps
-      for (const step of probe.setup) {
-        await runSetupAction(page, step);
-      }
-
-      // Capture result
-      let result;
-      if (probe.expect.kind === "invalid") {
-        const toastText = await captureToastText(page);
-        if (toastText) {
-          result = toastText;
-        } else {
-          // Check if submit button from last click step is disabled
-          const lastClickStep = [...probe.setup].reverse().find((s) => s.action === "click");
-          if (lastClickStep) {
-            const disabled = await isSubmitDisabled(page, lastClickStep.trigger);
-            result = disabled ? "submit-disabled" : "no-error-shown";
-          } else {
-            result = "no-error-shown";
-          }
-        }
-      } else {
-        // Valid case — check for success toast
-        const toastText = await captureToastText(page);
-        result = toastText || "no-toast";
-
-        // Cleanup
-        if (probe.expect.cleanup) {
-          await page.waitForTimeout(500);
-          for (const step of probe.expect.cleanup) {
-            try {
-              await runSetupAction(page, step);
-            } catch (cleanupErr) {
-              const probeInput = probe.setup.find((s) => s.action === "fill");
-              failures.push({
-                roleId,
-                screenKey: screen.key,
-                viewport: "desktop",
-                url: page.url(),
-                error: `Cleanup failed for probe ${probe.id} (created: ${probeInput?.value ?? "unknown"}): ${String(cleanupErr)}`,
-              });
-            }
-          }
-        }
-      }
-
-      probeResults.push({
-        id: probe.id,
-        roleId,
-        screenKey: screen.key,
-        result,
-        expectedKind: probe.expect.kind,
-        expectedText: probe.expect.text ?? null,
-      });
+      const PROBE_TIMEOUT_MS = 45_000;
+      const result = await Promise.race([
+        runOneProbe(page, screen, roleId, mode, baseUrl, probe, failures),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Probe timeout 45s")), PROBE_TIMEOUT_MS)
+        ),
+      ]);
+      probeResults.push(result);
     } catch (error) {
       probeResults.push({
         id: probe.id,
