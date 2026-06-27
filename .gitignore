@@ -43,3 +43,6 @@ backend/
 /output/ui-comparison/main/
 /output/ui-comparison/live/
 /output/ui-comparison/diff/
+
+# Graphify knowledge graph output (regenerable)
+graphify-out/

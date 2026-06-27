@@ -1,8 +1,17 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft, ShieldCheck, Lock, MessageSquare, Download,
-  User as UserIcon, Building2, MapPin, CalendarDays, Activity, AlertTriangle,
+  ArrowLeft,
+  ShieldCheck,
+  Lock,
+  MessageSquare,
+  Download,
+  User as UserIcon,
+  Building2,
+  MapPin,
+  CalendarDays,
+  Activity,
+  AlertTriangle,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/card";
@@ -10,25 +19,46 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import {
-  DynamicForm, type DynamicField,
-} from "@/components/workflow/DynamicForm";
+import { DynamicForm, type DynamicField } from "@/components/workflow/DynamicForm";
 import { OrgProcessStepper } from "@/components/workflow/OrgProcessStepper";
 import {
-  wfStore, getInitialStage, getStageFields, getViewerFields, getFieldGroups, getFieldDefs, getAvailableActions,
-  applyAction, saveDraftData, getInstanceHistory, canExecute, canView,
+  wfStore,
+  getInitialStage,
+  getStageFields,
+  getViewerFields,
+  getFieldGroups,
+  getFieldDefs,
+  getAvailableActions,
+  applyAction,
+  saveDraftData,
+  getInstanceHistory,
+  canExecute,
+  canView,
 } from "@/lib/workflow-engine";
 import { useWfUser } from "@/lib/workflow-engine/wfAuth";
 import { useAuth } from "@/lib/mock";
 import {
-  canScreen, progressForInstance, instanceRef, instanceTitle,
-  instanceGoodsType, instanceAmount, instanceCurrency, instanceInvoiceNumber, isDuplicateInvoice,
+  canScreen,
+  progressForInstance,
+  instanceRef,
+  instanceTitle,
+  instanceGoodsType,
+  instanceAmount,
+  instanceCurrency,
+  instanceInvoiceNumber,
+  isDuplicateInvoice,
   stageLabel,
 } from "@/lib/workflow-bridge";
 import { ScreenGuard } from "@/components/workflow/ScreenGuard";
 import { toast } from "sonner";
 import { isApiEnabled, ApiError } from "@/lib/api/client";
-import { useRequestDetailQuery, useRequestHistoryQuery, useRequestMutations, useWorkflowStagesQuery, useRequestsQuery } from "@/lib/api/requests";
+import {
+  useRequestDetailQuery,
+  useRequestHistoryQuery,
+  useRequestMutations,
+  useWorkflowStagesQuery,
+  useRequestsQuery,
+} from "@/lib/api/requests";
 import { useMerchantsQuery } from "@/lib/api/merchants";
 
 export const Route = createFileRoute("/workflows/instances/$id")({
@@ -65,7 +95,9 @@ function InstancePage() {
   const canActOnRequests = canScreen(legacyUser, "requests", "edit");
   const merchantsQuery = useMerchantsQuery(requestsApi && isNew);
 
-  const publishedVer = defs[0] ? versions.find((v) => v.workflowId === defs[0].id && v.isPublished) : undefined;
+  const publishedVer = defs[0]
+    ? versions.find((v) => v.workflowId === defs[0].id && v.isPublished)
+    : undefined;
   const initialStage = publishedVer ? getInitialStage(publishedVer.id) : undefined;
 
   const newInstance = useMemo<typeof detailQuery.data | undefined>(() => {
@@ -91,23 +123,31 @@ function InstancePage() {
   const instance = isNew
     ? newInstance
     : requestsApi
-      ? (detailData && detailData.id && detailData.id !== "null" ? { ...detailData } : undefined)
+      ? detailData && detailData.id && detailData.id !== "null"
+        ? { ...detailData }
+        : undefined
       : cellInstances.find((i) => i.id === id);
 
   const apiVersionId = instance?.workflowVersionId;
   const stagesQuery = useWorkflowStagesQuery(apiVersionId, requestsApi && !isNew);
   const stages = requestsApi
-    ? (cellStages.length > 0 ? cellStages : (stagesQuery.data ?? []))
+    ? cellStages.length > 0
+      ? cellStages
+      : (stagesQuery.data ?? [])
     : cellStages;
   const stage = instance ? stages.find((s) => s.id === instance.currentStageId) : undefined;
 
-  const isExecutor = isNew || requestsApi
-    ? (isNew || isAdmin)
-    : (user ? canExecute(instance?.currentStageId ?? "", user) : false);
+  // Resolve execute permission from live assignments in both modes. `user` is
+  // the engine WfUser (synthesized from the live auth user via wfAuth); live
+  // assignments use backend role/team/org ids which the synthesized user carries.
+  const isExecutor = isNew
+    ? true
+    : (user ? canExecute(instance?.currentStageId ?? "", user) : false) || isAdmin;
 
   const stageFields: DynamicField[] = useMemo(() => {
     if (!instance) return [];
-    if (isNew || isExecutor || isAdmin) return getStageFields(instance.workflowVersionId, instance.currentStageId);
+    if (isNew || isExecutor || isAdmin)
+      return getStageFields(instance.workflowVersionId, instance.currentStageId);
     return getViewerFields(instance.workflowVersionId, user);
   }, [instance, isNew, isExecutor, isAdmin, user]);
 
@@ -118,6 +158,22 @@ function InstancePage() {
 
   const [draftData, setDraftData] = useState<Record<string, unknown>>(instance?.data ?? {});
   const [comments, setComments] = useState("");
+
+  // Re-hydrate the local draft whenever the underlying request changes identity
+  // (navigating to a different request, or the server advancing it to a new
+  // stage/version after a draft save or action). Keyed on id+version so user
+  // edits between saves are not clobbered on re-render.
+  const instanceVersion = requestsApi
+    ? (instance as { _version?: number })?._version
+    : instance?.updatedAt;
+  const lastLoadedKey = useRef<string>("");
+  useEffect(() => {
+    if (!instance) return;
+    const key = `${instance.id}:${instanceVersion ?? ""}`;
+    if (key === lastLoadedKey.current) return;
+    lastLoadedKey.current = key;
+    setDraftData(instance.data);
+  }, [instance, instanceVersion]);
 
   if (requestsApi && !isNew && detailQuery.isLoading) {
     return (
@@ -130,12 +186,26 @@ function InstancePage() {
   if (requestsApi && !isNew && detailQuery.error) {
     return (
       <div>
-        <PageHeader title="خطأ" actions={<Link to="/workflows"><Button variant="outline">رجوع</Button></Link>} />
+        <PageHeader
+          title="خطأ"
+          actions={
+            <Link to="/workflows">
+              <Button variant="outline">رجوع</Button>
+            </Link>
+          }
+        />
         <Card className="p-6 text-center">
           <p className="text-sm text-muted-foreground">
-            {detailQuery.error instanceof ApiError ? detailQuery.error.message : "تعذّر تحميل الطلب"}
+            {detailQuery.error instanceof ApiError
+              ? detailQuery.error.message
+              : "تعذّر تحميل الطلب"}
           </p>
-          <Button variant="outline" size="sm" onClick={() => detailQuery.refetch()} className="mt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => detailQuery.refetch()}
+            className="mt-4"
+          >
             إعادة المحاولة
           </Button>
         </Card>
@@ -146,18 +216,27 @@ function InstancePage() {
   if (!instance) {
     return (
       <div>
-        <PageHeader title="الطلب غير موجود" actions={<Link to="/workflows"><Button variant="outline">رجوع</Button></Link>} />
+        <PageHeader
+          title="الطلب غير موجود"
+          actions={
+            <Link to="/workflows">
+              <Button variant="outline">رجوع</Button>
+            </Link>
+          }
+        />
       </div>
     );
   }
 
-  const actions = (requestsApi || isNew) ? [] : (user ? getAvailableActions(instance, user) : []);
-  const canSeeStage = isAdmin || isNew || (requestsApi ? true : canView(instance.currentStageId, user));
-  const canEditFields = isNew;
-  const showActionPanel = !isNew && !requestsApi && canSeeStage && isExecutor && canActOnRequests;
-  const history = requestsApi
-    ? (historyQuery.data ?? [])
-    : getInstanceHistory(instance.id);
+  // New requests have no transitions yet; existing requests compute available
+  // actions from live-loaded wfStore.transitions/assignments.
+  const actions = isNew ? [] : user ? getAvailableActions(instance, user) : [];
+  const canSeeStage = isAdmin || isNew || canView(instance.currentStageId, user);
+  // Executors of an existing request may edit its draft fields in API mode too
+  // (saveDraft mutation persists them); viewers stay read-only.
+  const canEditFields = isNew || (requestsApi ? isExecutor && canActOnRequests : false);
+  const showActionPanel = !isNew && canSeeStage && isExecutor && canActOnRequests;
+  const history = requestsApi ? (historyQuery.data ?? []) : getInstanceHistory(instance.id);
 
   const apiStageName = requestsApi
     ? (stage?.name ?? (detailData as { _stageName?: string })?._stageName ?? "—")
@@ -178,11 +257,9 @@ function InstancePage() {
 
   const creator = users.find((u) => u.id === instance.createdBy);
   const creatorOrg = orgs.find((o) => o.id === creator?.organizationId);
-  const apiMerchantName = requestsApi ? (detailData as { _merchantName?: string })?._merchantName : undefined;
-
-  if (Object.keys(draftData).length === 0 && Object.keys(instance.data).length > 0) {
-    setDraftData(instance.data);
-  }
+  const apiMerchantName = requestsApi
+    ? (detailData as { _merchantName?: string })?._merchantName
+    : undefined;
 
   const allInstances = requestsApi ? (allRequestsQuery.data ?? []) : undefined;
   const duplicateInvoice = isDuplicateInvoice(draftData, instance.id, allInstances);
@@ -229,7 +306,13 @@ function InstancePage() {
       return;
     }
     // Mock path (existing)
-    const res = applyAction({ instanceId: instance.id, transitionId, user, comments, data: draftData });
+    const res = applyAction({
+      instanceId: instance.id,
+      transitionId,
+      user,
+      comments,
+      data: draftData,
+    });
     if (!res.ok) return toast.error(res.error);
     toast.success(`تم تنفيذ: ${actionName}`);
     setComments("");
@@ -250,11 +333,12 @@ function InstancePage() {
     }
     const payload = {
       "رقم الطلب": instanceRef(instance),
-      "المستورد": instanceTitle(instance),
+      المستورد: instanceTitle(instance),
       "المرحلة الحالية": currentStageLabel,
-      "الحالة": instance.status === "active" ? "نشط" : instance.status === "closed" ? "مغلق" : "مرفوض",
+      الحالة:
+        instance.status === "active" ? "نشط" : instance.status === "closed" ? "مغلق" : "مرفوض",
       "تاريخ الإنشاء": new Date(instance.createdAt).toLocaleString("ar"),
-      "البيانات": fieldsLabeled,
+      البيانات: fieldsLabeled,
       "سجل الإجراءات": history.map((h) => ({
         الإجراء: h.actionName,
         المنفذ: users.find((u) => u.id === h.performedBy)?.fullName ?? h.performedBy,
@@ -262,7 +346,9 @@ function InstancePage() {
         ملاحظات: h.comments ?? "",
       })),
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -303,8 +389,9 @@ function InstancePage() {
           <div>
             <div className="font-semibold">تنبيه: فاتورة مكررة محتملة</div>
             <p className="mt-1 text-sm leading-6 text-foreground">
-              رقم الفاتورة <span className="font-mono font-semibold">{instanceInvoiceNumber(instance)}</span>
-              {" "}ظهر في طلبات سابقة: {duplicateInvoice.refs.join("، ")}.
+              رقم الفاتورة{" "}
+              <span className="font-mono font-semibold">{instanceInvoiceNumber(instance)}</span> ظهر
+              في طلبات سابقة: {duplicateInvoice.refs.join("، ")}.
             </p>
           </div>
         </div>
@@ -319,7 +406,9 @@ function InstancePage() {
               <span className="text-lg font-bold text-primary">{progress}%</span>
             </div>
             <Progress value={progress} />
-            <p className="text-xs text-muted-foreground mt-2">المرحلة الحالية: {currentStageLabel}</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              المرحلة الحالية: {currentStageLabel}
+            </p>
           </Card>
 
           {/* Stage banner */}
@@ -336,13 +425,21 @@ function InstancePage() {
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant={instance.status === "active" ? "default" : "secondary"}>
-                  {instance.status === "active" ? "نشط" : instance.status === "closed" ? "مغلق" : "مرفوض"}
+                  {instance.status === "active"
+                    ? "نشط"
+                    : instance.status === "closed"
+                      ? "مغلق"
+                      : "مرفوض"}
                 </Badge>
                 {isAdmin && (
-                  <Badge variant="outline" className="gap-1"><ShieldCheck className="h-3 w-3" /> مسؤول النظام</Badge>
+                  <Badge variant="outline" className="gap-1">
+                    <ShieldCheck className="h-3 w-3" /> مسؤول النظام
+                  </Badge>
                 )}
                 {!isAdmin && !isExecutor && (
-                  <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> عرض فقط</Badge>
+                  <Badge variant="outline" className="gap-1">
+                    <Lock className="h-3 w-3" /> عرض فقط
+                  </Badge>
                 )}
               </div>
             </div>
@@ -352,7 +449,13 @@ function InstancePage() {
           <Card id="request-data" className="p-5">
             <h2 className="font-semibold mb-4">بيانات الطلب</h2>
             {stageFields.length > 0 ? (
-              <DynamicForm fields={stageFields} value={draftData} onChange={setDraftData} groups={fieldGroups} readOnly={!canEditFields} />
+              <DynamicForm
+                fields={stageFields}
+                value={draftData}
+                onChange={setDraftData}
+                groups={fieldGroups}
+                readOnly={!canEditFields}
+              />
             ) : (
               <ApiDataView data={instance.data} />
             )}
@@ -376,13 +479,18 @@ function InstancePage() {
                         bankId: Number(legacyUser.entityId ?? 0),
                         merchantId: Number(merchant.id),
                         amount: Number(draftData.financeAmount) || undefined,
-                        currency: typeof draftData.currency === "string" ? draftData.currency : undefined,
-                        invoiceNumber: typeof draftData.invoiceNumber === "string" ? draftData.invoiceNumber : undefined,
+                        currency:
+                          typeof draftData.currency === "string" ? draftData.currency : undefined,
+                        invoiceNumber:
+                          typeof draftData.invoiceNumber === "string"
+                            ? draftData.invoiceNumber
+                            : undefined,
                         data: draftData,
                       });
                       toast.success("تم إنشاء الطلب");
                       const newId = (result as { id?: number })?.id;
-                      if (newId) nav({ to: "/workflows/instances/$id", params: { id: String(newId) } });
+                      if (newId)
+                        nav({ to: "/workflows/instances/$id", params: { id: String(newId) } });
                       else nav({ to: "/workflows" });
                     } catch (error) {
                       toast.error(error instanceof ApiError ? error.message : "تعذّر إنشاء الطلب");
@@ -391,7 +499,9 @@ function InstancePage() {
                 >
                   {mutations.create.isPending ? "جارٍ الإنشاء..." : "تقديم الطلب"}
                 </Button>
-                <Button variant="outline" onClick={() => nav({ to: "/workflows" })}>إلغاء</Button>
+                <Button variant="outline" onClick={() => nav({ to: "/workflows" })}>
+                  إلغاء
+                </Button>
               </div>
             </Card>
           )}
@@ -407,7 +517,9 @@ function InstancePage() {
                 <Textarea value={comments} onChange={(e) => setComments(e.target.value)} rows={2} />
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" onClick={onSaveDraft}>حفظ المسودة</Button>
+                <Button variant="secondary" onClick={onSaveDraft}>
+                  حفظ المسودة
+                </Button>
                 {actions.length === 0 && (
                   <span className="text-xs text-muted-foreground self-center">
                     لا توجد انتقالات معرَّفة لهذه المرحلة.
@@ -441,10 +553,29 @@ function InstancePage() {
           <Card className="p-5">
             <h2 className="font-semibold mb-4">معلومات سريعة</h2>
             <dl className="space-y-3">
-              <QuickRow icon={<UserIcon className="h-4 w-4" />} label="مقدم الطلب" value={apiMerchantName || instanceTitle(instance)} />
-              <QuickRow icon={<Building2 className="h-4 w-4" />} label="الجهة" value={creatorOrg?.name || (requestsApi ? (detailData as { _bankName?: string })?._bankName ?? "—" : "—")} />
-              <QuickRow icon={<MapPin className="h-4 w-4" />} label="الميناء" value={String(instance.data.arrivalPort ?? "—")} />
-              <QuickRow icon={<CalendarDays className="h-4 w-4" />} label="التقديم" value={new Date(instance.createdAt).toLocaleDateString("ar")} />
+              <QuickRow
+                icon={<UserIcon className="h-4 w-4" />}
+                label="مقدم الطلب"
+                value={apiMerchantName || instanceTitle(instance)}
+              />
+              <QuickRow
+                icon={<Building2 className="h-4 w-4" />}
+                label="الجهة"
+                value={
+                  creatorOrg?.name ||
+                  (requestsApi ? ((detailData as { _bankName?: string })?._bankName ?? "—") : "—")
+                }
+              />
+              <QuickRow
+                icon={<MapPin className="h-4 w-4" />}
+                label="الميناء"
+                value={String(instance.data.arrivalPort ?? "—")}
+              />
+              <QuickRow
+                icon={<CalendarDays className="h-4 w-4" />}
+                label="التقديم"
+                value={new Date(instance.createdAt).toLocaleDateString("ar")}
+              />
               <QuickRow
                 icon={<Activity className="h-4 w-4" />}
                 label="المبلغ"
@@ -479,9 +610,7 @@ const DATA_LABELS: Record<string, string> = {
 };
 
 function ApiDataView({ data }: { data: Record<string, unknown> }) {
-  const entries = Object.entries(data).filter(
-    ([, v]) => v !== undefined && v !== null && v !== "",
-  );
+  const entries = Object.entries(data).filter(([, v]) => v !== undefined && v !== null && v !== "");
   if (entries.length === 0) {
     return <p className="text-sm text-muted-foreground">لا توجد بيانات.</p>;
   }
@@ -500,11 +629,21 @@ function ApiDataView({ data }: { data: Record<string, unknown> }) {
 }
 
 function QuickRow({
-  icon, label, value, valueClass,
-}: { icon: React.ReactNode; label: string; value: string; valueClass?: string }) {
+  icon,
+  label,
+  value,
+  valueClass,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  valueClass?: string;
+}) {
   return (
     <div className="flex items-center gap-3">
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">{icon}</span>
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+        {icon}
+      </span>
       <div className="min-w-0">
         <dt className="text-xs text-muted-foreground">{label}</dt>
         <dd className={`text-sm font-medium truncate ${valueClass ?? ""}`}>{value}</dd>

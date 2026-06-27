@@ -20,7 +20,7 @@ The PM has set the **minimum-viable order** for what must work correctly first, 
 4. **Merchant management** — bank-scoped (a bank-1 user must never see bank-2's merchants) and **tax number unique per bank**, not globally (bank 1 and bank 2 can each register a merchant with tax number `111`; bank 1 cannot register two merchants both with `111`)
 5. **Request creation and stage progression**
 
-All PM priority items are unblocked as of the `fix-db` branch deployment. Items 1–5 verified working end-to-end (login, banks, users, merchants, request list + detail + stage display).
+All PM priority items are unblocked as of the `feature/import-request-missing-fields` branch deployment. Items 1–5 verified working end-to-end (login, banks, users, merchants, request list + detail + stage display).
 
 > **This document changes nothing in the frontend.** The frontend integrates resource-by-resource behind `VITE_API_RESOURCES`, falling back to local mock for any unfinished area, so shipping these in any order never breaks the running app. See the classification in [AUDIT.md](AUDIT.md).
 
@@ -327,7 +327,7 @@ This matches the PM's acceptance criterion exactly: bank 1 and bank 2 can each r
 
 **Where:** `GET /requests/{request}`, `PATCH /requests/{request}/draft`, `POST /requests/{request}/actions`, `GET /requests/{request}/history`, document endpoints — any route using `{request}` parameter.
 
-**Current (live, localhost:8000 fix-db branch):** `GET /requests/1` returns HTTP 200 with the correct response structure (all expected keys present) but **every field is `null`**, including `id`. The list endpoint `GET /requests` returns correct data for the same record.
+**Current (live, localhost:8000 feature branch):** `GET /requests/1` returns HTTP 200 with the correct response structure (all expected keys present) but **every field is `null`**, including `id`. The list endpoint `GET /requests` returns correct data for the same record.
 
 ```json
 {
@@ -382,7 +382,7 @@ Laravel's implicit route model binding matches by **parameter name**: `{request}
 
 **Where:** `GET /requests/{id}` (`ImportRequestResource`), `GET /requests` (`ImportRequestListResource`).
 
-**Current (live, localhost:8000 `fix-db` branch, re-verified 2026-06-25):** `GET /requests/1` returns the dedicated columns (`reference_number`, `merchant`, `current_stage`, `goods_description`, `port_of_entry`, etc.) but the JSON has **no `data` key and no `version` key at all** — not null, absent:
+**Current (live, localhost:8000 `feature/import-request-missing-fields` branch, re-verified 2026-06-25):** `GET /requests/1` returns the dedicated columns (`reference_number`, `merchant`, `current_stage`, `goods_description`, `port_of_entry`, etc.) but the JSON has **no `data` key and no `version` key at all** — not null, absent:
 
 ```json
 {
@@ -418,11 +418,11 @@ Same for the list row.
 
 ---
 
-### CR-16 · Bank-scoped admin sees zero requests · P0 — ✅ CLOSED (fix-db, re-verified 2026-06-25)
+### CR-16 · Bank-scoped admin sees zero requests · P0 — ✅ CLOSED (feature branch, re-verified 2026-06-25)
 
 **Where:** `GET /requests` for a bank-scoped user.
 
-**Was (live, localhost:8000 `fix-db` branch, pre-fix):** `admin@ybank.ye` (`bank_id: 1`) called `GET /requests` and got `total: 0`, despite seeded request #1 having `bank_id: 1`. Platform admin saw all 16.
+**Was (live, localhost:8000 `feature/import-request-missing-fields` branch, pre-fix):** `admin@ybank.ye` (`bank_id: 1`) called `GET /requests` and got `total: 0`, despite seeded request #1 having `bank_id: 1`. Platform admin saw all 16.
 
 **Root cause (per backend's fix):** `WorkflowService::canUserSeeRequest()` required a matching `StagePermission` row for every access level including plain `VIEW`; bank-admin roles have no stage-permission row anywhere (only the team actually working a stage does), so they were structurally invisible despite the `bank_id` check already being correct.
 
@@ -434,11 +434,11 @@ Same for the list row.
 
 ---
 
-### CR-17 · Banks/merchants responses omit `version`, despite PATCH requiring it · P1 — ✅ CLOSED (fix-db, re-verified 2026-06-25)
+### CR-17 · Banks/merchants responses omit `version`, despite PATCH requiring it · P1 — ✅ CLOSED (feature branch, re-verified 2026-06-25)
 
 **Where:** `GET /banks`, `GET /banks/{id}`, `GET /merchants`, `GET /merchants/{id}`.
 
-**Was (live, localhost:8000 `fix-db` branch, pre-fix):** CR-07 made `PATCH /banks/{id}` and `PATCH /merchants/{id}` require `version` (missing → `422`, mismatched → `409`), but neither resource's read responses included a `version` key at all.
+**Was (live, localhost:8000 `feature/import-request-missing-fields` branch, pre-fix):** CR-07 made `PATCH /banks/{id}` and `PATCH /merchants/{id}` require `version` (missing → `422`, mismatched → `409`), but neither resource's read responses included a `version` key at all.
 
 **Fix:** `BankResource`/`MerchantResource` now project `'version' => $this->version` on every read.
 
@@ -456,36 +456,127 @@ These were investigated during the 2026-06-25 re-verification and determined to 
 
 ---
 
-## Summary
+## G. Deployment + latent (filed 2026-06-27)
+
+### CR-DEPLOY · `feature/import-request-missing-fields` is not merged to `main` and not deployed to `cby2.ultimate-dev2.com` · P0 (operational)
+
+**Where:** the production host `https://cby2.ultimate-dev2.com`.
+
+**Current (verified against the backend repo `github.com/programista404/yemen-flow-hub-backend`, 2026-06-27):** the `feature/import-request-missing-fields` branch (tip `9ee2aa1`) exists only as a **local** branch — it has **not been pushed** to `origin` (remote has only `develop` @ `9152a39`, `main` @ `3fe0357`, `spec/012-projects` @ `d6bdb57`; no `feature/import-request-missing-fields`). It is therefore **not merged** into `develop`/`main` and **not deployed** to `cby2.ultimate-dev2.com`. Every "✅ CLOSED / re-verified live" note in this document for CR-01 through CR-17 was gathered against a **local** Laravel server on `http://localhost:8000` running the `feature/import-request-missing-fields` branch (see the `localhost:8000 feature branch` phrasing throughout, e.g. CR-14/15/16/17). The remote host `cby2.ultimate-dev2.com` still serves **pre-feature-fix** code, so pointing the frontend at it today reproduces every bug the feature branch already closed.
+
+**Update (2026-06-27):** the frontend proxy (`vite.config.ts`) has been repointed from `http://localhost:8000` to `https://cby2.ultimate-dev2.com`, anticipating this deploy. Until the branch is actually pushed/merged/deployed, every live-against-the-real-host check (CR-01..17, CR-19) will regress on the remote host — this is now the **blocking** action, not a future one.
+
+**Expected:** push `feature/import-request-missing-fields` to origin, merge it into `develop`/`main`, and deploy it to `cby2.ultimate-dev2.com` (run the documented deploy steps: `php artisan migrate`, `php artisan db:seed --class=DemoDataSeeder`, `php artisan l5-swagger:generate`). Once deployed, the frontend can repoint its proxy at the remote host.
+
+**Why:** without deployment, none of CR-01..CR-17 are actually live for any user not running a local Laravel server. This is the single highest-leverage action for making the platform run on the real database for real users.
+
+**Acceptance:** `https://cby2.ultimate-dev2.com/api/v1/requests/1` returns the full, populated request record (not all-nulls); a `PATCH /banks/{id}` round-trip with `version` succeeds; the `feature/import-request-missing-fields` commits are pushed to origin, present in `origin/develop`/`origin/main`, and in the deployed revision.
+
+**Note:** this is a deployment + merge request, not a code-change request — the code already exists on `feature/import-request-missing-fields`.
+
+### CR-18 · `/workflow-versions/{id}/transitions` omits the inline action name/code · P2
+
+**Where:** `GET /workflow-versions/{id}/transitions`.
+
+**Current:** each transition row returns `action_id` (FK int into `workflow_actions`) but no inline action `code` / `name`. To render action labels on transition rows (and on a request's available-action buttons) the frontend must separately fetch `GET /workflow-actions` (a global list) and join client-side on `action_id`.
+
+**Workaround in place:** `useWorkflowSync()` in `src/lib/api/workflow-designer.ts` already fetches `/workflow-actions` once and maps `actionCode`/`actionName` onto each transition, so the runtime is fully functional today.
+
+**Expected (optional):** embed the action inline on each transition row, e.g. `"action": { "id": <id>, "code": "APPROVE", "name": "اعتماد" }`, so the extra global fetch is not required to label transitions.
+
+**Acceptance (optional):** a transition row includes enough to render its action label without a second request; the frontend can drop the `/workflow-actions` fetch from the transition-label path.
+
+### CR-19 · `POST /requests/{id}/actions` throws 500 — `WorkflowVersion::actions` relation does not exist · P0 (CRITICAL)
+
+**Where:** `POST /api/v1/requests/{id}/actions` — executing any workflow transition. **This blocks PM priority #5 (request stage progression) entirely.**
+
+**Current (live, `http://127.0.0.1:8000` feature branch, re-verified 2026-06-27):** every `POST /requests/{id}/actions` returns `500 SERVER_ERROR` with:
+
+```
+local.ERROR: Call to undefined relationship [actions] on model [App\Models\WorkflowVersion].
+  at vendor/laravel/framework/.../Eloquent/RelationNotFoundException.php:35
+```
+
+**Root cause (verified in code):** `app/Services/Workflow/WorkflowService.php:162` eager-loads a relation that does not exist:
+
+```php
+// WorkflowService::executeAction() — line 162 (BROKEN)
+$transition = WorkflowTransition::query()
+    ->with(['version.stages.permissions', 'version.actions'])   // ← 'version.actions' does not exist
+    ->findOrFail($transitionId);
+```
+
+`App\Models\WorkflowVersion` defines `stages()`, `transitions()`, `fieldGroups()`, `fields()` — but **no `actions()`** method (`workflow_actions` is a global table linked via `transitions.action_id`, not a per-version relation). Laravel throws `RelationNotFoundException` on the eager-load, which aborts the whole action before any stage transition happens.
+
+Line 193 then reads the (never-loaded) collection:
+
+```php
+// line 193 (BROKEN — relies on the non-existent eager-load)
+$nextStatus = $nextStage->is_final
+    ? ($transition->version->actions->firstWhere('id', $transition->action_id)?->kind === 'REJECT'
+        ? RequestStatus::REJECTED : RequestStatus::CLOSED)
+    : RequestStatus::ACTIVE;
+```
+
+**Suggested fix (resolve the action directly instead of via a non-existent version relation):**
+
+```php
+// WorkflowService::executeAction()
+$transition = WorkflowTransition::query()
+    ->with(['version.stages.permissions'])   // drop 'version.actions'
+    ->findOrFail($transitionId);
+
+// when computing next status:
+$action = $transition->action_id
+    ? WorkflowAction::find($transition->action_id)
+    : null;
+$nextStatus = $nextStage->is_final
+    ? (($action && $action->kind === 'REJECT') ? RequestStatus::REJECTED : RequestStatus::CLOSED)
+    : RequestStatus::ACTIVE;
+```
+
+(Alternatively add a `WorkflowVersion::actions()` relation, but actions are global, not version-scoped, so the direct lookup is the correct fix.)
+
+**Note on `reference_number`:** while re-verifying this, `GET /requests/1` returned `id:1, reference_number:"IMP-2026-2001", current_stage:{...}, version:1, data:{...}` — so CR-06/14/15 are confirmed working live. The `data` blob + `version` round-trip the frontend relies on are present. **Only action execution is broken** (this CR).
+
+**Acceptance:** `POST /requests/{id}/actions` with a valid `{ transition_id, version, comment? }` advances the request to the transition's `to_stage`, increments `version`, writes a `workflow_history` row, and returns the updated request (200); a transition whose action `kind === 'REJECT'` sets status `REJECTED`; a stale `version` returns `409 STALE_RESOURCE` (per CR-07).
+
+**Blocks:** the entire request runtime (PM priority #5). The frontend's action panel (`src/routes/workflows.instances.$id.tsx`) is wired to call this endpoint and will surface the 500 as an error toast until this is fixed.
+
+---
+
 
 | ID | Title | Priority | Status | Blocks |
 |---|---|---|---|---|
-| CR-01 | Workflow authoring write endpoints | P0 | ✅ Closed (fix-db: all create/update/delete routes live and verified — `POST /workflows`, stages, transitions, fields, field-groups; Workflow Designer frontend now fully wired to these endpoints) | — |
+| CR-01 | Workflow authoring write endpoints | P0 | ✅ Closed (feature/import-request-missing-fields: all create/update/delete routes live and verified — `POST /workflows`, stages, transitions, fields, field-groups; Workflow Designer frontend now fully wired to these endpoints) | — |
 | CR-02 | `POST /users` role field | P0 | ✅ Closed | all user creation |
 | CR-03 | activate/deactivate/suspend → 406 (+team delete) | P0 | ✅ Closed | status toggle (merchant/user fully) |
 | CR-03b | Role deactivate blocked while linked to users (backend-added) | — | ✅ Confirmed | data integrity |
-| CR-04 | Document + populate permissions payload | P1 | ✅ Closed (fix-db: `me/permissions` OpenAPI typed, live-confirmed matches login shape) | screen/action gating |
+| CR-04 | Document + populate permissions payload | P1 | ✅ Closed (feature/import-request-missing-fields: `me/permissions` OpenAPI typed, live-confirmed matches login shape) | screen/action gating |
 | CR-05 | Auth completeness (MFA/refresh/password) | P1 | Open | real sign-in |
-| CR-06 | Enrich `GET /requests` row | P0 | ✅ Closed (fix-db: reference_number bug fixed, workflow_version_id + current_stage + merchant added) | requests list + runtime |
-| CR-07 | Optimistic locking (`version`) | P1 | ✅ Closed (fix-db: banks + merchants enforce `version` on PATCH; orgs/teams/roles already did) | safe concurrent edits |
-| CR-08 | Document nested write payloads | P2 | ✅ Closed (fix-db: merchants `owners[]`/`companies[]`, stage `permissions[]`/`field_rules[]` typed) | merchants/permissions writes |
-| CR-09 | Standardize `meta` shape | P2 | ✅ Closed (fix-db: pagination meta unified to `{page, per_page, total, last_page}` on all list endpoints) | contract consistency |
-| CR-10 | OpenAPI accuracy | P2 | ⚠️ Mostly closed (fix-db: generic `object` types fixed where under-typed; `requests.data`/`reports.filters` correctly left open by design) | typed client |
-| CR-11 | Seed non-admin permissions | P1 | ✅ Closed (fix-db: seedScreenPermissions for all 8 roles) | testing non-admin roles |
-| CR-12 | Grant supporting-resource READ for multi-resource screens | P0 | ✅ Closed (fix-db: lookup VIEW grants seeded per role) | merchants/roles/teams/banks for non-admin roles |
+| CR-06 | Enrich `GET /requests` row | P0 | ✅ Closed (feature/import-request-missing-fields: reference_number bug fixed, workflow_version_id + current_stage + merchant added) | requests list + runtime |
+| CR-07 | Optimistic locking (`version`) | P1 | ✅ Closed (feature/import-request-missing-fields: banks + merchants enforce `version` on PATCH; orgs/teams/roles already did) | safe concurrent edits |
+| CR-08 | Document nested write payloads | P2 | ✅ Closed (feature/import-request-missing-fields: merchants `owners[]`/`companies[]`, stage `permissions[]`/`field_rules[]` typed) | merchants/permissions writes |
+| CR-09 | Standardize `meta` shape | P2 | ✅ Closed (feature/import-request-missing-fields: pagination meta unified to `{page, per_page, total, last_page}` on all list endpoints) | contract consistency |
+| CR-10 | OpenAPI accuracy | P2 | ⚠️ Mostly closed (feature/import-request-missing-fields: generic `object` types fixed where under-typed; `requests.data`/`reports.filters` correctly left open by design) | typed client |
+| CR-11 | Seed non-admin permissions | P1 | ✅ Closed (feature/import-request-missing-fields: seedScreenPermissions for all 8 roles) | testing non-admin roles |
+| CR-12 | Grant supporting-resource READ for multi-resource screens | P0 | ✅ Closed (feature/import-request-missing-fields: lookup VIEW grants seeded per role) | merchants/roles/teams/banks for non-admin roles |
 | CR-13 | Merchant `tax_number` unique globally — must be unique per bank | P0 | ✅ Closed | merchant onboarding (PM priority #4) |
-| CR-14 | `GET /requests/{request}` returns all nulls — route model binding | P0 | ✅ Closed (fix-db: renamed {request} → {importRequest} in routes + controller) | request detail, actions, draft, documents (PM priority #5) |
-| CR-15 | `ImportRequestResource`/`ImportRequestListResource` omit `data` and `version` | P0 | ✅ Closed (fix-db: both keys present and populated, live-verified 2026-06-25) | dynamic form rendering + optimistic locking on requests |
-| CR-16 | Bank-scoped admin sees zero requests on `GET /requests` | P0 | ✅ Closed (fix-db: bank-role `VIEW` no longer requires stage-permission row; cross-bank isolation fully verified with bank-1/bank-2 accounts) | request list for every bank-side role (PM priority #5, bank users only) |
-| CR-17 | Banks/merchants responses omit `version` despite PATCH requiring it | P1 | ✅ Closed (fix-db: `version` now on `BankResource`/`MerchantResource`; round-trip live-verified) | optimistic-locking round-trip on bank/merchant edits |
+| CR-14 | `GET /requests/{request}` returns all nulls — route model binding | P0 | ✅ Closed (feature/import-request-missing-fields: renamed {request} → {importRequest} in routes + controller) | request detail, actions, draft, documents (PM priority #5) |
+| CR-15 | `ImportRequestResource`/`ImportRequestListResource` omit `data` and `version` | P0 | ✅ Closed (feature/import-request-missing-fields: both keys present and populated, live-verified 2026-06-25) | dynamic form rendering + optimistic locking on requests |
+| CR-16 | Bank-scoped admin sees zero requests on `GET /requests` | P0 | ✅ Closed (feature/import-request-missing-fields: bank-role `VIEW` no longer requires stage-permission row; cross-bank isolation fully verified with bank-1/bank-2 accounts) | request list for every bank-side role (PM priority #5, bank users only) |
+| CR-17 | Banks/merchants responses omit `version` despite PATCH requiring it | P1 | ✅ Closed (feature/import-request-missing-fields: `version` now on `BankResource`/`MerchantResource`; round-trip live-verified) | optimistic-locking round-trip on bank/merchant edits |
+| CR-DEPLOY | `feature/import-request-missing-fields` not pushed / not merged to `develop`+`main` / not deployed to `cby2.ultimate-dev2.com` | P0 | 🔴 Open (operational) — `feature/import-request-missing-fields` (`9ee2aa1`) is local-only; needs push + merge + deploy | **everything** — remote host still serves pre-feature-fix code |
+| CR-18 | `/workflow-versions/{id}/transitions` omits inline action name/code | P2 | 🟡 Worked around client-side (extra `/workflow-actions` fetch + join) | transition/action label rendering (not blocking) |
+| CR-19 | `POST /requests/{id}/actions` 500s — `WorkflowVersion::actions` relation missing | P0 | 🔴 Open (live 500, verified 2026-06-27) | **request stage progression (PM #5)** — every action execute fails |
 
-**All PM priority items 1-5 unblocked, including bank-scoped roles.** Backend `fix-db` branch closes CR-01 (quality), CR-04, CR-06, CR-07, CR-08, CR-09, CR-11, CR-12, CR-14, CR-15, CR-16, CR-17. See [HANDOFF-FIX-DB.md](HANDOFF-FIX-DB.md) for full details.
+**All PM priority items 1-5 unblocked, including bank-scoped roles.** Backend `feature/import-request-missing-fields` branch closes CR-01 (quality), CR-04, CR-06, CR-07, CR-08, CR-09, CR-11, CR-12, CR-14, CR-15, CR-16, CR-17. See [HANDOFF-FIX-DB.md](HANDOFF-FIX-DB.md) for full details.
 
-**What's closed as of 2026-06-25 (fix-db, re-verified live):** CR-01 (workflow writes + quality fixes + frontend wiring), CR-02, CR-03/03b, CR-04 (me/permissions typed), CR-06 (request enrichment + reference_number fix), CR-07 (version enforcement on banks/merchants), CR-08 (nested payloads typed), CR-09 (pagination meta unified), CR-11 (permission seeding for all 8 roles), CR-12 (lookup READ grants), CR-13, CR-14 (route model binding + detail columns migration + seeder enrichment), CR-15 (`data`/`version` on requests), CR-16 (bank-scoped requests list), CR-17 (`version` on banks/merchants read). Frontend proxy now points at `http://localhost:8000`.
+**What's closed as of 2026-06-25 (feature branch, re-verified live):** CR-01 (workflow writes + quality fixes + frontend wiring), CR-02, CR-03/03b, CR-04 (me/permissions typed), CR-06 (request enrichment + reference_number fix), CR-07 (version enforcement on banks/merchants), CR-08 (nested payloads typed), CR-09 (pagination meta unified), CR-11 (permission seeding for all 8 roles), CR-12 (lookup READ grants), CR-13, CR-14 (route model binding + detail columns migration + seeder enrichment), CR-15 (`data`/`version` on requests), CR-16 (bank-scoped requests list), CR-17 (`version` on banks/merchants read). Frontend proxy now points at `https://cby2.ultimate-dev2.com` (changed 2026-06-27, ahead of CR-DEPLOY landing — every closure above needs re-verification once the feature branch is actually live there).
 
-**What's still open (backend):** CR-05 (MFA/refresh/password), CR-10 (mostly closed, minor doc quality remains).
+**What's still open (backend):** **CR-DEPLOY** (P0 operational — `feature/import-request-missing-fields` is verified-correct code but is NOT merged to `main` and NOT deployed to `cby2.ultimate-dev2.com`; the remote host still serves pre-feature-fix code, so every CR-01..17 closure is reachable only on `localhost:8000` today), **CR-19** (P0 — `POST /requests/{id}/actions` throws 500 because `WorkflowVersion::actions` relation doesn't exist; blocks PM priority #5, verified live 2026-06-27), **CR-05** (MFA/refresh/password), **CR-10** (mostly closed, minor doc quality remains). **CR-18** (P2) is worked around client-side, not blocking.
 
-**What's still blocking full `VITE_API_RESOURCES=*`:** CR-05 only (auth completeness — MFA flow needed to remove the demo login). All other screens functional for both platform admin and bank-scoped roles.
+**Frontend update (2026-06-27):** `VITE_API_RESOURCES` is now set to `*` — every resource client is live-wired, no screen falls back to mock by flag. The remaining gaps are backend-side, not frontend config: **CR-DEPLOY** (the live host still serves pre-feature code) and **CR-19** (action-execute 500s once pointed at a host actually running the fix). **CR-05** (auth completeness — MFA flow) is the only item still requiring a frontend demo-login fallback.
 
 
 **Frontend-side work still pending (not backend CRs, see section F):** transition rows need a client-side join against `/workflow-actions` to show action names. (Workflow Designer wiring is now complete — see section F.)
