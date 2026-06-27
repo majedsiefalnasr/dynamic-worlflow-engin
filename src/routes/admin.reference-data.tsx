@@ -9,9 +9,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
-import { useReferenceTables, useReferenceMutations, type ReferenceTable } from "@/lib/data/reference-data";
+import {
+  useReferenceTables,
+  useReferenceMutations,
+  type ReferenceTable,
+} from "@/lib/data/reference-data";
 import { isDomainError } from "@/lib/data/errors";
 import { toast } from "sonner";
 
@@ -33,7 +42,8 @@ function ReferenceDataPage() {
     const key = tableKey.trim();
     const label = tableLabel.trim();
     if (!key || !label) return toast.error("المفتاح والاسم مطلوبان");
-    if (!/^[a-z][a-z0-9_]*$/.test(key)) return toast.error("المفتاح يجب أن يكون بالإنجليزية مثل arrival_port");
+    if (!/^[a-z][a-z0-9_]*$/.test(key))
+      return toast.error("المفتاح يجب أن يكون بالإنجليزية مثل arrival_port");
     if (tables.some((t) => t.key === key)) return toast.error("هذا المفتاح مستخدم بالفعل");
     try {
       await createTable.mutate({ key, label });
@@ -72,14 +82,25 @@ function ReferenceDataPage() {
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">المفتاح</Label>
-            <Input dir="ltr" value={tableKey} onChange={(e) => setTableKey(e.target.value)} placeholder="custom_table_key" />
+            <Input
+              dir="ltr"
+              value={tableKey}
+              onChange={(e) => setTableKey(e.target.value)}
+              placeholder="custom_table_key"
+            />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">اسم العرض</Label>
-            <Input value={tableLabel} onChange={(e) => setTableLabel(e.target.value)} placeholder="اسم الجدول الداخلي" />
+            <Input
+              value={tableLabel}
+              onChange={(e) => setTableLabel(e.target.value)}
+              placeholder="اسم الجدول الداخلي"
+            />
           </div>
           <div className="flex items-end">
-            <Button onClick={addTable}><Plus className="ms-1 h-4 w-4" /> إضافة جدول</Button>
+            <Button onClick={addTable}>
+              <Plus className="ms-1 h-4 w-4" /> إضافة جدول
+            </Button>
           </div>
         </div>
       </Card>
@@ -114,7 +135,10 @@ function ReferenceDataPage() {
 }
 
 function ReferenceTableCard({
-  table, onRemove, onAddValue, onRemoveValue,
+  table,
+  onRemove,
+  onAddValue,
+  onRemoveValue,
 }: {
   table: ReferenceTable;
   onRemove: () => void;
@@ -128,8 +152,10 @@ function ReferenceTableCard({
     const nextKey = key.trim();
     const nextLabel = label.trim();
     if (!nextKey || !nextLabel) return toast.error("مفتاح وقيمة البيان مطلوبان");
-    if (!/^[a-z][a-z0-9_]*$/.test(nextKey)) return toast.error("مفتاح القيمة يجب أن يكون بالإنجليزية");
-    if (table.values.some((v) => v.key === nextKey)) return toast.error("هذا المفتاح مستخدم داخل الجدول");
+    if (!/^[a-z][a-z0-9_]*$/.test(nextKey))
+      return toast.error("مفتاح القيمة يجب أن يكون بالإنجليزية");
+    if (table.values.some((v) => v.key === nextKey))
+      return toast.error("هذا المفتاح مستخدم داخل الجدول");
     try {
       await onAddValue(nextKey, nextLabel);
       setKey("");
@@ -157,9 +183,16 @@ function ReferenceTableCard({
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
-        <Input dir="ltr" value={key} onChange={(e) => setKey(e.target.value)} placeholder="value_key" />
+        <Input
+          dir="ltr"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          placeholder="value_key"
+        />
         <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="قيمة العرض" />
-        <Button variant="outline" onClick={addValue}><Plus className="ms-1 h-4 w-4" /> إضافة قيمة</Button>
+        <Button variant="outline" onClick={addValue}>
+          <Plus className="ms-1 h-4 w-4" /> إضافة قيمة
+        </Button>
       </div>
 
       <Table>
@@ -183,7 +216,11 @@ function ReferenceTableCard({
             </TableRow>
           ))}
           {table.values.length === 0 && (
-            <TableRow><TableCell colSpan={3} className="text-center text-sm text-muted-foreground">لا توجد قيم بعد.</TableCell></TableRow>
+            <TableRow>
+              <TableCell colSpan={3} className="text-center text-sm text-muted-foreground">
+                لا توجد قيم بعد.
+              </TableCell>
+            </TableRow>
           )}
         </TableBody>
       </Table>

@@ -28,7 +28,11 @@ export interface DomainError {
 
 const BRAND = Symbol.for("cby.DomainError");
 
-function make(kind: DomainErrorKind, message: string, extra: Partial<DomainError> = {}): DomainError {
+function make(
+  kind: DomainErrorKind,
+  message: string,
+  extra: Partial<DomainError> = {},
+): DomainError {
   return Object.assign({ [BRAND]: true } as object, { kind, message, ...extra }) as DomainError;
 }
 

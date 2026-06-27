@@ -4,11 +4,19 @@ import { toReferenceTable, referenceKeys } from "./reference-data";
 describe("toReferenceTable", () => {
   test("maps DTO -> domain, string ids, nested values, version", () => {
     const t = toReferenceTable({
-      id: 7, key: "sectors", label: "Sectors", is_system: true, version: 3,
+      id: 7,
+      key: "sectors",
+      label: "Sectors",
+      is_system: true,
+      version: 3,
       values: [{ id: 11, key: "agri", label: "Agriculture", version: 2 }],
     });
     expect(t).toEqual({
-      id: "7", key: "sectors", label: "Sectors", system: true, _version: 3,
+      id: "7",
+      key: "sectors",
+      label: "Sectors",
+      system: true,
+      _version: 3,
       values: [{ id: "11", key: "agri", label: "Agriculture", _version: 2 }],
     });
   });

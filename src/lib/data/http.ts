@@ -12,7 +12,11 @@ const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/+$/, "");
 const TOKEN_KEY = "cby:token";
 
 function read(): string | null {
-  try { return sessionStorage.getItem(TOKEN_KEY); } catch { return null; }
+  try {
+    return sessionStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
 }
 let token: string | null = read();
 
@@ -23,11 +27,17 @@ export const tokenStore = {
     try {
       if (t) sessionStorage.setItem(TOKEN_KEY, t);
       else sessionStorage.removeItem(TOKEN_KEY);
-    } catch { /* private mode */ }
+    } catch {
+      /* private mode */
+    }
   },
   clear: () => {
     token = null;
-    try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* */ }
+    try {
+      sessionStorage.removeItem(TOKEN_KEY);
+    } catch {
+      /* */
+    }
   },
 };
 
@@ -55,10 +65,18 @@ function buildUrl(path: string, query?: Query): string {
 async function parse(res: Response): Promise<unknown> {
   const text = await res.text();
   if (!text) return null;
-  try { return JSON.parse(text); } catch { return text; }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
 
-async function request(method: Method, path: string, opts: { body?: unknown; query?: Query; signal?: AbortSignal } = {}): Promise<unknown> {
+async function request(
+  method: Method,
+  path: string,
+  opts: { body?: unknown; query?: Query; signal?: AbortSignal } = {},
+): Promise<unknown> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -95,7 +113,11 @@ export const api = {
   get: async <T>(path: string, query?: Query, signal?: AbortSignal): Promise<T> =>
     unwrap(await request("GET", path, { query, signal })) as T,
 
-  getList: async <T>(path: string, query?: Query, signal?: AbortSignal): Promise<{ data: T[]; meta?: PageMeta }> => {
+  getList: async <T>(
+    path: string,
+    query?: Query,
+    signal?: AbortSignal,
+  ): Promise<{ data: T[]; meta?: PageMeta }> => {
     const body = await request("GET", path, { query, signal });
     const data = (unwrap(body) ?? []) as T[];
     const meta = (body as { meta?: PageMeta } | null)?.meta;
@@ -108,8 +130,7 @@ export const api = {
   patch: async <T>(path: string, body?: unknown): Promise<T> =>
     unwrap(await request("PATCH", path, { body })) as T,
 
-  del: async <T>(path: string): Promise<T> =>
-    unwrap(await request("DELETE", path)) as T,
+  del: async <T>(path: string): Promise<T> => unwrap(await request("DELETE", path)) as T,
 };
 
 export type { DomainError };

@@ -9,11 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./http";
 import { source } from "./source";
 import { mockRead, type MutationHandle, type ReadResult } from "./query";
-import {
-  referenceTablesCell,
-  type ReferenceTable,
-  type ReferenceValue,
-} from "@/lib/governance";
+import { referenceTablesCell, type ReferenceTable, type ReferenceValue } from "@/lib/governance";
 
 // Re-export types for adapter consumers (spec §6)
 export type { ReferenceTable, ReferenceValue } from "@/lib/governance";
@@ -30,8 +26,21 @@ export const referenceKeys = {
 };
 
 // ---------- DTO -> domain ----------
-interface RefValueDto { id: number; key: string; label: string; version?: number; is_system?: boolean }
-interface RefTableDto { id: number; key: string; label: string; is_system?: boolean; version?: number; values?: RefValueDto[] }
+interface RefValueDto {
+  id: number;
+  key: string;
+  label: string;
+  version?: number;
+  is_system?: boolean;
+}
+interface RefTableDto {
+  id: number;
+  key: string;
+  label: string;
+  is_system?: boolean;
+  version?: number;
+  values?: RefValueDto[];
+}
 
 export function toReferenceTable(dto: RefTableDto): ReferenceTable {
   return {
@@ -87,24 +96,37 @@ function useLiveMutations() {
     mutationFn: (i: { tableId: string; key: string; label: string }) =>
       api
         .post<RefValueDto>(`/reference-tables/${i.tableId}/values`, { key: i.key, label: i.label })
-        .then((v) => ({ id: String(v.id), key: v.key, label: v.label, _version: v.version }) as ReferenceValue),
+        .then(
+          (v) =>
+            ({
+              id: String(v.id),
+              key: v.key,
+              label: v.label,
+              _version: v.version,
+            }) as ReferenceValue,
+        ),
     onSuccess: invalidate,
   });
   // No hard delete — deactivate via PATCH is_active (POST /deactivate is WAF-blocked, spec §7).
   const removeTable = useMutation({
-    mutationFn: (i: { id: string }) => api.patch(`/reference-tables/${i.id}`, { is_active: false }).then(() => undefined),
+    mutationFn: (i: { id: string }) =>
+      api.patch(`/reference-tables/${i.id}`, { is_active: false }).then(() => undefined),
     onSuccess: invalidate,
   });
   const removeValue = useMutation({
-    mutationFn: (i: { id: string }) => api.patch(`/reference-values/${i.id}`, { is_active: false }).then(() => undefined),
+    mutationFn: (i: { id: string }) =>
+      api.patch(`/reference-values/${i.id}`, { is_active: false }).then(() => undefined),
     onSuccess: invalidate,
   });
   return { createTable, createValue, removeTable, removeValue };
 }
 
-function handle<TInput, TResult>(
-  m: { mutateAsync: (i: TInput) => Promise<TResult>; isPending: boolean; error: unknown; reset: () => void },
-): MutationHandle<TInput, TResult> {
+function handle<TInput, TResult>(m: {
+  mutateAsync: (i: TInput) => Promise<TResult>;
+  isPending: boolean;
+  error: unknown;
+  reset: () => void;
+}): MutationHandle<TInput, TResult> {
   return {
     mutate: (i) => m.mutateAsync(i),
     isPending: m.isPending,
@@ -133,7 +155,12 @@ export function useReferenceMutations() {
     createTable: {
       ...idle,
       mutate: async (i: { key: string; label: string }) => {
-        const t: ReferenceTable = { id: `rt_${Date.now()}`, key: i.key, label: i.label, values: [] };
+        const t: ReferenceTable = {
+          id: `rt_${Date.now()}`,
+          key: i.key,
+          label: i.label,
+          values: [],
+        };
         referenceTablesCell.set((prev) => [...prev, t]);
         return t;
       },
@@ -143,7 +170,8 @@ export function useReferenceMutations() {
       mutate: async (i: { tableId: string; key: string; label: string }) => {
         const v: ReferenceValue = { id: `rv_${Date.now()}`, key: i.key, label: i.label };
         referenceTablesCell.set((prev) =>
-          prev.map((t) => (t.id === i.tableId ? { ...t, values: [...t.values, v] } : t)));
+          prev.map((t) => (t.id === i.tableId ? { ...t, values: [...t.values, v] } : t)),
+        );
         return v;
       },
     } as MutationHandle<{ tableId: string; key: string; label: string }, ReferenceValue>,
@@ -157,7 +185,8 @@ export function useReferenceMutations() {
       ...idle,
       mutate: async (i: { id: string }) => {
         referenceTablesCell.set((prev) =>
-          prev.map((t) => ({ ...t, values: t.values.filter((v) => v.id !== i.id) })));
+          prev.map((t) => ({ ...t, values: t.values.filter((v) => v.id !== i.id) })),
+        );
       },
     } as MutationHandle<{ id: string }>,
   };
