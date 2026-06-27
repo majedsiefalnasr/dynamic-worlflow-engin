@@ -106,7 +106,7 @@ function SystemUsers() {
     const teamLabel = getTeamLabel(p.teamId);
     const orgLabel = getOrgLabel(p.orgId);
     if (p.orgId === "bank" && p.entityId) {
-      const b = banks.find((e) => e.id === p.entityId);
+      const b = banks.find((e) => String(e.id) === p.entityId);
       if (b) return `${b.name}، ${teamLabel}`;
     }
     return `${orgLabel}، ${teamLabel}`;
@@ -115,14 +115,13 @@ function SystemUsers() {
   function buildUserFields(p: Payload) {
     const team = teams.find((t) => t.code === p.teamId);
     const org = orgs.find((o) => o.code === p.orgId);
-    const bankIndex =
-      p.orgId === "bank" && p.entityId ? banks.findIndex((e) => e.id === p.entityId) : -1;
-    const bankEntity = bankIndex >= 0 ? banks[bankIndex] : undefined;
+    const bankEntity =
+      p.orgId === "bank" && p.entityId ? banks.find((e) => String(e.id) === p.entityId) : undefined;
     return {
       organization: org ? { id: org.id, code: org.code, name: org.label } : null,
       team: team ? { id: team.id, code: team.code, name: team.label } : null,
-      bank: bankEntity ? { id: bankIndex + 1, code: bankEntity.id, name: bankEntity.name } : null,
-      bankId: bankEntity ? bankIndex + 1 : null,
+      bank: bankEntity ? { id: bankEntity.id, code: bankEntity.code, name: bankEntity.name } : null,
+      bankId: bankEntity?.id ?? null,
     };
   }
 
@@ -490,7 +489,7 @@ function UserDialog({
   title: string;
   initial?: User;
   initialRoleId?: string;
-  banks: { id: string; name: string }[];
+  banks: { id: number; code: string; name: string }[];
   orgs: { id: number; code: string; label: string }[];
   teams: { id: number; code: string; label: string; orgCode: string }[];
   roles: { id: number; code: string; name: string; orgCode: string }[];
@@ -501,10 +500,11 @@ function UserDialog({
   const [email, setEmail] = useState(initial?.email ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
   const [orgId, setOrgId] = useState<string>(defaultOrg);
-  const [entityId, setEntityId] = useState<string | null>(
-    banks.find((b) => b.name === initial?.bank?.name)?.id ??
-      (defaultOrg === "bank" ? (banks[0]?.id ?? null) : null),
-  );
+  const [entityId, setEntityId] = useState<string | null>(() => {
+    const found = banks.find((b) => b.name === initial?.bank?.name);
+    if (found) return String(found.id);
+    return defaultOrg === "bank" ? (banks[0] ? String(banks[0].id) : null) : null;
+  });
 
   const teamsForOrg = teams.filter((t) => t.orgCode === orgId);
   const rolesForOrg = roles.filter((r) => r.orgCode === orgId);
@@ -519,7 +519,7 @@ function UserDialog({
     setTeamId(nt[0]?.code ?? "");
     setRoleId(nr[0]?.code ?? "");
     if (next === "bank") {
-      if (!entityId) setEntityId(banks[0]?.id ?? null);
+      if (!entityId) setEntityId(banks[0] ? String(banks[0].id) : null);
     } else {
       setEntityId(null);
     }
@@ -585,7 +585,7 @@ function UserDialog({
               </SelectTrigger>
               <SelectContent>
                 {banks.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
+                  <SelectItem key={b.id} value={String(b.id)}>
                     {b.name}
                   </SelectItem>
                 ))}

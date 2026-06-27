@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAuth, ENTITIES, type Merchant } from "@/lib/mock";
+import { useAuth, BANK_ENTITIES, type Merchant } from "@/lib/mock";
 import {
   merchantsCell,
   logAudit,
@@ -44,7 +44,7 @@ export const Route = createFileRoute("/merchants")({
 });
 
 function entityName(id?: string) {
-  return ENTITIES.find((e) => e.id === id)?.name ?? "—";
+  return BANK_ENTITIES.find((e) => String(e.id) === id)?.name ?? "—";
 }
 
 function linkedCompanies(m: Merchant) {
@@ -65,11 +65,9 @@ function primaryCompany(m: Merchant) {
   return linkedCompanies(m)[0];
 }
 
-// Entity/bank reconciliation is deferred to the banks adapter (Task 7).
-// Until then, ENTITIES ids ("e1", "e2", ...) line up 1:1 with the seeded
-// DEMO_USERS bank ids (1, 2, ...), so bridge numeric bankId -> entity id here.
+// Bank IDs and entity IDs are now both numeric (aligned by the banks adapter).
 function bankIdToEntityId(bankId?: number | null): string | undefined {
-  return bankId != null ? `e${bankId}` : undefined;
+  return bankId != null ? String(bankId) : undefined;
 }
 
 function Merchants() {
@@ -192,8 +190,8 @@ function Merchants() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">كل البنوك</SelectItem>
-              {ENTITIES.map((e) => (
-                <SelectItem key={e.id} value={e.id}>
+              {BANK_ENTITIES.map((e) => (
+                <SelectItem key={e.id} value={String(e.id)}>
                   {e.name}
                 </SelectItem>
               ))}
@@ -513,7 +511,7 @@ function MerchantDialog({
   const [contact, setContact] = useState(initial?.contact === "—" ? "" : (initial?.contact ?? ""));
   const [status, setStatus] = useState<"active" | "suspended">(initial?.status ?? "active");
   const [entityId, setEntityId] = useState<string>(
-    initial?.entityId ?? defaultEntityId ?? ENTITIES[0].id,
+    initial?.entityId ?? defaultEntityId ?? String(BANK_ENTITIES[0].id),
   );
   const [owners, setOwners] = useState(
     initial?.owners?.length ? initial.owners : [{ id: `own_${Date.now()}`, name: "", share: 25 }],
@@ -618,8 +616,8 @@ function MerchantDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ENTITIES.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
+                {BANK_ENTITIES.map((e) => (
+                  <SelectItem key={e.id} value={String(e.id)}>
                     {e.name}
                   </SelectItem>
                 ))}

@@ -55,43 +55,47 @@ export function normalizeRoleId(roleId: string | null | undefined): RoleId {
   return STORED_ROLE_ID_ALIASES[roleId] ?? roleId;
 }
 
-export type Entity = {
-  id: string;
-  type: "bank";
+export type BankEntity = {
+  id: number;
+  code: string;
   name: string;
+  licenseNumber?: string;
   swiftCode?: string;
-  licenseNo: string;
-  status: "active" | "suspended";
-  adminName?: string;
-  adminEmail?: string;
+  status: "active" | "inactive" | "suspended";
+  _version?: number;
 };
 
-export const ENTITIES: Entity[] = [
+export const BANK_ENTITIES: BankEntity[] = [
   {
-    id: "e1",
-    type: "bank",
+    id: 1,
+    code: "ybrd",
     name: "البنك اليمني للإنشاء والتعمير",
     swiftCode: "YBRDYESA",
-    licenseNo: "BNK-001",
+    licenseNumber: "BNK-001",
     status: "active",
   },
   {
-    id: "e2",
-    type: "bank",
+    id: 2,
+    code: "tsib",
     name: "بنك التضامن الإسلامي",
     swiftCode: "TSIBYESA",
-    licenseNo: "BNK-002",
+    licenseNumber: "BNK-002",
     status: "active",
   },
   {
-    id: "e3",
-    type: "bank",
+    id: 3,
+    code: "sbai",
     name: "بنك سبأ الإسلامي",
     swiftCode: "SBAIYESA",
-    licenseNo: "BNK-003",
+    licenseNumber: "BNK-003",
     status: "active",
   },
 ];
+
+/** @deprecated Use BankEntity instead. */
+export type Entity = BankEntity;
+/** @deprecated Use BANK_ENTITIES instead. */
+export const ENTITIES = BANK_ENTITIES;
 
 export type OrgKind = string;
 export type TeamId = string;
@@ -513,7 +517,7 @@ export const MERCHANTS: Merchant[] = importers.map((n, i) => ({
   category: types[i % types.length],
   status: i === 4 ? "suspended" : "active",
   transactions: 3 + i * 4,
-  entityId: ENTITIES[i % ENTITIES.length].id,
+  entityId: String(BANK_ENTITIES[i % BANK_ENTITIES.length].id),
 }));
 
 export type AuditLog = {

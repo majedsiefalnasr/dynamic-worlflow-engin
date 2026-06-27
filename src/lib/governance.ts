@@ -1,8 +1,9 @@
 import { cell, dbResetAll } from "./db";
 import {
   AUDIT as SEED_AUDIT,
+  BANK_ENTITIES,
+  type BankEntity,
   DEMO_USERS,
-  ENTITIES,
   getRoleLabel,
   MERCHANTS as SEED_MERCHANTS,
   NOTIFICATIONS as SEED_NOTIFS,
@@ -105,7 +106,11 @@ export function clearAllNotifs() {
 }
 
 export const merchantsCell = cell("merchants", SEED_MERCHANTS);
-export const entitiesCell = cell("entities", ENTITIES);
+export const entitiesCell = cell<BankEntity[]>("entities", BANK_ENTITIES);
+
+if (entitiesCell.get().some((e) => typeof e.id === "string")) {
+  entitiesCell.set(BANK_ENTITIES);
+}
 
 // ============================================================
 // Internal reference tables

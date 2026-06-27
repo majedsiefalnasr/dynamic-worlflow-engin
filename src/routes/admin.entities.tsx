@@ -1,14 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Building2, Edit, Eye, Search, Power } from "lucide-react";
+import { Plus, Building2, Edit, Eye, Search, Power, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { type Entity, useAuth } from "@/lib/mock";
-import { entitiesCell, logAudit } from "@/lib/governance";
+import { useAuth } from "@/lib/mock";
+import { useBanks, useBankMutations, type BankEntity } from "@/lib/data/banks";
+import { isDomainError } from "@/lib/data/errors";
 import {
   Dialog,
   DialogContent,
@@ -31,76 +32,80 @@ export const Route = createFileRoute("/admin/entities")({
 
 type EntityPayload = {
   name: string;
-  licenseNo: string;
+  licenseNumber?: string;
   swiftCode?: string;
-  status: "active" | "suspended";
-  adminName?: string;
-  adminEmail?: string;
+  status: "active" | "inactive" | "suspended";
 };
 
 function EntitiesAdmin() {
   const { user } = useAuth();
-  const list = entitiesCell.use();
+  const { data: list, isLoading } = useBanks();
+  const mutations = useBankMutations(
+    user ? { userId: String(user.id), userName: user.name, role: user.roleId } : undefined,
+  );
   const [openAdd, setOpenAdd] = useState(false);
-  const [editing, setEditing] = useState<Entity | null>(null);
-  const [viewing, setViewing] = useState<Entity | null>(null);
+  const [editing, setEditing] = useState<BankEntity | null>(null);
+  const [viewing, setViewing] = useState<BankEntity | null>(null);
   const [q, setQ] = useState("");
+
+  const banks = useMemo(() => list ?? [], [list]);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return list;
-    return list.filter(
+    if (!s) return banks;
+    return banks.filter(
       (e) =>
         e.name.toLowerCase().includes(s) ||
-        e.licenseNo.toLowerCase().includes(s) ||
+        (e.licenseNumber ?? "").toLowerCase().includes(s) ||
         (e.swiftCode ?? "").toLowerCase().includes(s),
     );
-  }, [list, q]);
+  }, [banks, q]);
 
-  function add(p: EntityPayload) {
-    const e: Entity = { id: `e_${Date.now()}`, type: "bank", ...p };
-    entitiesCell.set((prev) => [...prev, e]);
-    if (user)
-      logAudit({
-        userId: String(user.id),
-        userName: user.name,
-        role: user.roleId,
-        action: "إضافة بنك جديد",
-        ref: e.id,
-        notes: e.name,
+  async function add(p: EntityPayload) {
+    try {
+      await mutations.createBank.mutate({
+        name: p.name,
+        license_number: p.licenseNumber,
+        swift_code: p.swiftCode,
       });
-    toast.success(`تم إضافة "${p.name}"`);
-    setOpenAdd(false);
+      toast.success(`تم إضافة "${p.name}"`);
+      setOpenAdd(false);
+    } catch (err) {
+      toast.error(isDomainError(err) ? err.message : "فشل إضافة البنك");
+    }
   }
 
-  function update(id: string, p: EntityPayload) {
-    entitiesCell.set((prev) => prev.map((x) => (x.id === id ? { ...x, ...p } : x)));
-    if (user)
-      logAudit({
-        userId: String(user.id),
-        userName: user.name,
-        role: user.roleId,
-        action: "تعديل بيانات بنك",
-        ref: id,
-        notes: p.name,
+  async function update(id: number, p: EntityPayload) {
+    try {
+      await mutations.updateBank.mutate({
+        id,
+        name: p.name,
+        license_number: p.licenseNumber,
+        swift_code: p.swiftCode,
       });
-    toast.success("تم حفظ التعديلات");
-    setEditing(null);
+      toast.success("تم حفظ التعديلات");
+      setEditing(null);
+    } catch (err) {
+      toast.error(isDomainError(err) ? err.message : "فشل تعديل البنك");
+    }
   }
 
-  function toggleStatus(e: Entity) {
-    const next: Entity["status"] = e.status === "active" ? "suspended" : "active";
-    entitiesCell.set((prev) => prev.map((x) => (x.id === e.id ? { ...x, status: next } : x)));
-    if (user)
-      logAudit({
-        userId: String(user.id),
-        userName: user.name,
-        role: user.roleId,
-        action: next === "active" ? "تفعيل بنك" : "إيقاف بنك",
-        ref: e.id,
-        notes: e.name,
-      });
-    toast.success(next === "active" ? `تم تفعيل ${e.name}` : `تم إيقاف ${e.name}`);
+  async function toggleStatus(e: BankEntity) {
+    const activate = e.status !== "active";
+    try {
+      await mutations.toggleBank.mutate({ id: e.id, is_active: activate });
+      toast.success(activate ? `تم تفعيل ${e.name}` : `تم إيقاف ${e.name}`);
+    } catch (err) {
+      toast.error(isDomainError(err) ? err.message : "فشل تغيير حالة البنك");
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   return (
@@ -167,7 +172,7 @@ function EntitiesAdmin() {
                       {e.name}
                     </div>
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs">{e.licenseNo}</td>
+                  <td className="px-4 py-3 font-mono text-xs">{e.licenseNumber ?? "—"}</td>
                   <td className="px-4 py-3 font-mono text-xs">{e.swiftCode ?? "—"}</td>
                   <td className="px-4 py-3">
                     <Badge
@@ -177,7 +182,11 @@ function EntitiesAdmin() {
                           : "bg-destructive/15 text-destructive border-0"
                       }
                     >
-                      {e.status === "active" ? "نشط" : "موقوف"}
+                      {e.status === "active"
+                        ? "نشط"
+                        : e.status === "suspended"
+                          ? "موقوف"
+                          : "غير نشط"}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
@@ -206,7 +215,7 @@ function EntitiesAdmin() {
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center">
-                    {list.length === 0 ? (
+                    {banks.length === 0 ? (
                       <div className="flex flex-col items-center gap-3">
                         <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary grid place-items-center">
                           <Building2 className="h-5 w-5" />
@@ -252,10 +261,19 @@ function EntitiesAdmin() {
               <DialogDescription>تفاصيل البنك</DialogDescription>
             </DialogHeader>
             <div className="space-y-3 py-2 text-sm">
-              <Row label="رقم الترخيص" value={viewing.licenseNo} />
+              <Row label="رقم الترخيص" value={viewing.licenseNumber ?? "—"} />
               <Row label="SWIFT" value={viewing.swiftCode ?? "—"} />
-              <Row label="الحالة" value={viewing.status === "active" ? "نشط" : "موقوف"} />
-              <Row label="المعرّف" value={viewing.id} />
+              <Row
+                label="الحالة"
+                value={
+                  viewing.status === "active"
+                    ? "نشط"
+                    : viewing.status === "suspended"
+                      ? "موقوف"
+                      : "غير نشط"
+                }
+              />
+              <Row label="المعرّف" value={String(viewing.id)} />
             </div>
           </DialogContent>
         )}
@@ -279,21 +297,14 @@ function EntityDialog({
   onSave,
 }: {
   title: string;
-  initial?: Entity;
+  initial?: BankEntity;
   onSave: (p: EntityPayload) => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [licenseNo, setLicenseNo] = useState(initial?.licenseNo ?? "");
+  const [licenseNumber, setLicenseNumber] = useState(initial?.licenseNumber ?? "");
   const [swiftCode, setSwiftCode] = useState(initial?.swiftCode ?? "");
-  const [status, setStatus] = useState<Entity["status"]>(initial?.status ?? "active");
-  const [adminName, setAdminName] = useState(initial?.adminName ?? "");
-  const [adminEmail, setAdminEmail] = useState(initial?.adminEmail ?? "");
-  const isNew = !initial;
-  const emailOk = !adminEmail.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim());
-  const adminOk = isNew
-    ? adminName.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim())
-    : emailOk;
-  const valid = name.trim() && licenseNo.trim() && adminOk;
+  const [status, setStatus] = useState<BankEntity["status"]>(initial?.status ?? "active");
+  const valid = !!name.trim();
   return (
     <DialogContent dir="rtl" className="sm:max-w-md">
       <DialogHeader>
@@ -305,10 +316,10 @@ function EntityDialog({
           <Input value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="space-y-1.5">
-          <Label>رقم الترخيص *</Label>
+          <Label>رقم الترخيص</Label>
           <Input
-            value={licenseNo}
-            onChange={(e) => setLicenseNo(e.target.value)}
+            value={licenseNumber}
+            onChange={(e) => setLicenseNumber(e.target.value)}
             placeholder="BNK-004"
           />
         </div>
@@ -333,44 +344,20 @@ function EntityDialog({
             </Button>
             <Button
               type="button"
+              variant={status === "inactive" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatus("inactive")}
+            >
+              غير نشط
+            </Button>
+            <Button
+              type="button"
               variant={status === "suspended" ? "default" : "outline"}
               size="sm"
               onClick={() => setStatus("suspended")}
             >
               موقوف
             </Button>
-          </div>
-        </div>
-
-        <div className="pt-3 mt-2 border-t">
-          <div className="text-sm font-semibold mb-1">
-            حساب مدير البنك {isNew && <span className="text-destructive">*</span>}
-          </div>
-          <p className="text-xs text-muted-foreground mb-3">
-            {isNew
-              ? "يُنشأ حساب المدير الأول للبنك تلقائياً ويُستخدم لتسجيل الدخول وإضافة باقي المستخدمين."
-              : "بيانات المدير الأول للبنك."}
-          </p>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>اسم المدير {isNew && "*"}</Label>
-              <Input
-                value={adminName}
-                onChange={(e) => setAdminName(e.target.value)}
-                placeholder="مثال: محمد علي"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>البريد الإلكتروني للمدير {isNew && "*"}</Label>
-              <Input
-                type="email"
-                dir="ltr"
-                value={adminEmail}
-                onChange={(e) => setAdminEmail(e.target.value)}
-                placeholder="admin@bank.ye"
-              />
-              {!emailOk && <p className="text-xs text-destructive">صيغة البريد غير صحيحة</p>}
-            </div>
           </div>
         </div>
       </div>
@@ -380,11 +367,9 @@ function EntityDialog({
             valid &&
             onSave({
               name: name.trim(),
-              licenseNo: licenseNo.trim(),
+              licenseNumber: licenseNumber.trim() || undefined,
               swiftCode: swiftCode.trim() || undefined,
               status,
-              adminName: adminName.trim() || undefined,
-              adminEmail: adminEmail.trim() || undefined,
             })
           }
           disabled={!valid}
