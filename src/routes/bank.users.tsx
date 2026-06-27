@@ -90,9 +90,12 @@ function BankUsers() {
 
   function toggleActive(u: User) {
     const next = u.isActive === false;
-    mutations.toggleUser.mutate({ id: u.id, isActive: next }).then(() => {
-      toast.success(next ? `تم تفعيل ${u.name}` : `تم إلغاء تفعيل ${u.name}`);
-    });
+    mutations.toggleUser
+      .mutate({ id: u.id, isActive: next })
+      .then(() => {
+        toast.success(next ? `تم تفعيل ${u.name}` : `تم إلغاء تفعيل ${u.name}`);
+      })
+      .catch(() => toast.error("فشل تغيير حالة المستخدم"));
   }
 
   return (
@@ -132,7 +135,8 @@ function BankUsers() {
                   .then(() => {
                     toast.success(`تمت إضافة ${payload.name}`);
                     setOpenAdd(false);
-                  });
+                  })
+                  .catch(() => toast.error("فشل إضافة المستخدم"));
               }}
             />
           </Dialog>
@@ -307,7 +311,8 @@ function BankUsers() {
                 .then(() => {
                   toast.success("تم حفظ التعديلات");
                   setEditing(null);
-                });
+                })
+                .catch(() => toast.error("فشل حفظ التعديلات"));
             }}
           />
         )}

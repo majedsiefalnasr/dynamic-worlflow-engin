@@ -136,10 +136,13 @@ function SystemUsers() {
         roleLabel: mock.roleLabel,
       },
     };
-    mutations.createUser.mutate(input).then(() => {
-      toast.success(`تمت إضافة ${p.name}`);
-      setOpenAdd(false);
-    });
+    mutations.createUser
+      .mutate(input)
+      .then(() => {
+        toast.success(`تمت إضافة ${p.name}`);
+        setOpenAdd(false);
+      })
+      .catch(() => toast.error("فشل إضافة المستخدم"));
   }
 
   function update(target: User, p: Payload) {
@@ -160,14 +163,18 @@ function SystemUsers() {
       .then(() => {
         toast.success("تم حفظ التعديلات");
         setEditing(null);
-      });
+      })
+      .catch(() => toast.error("فشل حفظ التعديلات"));
   }
 
   function toggleActive(u: User) {
     const next = u.isActive === false;
-    mutations.toggleUser.mutate({ id: u.id, isActive: next }).then(() => {
-      toast.success(next ? `تم تفعيل ${u.name}` : `تم إلغاء تفعيل ${u.name}`);
-    });
+    mutations.toggleUser
+      .mutate({ id: u.id, isActive: next })
+      .then(() => {
+        toast.success(next ? `تم تفعيل ${u.name}` : `تم إلغاء تفعيل ${u.name}`);
+      })
+      .catch(() => toast.error("فشل تغيير حالة المستخدم"));
   }
 
   function deriveInitialRoleId(u: User): string {

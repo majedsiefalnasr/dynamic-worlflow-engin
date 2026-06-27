@@ -4,6 +4,7 @@ import {
   BANK_ENTITIES,
   type BankEntity,
   DEMO_USERS,
+  type User,
   getRoleLabel,
   MERCHANTS as SEED_MERCHANTS,
   NOTIFICATIONS as SEED_NOTIFS,
@@ -110,6 +111,12 @@ export const entitiesCell = cell<BankEntity[]>("entities", BANK_ENTITIES);
 
 if (entitiesCell.get().some((e) => typeof e.id === "string")) {
   entitiesCell.set(BANK_ENTITIES);
+}
+
+export const usersCell = cell<User[]>("users", DEMO_USERS);
+
+if (usersCell.get().some((u) => typeof u.id === "string" || !("role" in u))) {
+  usersCell.set(DEMO_USERS);
 }
 
 // ============================================================

@@ -10,15 +10,8 @@ import { api } from "./http";
 import { source } from "./source";
 import { mockRead, type MutationHandle, type ReadResult } from "./query";
 import { toUser } from "./auth";
-import {
-  DEMO_USERS,
-  saveUsers,
-  computeAvatar,
-  getRoleLabel,
-  type User,
-  type RoleId,
-} from "@/lib/mock";
-import { logAudit } from "@/lib/governance";
+import { computeAvatar, getRoleLabel, type User, type RoleId } from "@/lib/mock";
+import { logAudit, usersCell } from "@/lib/governance";
 import { upsertWorkflowUser } from "@/lib/workflow-bridge";
 
 export type { User } from "@/lib/mock";
@@ -62,6 +55,7 @@ export function useUsers(filters?: {
   search?: string;
 }): ReadResult<User[]> {
   const live = source(KEY) === "live";
+  const cell = usersCell.use();
 
   const query = useQuery({
     queryKey: userKeys.list(filters as Record<string, unknown> | undefined),
@@ -76,7 +70,7 @@ export function useUsers(filters?: {
   });
 
   if (!live) {
-    let users = [...DEMO_USERS];
+    let users = [...cell];
     if (filters?.bankId !== undefined) {
       users = users.filter((u) => u.bankId === filters.bankId);
     }
@@ -249,8 +243,7 @@ export function useUserMutations(auditCtx?: AuditInput) {
           screenPermissions: [],
           capabilities: [],
         };
-        DEMO_USERS.push(newUser);
-        saveUsers();
+        usersCell.set((prev) => [...prev, newUser]);
         upsertWorkflowUser(newUser);
         audit("إضافة مستخدم نظام", newUser.email, newUser.name);
         return newUser;
@@ -259,32 +252,41 @@ export function useUserMutations(auditCtx?: AuditInput) {
     updateUser: {
       ...idle,
       mutate: async (i: UpdateUserInput) => {
-        const idx = DEMO_USERS.findIndex((u) => u.id === i.id);
-        if (idx < 0) return;
-        DEMO_USERS[idx] = {
-          ...DEMO_USERS[idx],
-          name: i.name,
-          email: i.email,
-          phone: i.phone,
-          roleId: i.roleId,
-          roleLabel: i._mock?.roleLabel ?? getRoleLabel(i.roleId),
-          team: i._mock?.team ?? DEMO_USERS[idx].team,
-          avatar: computeAvatar(i.name),
-        };
-        saveUsers();
-        upsertWorkflowUser(DEMO_USERS[idx]);
+        let updated: User | undefined;
+        usersCell.set((prev) =>
+          prev.map((u) => {
+            if (u.id !== i.id) return u;
+            updated = {
+              ...u,
+              name: i.name,
+              email: i.email,
+              phone: i.phone,
+              roleId: i.roleId,
+              roleLabel: i._mock?.roleLabel ?? getRoleLabel(i.roleId),
+              team: i._mock?.team ?? u.team,
+              avatar: computeAvatar(i.name),
+            };
+            return updated;
+          }),
+        );
+        if (updated) upsertWorkflowUser(updated);
         audit("تعديل بيانات مستخدم", i.email, i.name);
       },
     } as MutationHandle<UpdateUserInput>,
     toggleUser: {
       ...idle,
       mutate: async (i: ToggleUserInput) => {
-        const idx = DEMO_USERS.findIndex((u) => u.id === i.id);
-        if (idx < 0) return;
-        DEMO_USERS[idx] = { ...DEMO_USERS[idx], isActive: i.isActive };
-        saveUsers();
-        const u = DEMO_USERS[idx];
-        audit(i.isActive ? "تفعيل مستخدم" : "إلغاء تفعيل مستخدم", u.email, u.name);
+        let toggled: User | undefined;
+        usersCell.set((prev) =>
+          prev.map((u) => {
+            if (u.id !== i.id) return u;
+            toggled = { ...u, isActive: i.isActive };
+            return toggled;
+          }),
+        );
+        if (toggled) {
+          audit(i.isActive ? "تفعيل مستخدم" : "إلغاء تفعيل مستخدم", toggled.email, toggled.name);
+        }
       },
     } as MutationHandle<ToggleUserInput>,
   };
