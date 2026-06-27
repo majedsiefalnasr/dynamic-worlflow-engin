@@ -202,6 +202,61 @@ changes. This is the *only* place mock and live legitimately share the cell, and
 is a cache, not a second write path — mutations always go through the adapter, never
 straight to the cell, in live mode.
 
+### 3.5 Adapter independence
+
+Resource adapters are **independent**. One adapter never imports or calls another
+resource adapter. No `merchants.ts` reaching into `banks.ts`, no transitive
+adapter graph.
+
+Shared behavior lives in common utilities only — `http.ts`, `errors.ts`,
+`query.ts`, `source.ts`, and small shared mappers/helpers — never in a peer
+resource module. If two adapters need the same logic, it moves down into a shared
+util; it does not move sideways.
+
+Resources still relate at the *data* level (merchants display bank names and sector
+labels). That relationship is satisfied without coupling, in one of two ways:
+
+- the screen reads each resource's own hook and composes them in the UI, or
+- the live read adapter resolves the label via the **shared sync lookup cache**
+  (§3.4), which is a cross-cutting utility, not a sibling adapter.
+
+The forbidden thing is an adapter `import`-ing another adapter or calling its hooks.
+Composition happens in the UI or through shared utils, keeping every resource module
+understandable and testable in isolation.
+
+### 3.6 Query key convention
+
+To keep cache invalidation predictable across all resources, every live adapter
+builds its TanStack Query keys from one convention. Each resource module exports a
+`<resource>Keys` factory shaped identically:
+
+```ts
+export const merchantKeys = {
+  all:      ["merchants"] as const,                      // namespace root
+  lists:    () => [...merchantKeys.all, "list"] as const, // all list queries
+  list:     (filters?: Record<string, unknown>) =>        // one filtered list
+              [...merchantKeys.lists(), filters ?? {}] as const,
+  details:  () => [...merchantKeys.all, "detail"] as const,
+  detail:   (id: string) => [...merchantKeys.details(), id] as const,
+};
+```
+
+Rules:
+
+- **Root** is `[<resource>]` (singular-or-plural, fixed per resource) — the
+  invalidation handle for "everything in this resource."
+- **Collections** live under `...all, "list"`; a filtered collection appends the
+  normalized filter object so different filters cache separately but invalidate
+  together.
+- **Details** live under `...all, "detail", id`.
+- After any mutation, the adapter invalidates at the **narrowest correct level**:
+  a create/delete invalidates `lists()`; an update invalidates both `detail(id)`
+  and `lists()`. Nothing invalidates another resource's keys (ties back to §3.5).
+- Keys are **never** spelled inline in a screen or mid-adapter — only via the
+  factory, so the convention can't drift.
+
+`query.ts` documents this convention once; every resource follows it verbatim.
+
 ## 4. The resource switch
 
 `src/lib/data/source.ts`:
@@ -271,7 +326,10 @@ Internally it has a `mockReferenceAdapter` and a `liveReferenceAdapter`, both
 implementing the same internal `ReferenceAdapter` interface; the hook picks one via
 `source('reference-data')`. The DTO↔domain mapping (`toReferenceTable`) lives here,
 never in the screen. Optimistic-lock `version` is read from the domain model and
-sent on PATCH by the live adapter only.
+sent on PATCH by the live adapter only. The module exports a `referenceKeys` factory
+following the §3.6 convention; the live adapter invalidates at the narrowest level
+after each mutation. The adapter imports only shared utils (`http`, `errors`,
+`query`, `source`) — never another resource module (§3.5).
 
 The screen (`admin.reference-data.tsx`) imports `useReferenceTables` +
 `useReferenceMutations` and nothing else from the data layer. No `isApiEnabled`,
@@ -363,3 +421,5 @@ default and any resource can go live in isolation.
 | A blocked write looks "done" but isn't | Stub rejects with `kind:"blocked"` + logged in handoff (§7) |
 | Required UI change sneaks in | Blocked by `UI-CHANGES.md` approval gate (§8) |
 | Optimistic-lock conflicts surface as scary errors | `conflict` kind → existing toast with a friendly message |
+| Adapters grow cross-resource coupling | §3.5 independence rule; per-module isolation test asserts no peer-adapter import |
+| Cache invalidation drifts per resource | §3.6 single key convention via factory; reviewed per resource |
