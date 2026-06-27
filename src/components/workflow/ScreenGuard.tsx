@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/mock";
 import { screenPermsCell, type ScreenKey } from "@/lib/governance";
 import { canScreen } from "@/lib/workflow-bridge";
 import { wfStore } from "@/lib/workflow-engine";
+import { hasApiBase } from "@/lib/data/source";
 import type { ReactNode } from "react";
 
 export function ScreenGuard({
@@ -16,14 +17,20 @@ export function ScreenGuard({
   message?: string;
 }) {
   const { user } = useAuth();
-  // Subscribe so the guard re-evaluates when permissions or the workflow
-  // designer's stage assignments change.
+  const live = hasApiBase();
+
+  // Always call cell hooks to keep hook order stable (React rules).
   screenPermsCell.use();
   wfStore.assignments.use();
   wfStore.versions.use();
   if (!user) return null;
   wfStore.users.use();
-  if (!canScreen(user, screen, "view")) {
+
+  const allowed = live
+    ? (user.screenPermissions?.some((sp) => sp.screen === screen) ?? false)
+    : canScreen(user, screen, "view");
+
+  if (!allowed) {
     return (
       <div className="p-6">
         <Card className="p-8 shadow-card border-0 flex items-start gap-4">

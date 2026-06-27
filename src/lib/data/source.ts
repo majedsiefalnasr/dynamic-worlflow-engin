@@ -18,6 +18,7 @@ export const SUPPORTED = [
   "requests",
   "workflows",
   "users",
+  "screen-permissions",
 ] as const;
 
 export type Resource = (typeof SUPPORTED)[number];

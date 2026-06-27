@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Info, Check, X, Workflow, SlidersHorizontal } from "lucide-react";
+import { Info, Check, X, Workflow, SlidersHorizontal, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,16 +10,13 @@ import { useAuth, type RoleId } from "@/lib/mock";
 import {
   MANAGED_SCREENS,
   SCREEN_CAP_LABELS,
-  screenPermsCell,
-  roleCatalogCell,
   getOrgLabel,
   manualScreenCan,
-  setScreenPermission,
-  logAudit,
   type ManualScreenKey,
   type RoleCatalogEntry,
   type ScreenCapability,
 } from "@/lib/governance";
+import { usePermissionMatrix, usePermissionMutations } from "@/lib/data/screen-permissions";
 import { requestsAccessForRole } from "@/lib/workflow-bridge";
 import { wfStore } from "@/lib/workflow-engine";
 
@@ -74,13 +71,32 @@ const GROUPS: Group[] = [
 
 function ScreenPermissionsAdmin() {
   const { user } = useAuth();
-  screenPermsCell.use();
-  const roleCatalog = roleCatalogCell.use();
+  const matrix = usePermissionMatrix();
+  const { togglePermission } = usePermissionMutations(
+    user ? { userId: String(user.id), userName: user.name, role: user.roleId } : undefined,
+  );
+
+  // Still need workflow subscriptions for the derived requests column
   wfStore.assignments.use();
   wfStore.versions.use();
-  const roleRows = roleCatalog
-    .filter((r) => r.active && r.code !== "rc_platform_admin")
-    .sort((a, b) => `${a.orgCode}-${a.name}`.localeCompare(`${b.orgCode}-${b.name}`));
+
+  if (matrix.isLoading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const roleRows: RoleCatalogEntry[] = (matrix.data?.roles ?? []).map((r) => ({
+    id: r.id,
+    code: r.code,
+    name: r.name,
+    orgId: 0, // not needed for display
+    orgCode: r.orgCode,
+    active: true,
+    builtin: false,
+  }));
 
   function toggle(
     screen: ManualScreenKey,
@@ -89,17 +105,14 @@ function ScreenPermissionsAdmin() {
     cap: ScreenCapability,
     enabled: boolean,
   ) {
-    setScreenPermission(screen, role.code as RoleId, cap, enabled);
-    if (user) {
-      logAudit({
-        userId: String(user.id),
-        userName: user.name,
-        role: user.roleId,
-        action: `${enabled ? "منح" : "إلغاء"} صلاحية ${SCREEN_CAP_LABELS[cap]}`,
-        ref: `${screen}:${role.code}`,
-        notes: `${label}، ${role.name}`,
-      });
-    }
+    togglePermission.mutate({
+      screen,
+      roleCode: role.code as RoleId,
+      cap,
+      enabled,
+      screenLabel: label,
+      roleName: role.name,
+    });
   }
 
   return (
