@@ -11,8 +11,7 @@ import { Label } from "@/components/ui/label";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import type { ReferenceTable } from "@/lib/governance";
-import { useReferenceTables, useReferenceMutations } from "@/lib/data/reference-data";
+import { useReferenceTables, useReferenceMutations, type ReferenceTable } from "@/lib/data/reference-data";
 import { isDomainError } from "@/lib/data/errors";
 import { toast } from "sonner";
 
@@ -42,7 +41,7 @@ function ReferenceDataPage() {
       setTableLabel("");
       toast.success("تمت إضافة جدول داخلي");
     } catch (e) {
-      toast.error(isDomainError(e) ? e.message : "Could not add table");
+      toast.error(isDomainError(e) ? e.message : "تعذر إضافة الجدول");
     }
   };
 
@@ -53,7 +52,7 @@ function ReferenceDataPage() {
       await removeTable.mutate({ id });
       toast.success("تم حذف الجدول الداخلي");
     } catch (e) {
-      toast.error(isDomainError(e) ? e.message : "Could not remove table");
+      toast.error(isDomainError(e) ? e.message : "تعذر حذف الجدول");
     }
   };
 
@@ -87,7 +86,7 @@ function ReferenceDataPage() {
 
       {isLoading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+          <Loader2 className="h-4 w-4 animate-spin" /> جاري التحميل…
         </div>
       ) : (
         <div className="space-y-5">
@@ -97,17 +96,13 @@ function ReferenceDataPage() {
               table={table}
               onRemove={() => onRemoveTable(table.id)}
               onAddValue={async (k, l) => {
-                try {
-                  await createValue.mutate({ tableId: table.id, key: k, label: l });
-                } catch (e) {
-                  toast.error(isDomainError(e) ? e.message : "Could not add value");
-                }
+                await createValue.mutate({ tableId: table.id, key: k, label: l });
               }}
               onRemoveValue={async (id) => {
                 try {
                   await removeValue.mutate({ id });
                 } catch (e) {
-                  toast.error(isDomainError(e) ? e.message : "Could not remove value");
+                  toast.error(isDomainError(e) ? e.message : "تعذر حذف القيمة");
                 }
               }}
             />
@@ -135,9 +130,13 @@ function ReferenceTableCard({
     if (!nextKey || !nextLabel) return toast.error("مفتاح وقيمة البيان مطلوبان");
     if (!/^[a-z][a-z0-9_]*$/.test(nextKey)) return toast.error("مفتاح القيمة يجب أن يكون بالإنجليزية");
     if (table.values.some((v) => v.key === nextKey)) return toast.error("هذا المفتاح مستخدم داخل الجدول");
-    await onAddValue(nextKey, nextLabel);
-    setKey("");
-    setLabel("");
+    try {
+      await onAddValue(nextKey, nextLabel);
+      setKey("");
+      setLabel("");
+    } catch (e) {
+      toast.error(isDomainError(e) ? e.message : "تعذر إضافة القيمة");
+    }
   };
 
   return (

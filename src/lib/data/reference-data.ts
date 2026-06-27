@@ -15,6 +15,9 @@ import {
   type ReferenceValue,
 } from "@/lib/governance";
 
+// Re-export types for adapter consumers (spec §6)
+export type { ReferenceTable, ReferenceValue } from "@/lib/governance";
+
 const KEY = "reference-data" as const;
 
 // ---------- Query key factory (spec §3.6) ----------
