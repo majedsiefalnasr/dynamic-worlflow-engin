@@ -92,11 +92,6 @@ export const BANK_ENTITIES: BankEntity[] = [
   },
 ];
 
-/** @deprecated Use BankEntity instead. */
-export type Entity = BankEntity;
-/** @deprecated Use BANK_ENTITIES instead. */
-export const ENTITIES = BANK_ENTITIES;
-
 export type OrgKind = string;
 export type TeamId = string;
 export type BuiltinTeamId =

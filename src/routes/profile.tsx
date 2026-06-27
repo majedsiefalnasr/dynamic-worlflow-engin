@@ -184,7 +184,13 @@ function Profile() {
   );
 }
 
-function InfoRow({ icon: Icon, v }: { icon: any; v: string }) {
+function InfoRow({
+  icon: Icon,
+  v,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  v: string;
+}) {
   return (
     <div className="flex items-center gap-2 text-xs text-muted-foreground">
       <Icon className="h-3.5 w-3.5 shrink-0" />

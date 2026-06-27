@@ -1,7 +1,6 @@
 // ============================================================
 // Users adapter (spec §6). Exposes a stable hook surface;
-// picks mock vs live via source(). DTO<->domain mapping reuses
-// toUser from auth.ts. Imports only shared utils
+// picks mock vs live via source(). Imports only shared utils
 // (http/query/source) + mock helpers — never a peer adapter (§3.5).
 // ============================================================
 
@@ -9,7 +8,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./http";
 import { source } from "./source";
 import { mockRead, type MutationHandle, type ReadResult } from "./query";
-import { toUser } from "./auth";
 import { computeAvatar, getRoleLabel, type User, type RoleId } from "@/lib/mock";
 import { logAudit, usersCell } from "@/lib/governance";
 import { upsertWorkflowUser } from "@/lib/workflow-bridge";
@@ -27,7 +25,7 @@ export const userKeys = {
   detail: (id: number) => [...userKeys.details(), id] as const,
 };
 
-// ---------- DTO type (reuses toUser from auth) ----------
+// ---------- DTO -> domain ----------
 interface UserDto {
   id: number;
   version?: number;
@@ -46,6 +44,27 @@ interface UserDto {
   capabilities: string[];
   created_at: string | null;
   updated_at: string | null;
+}
+
+function toUser(dto: UserDto): User {
+  return {
+    id: dto.id,
+    name: dto.name,
+    email: dto.email,
+    roleId: dto.role?.code ?? "",
+    roleLabel: dto.role?.name ?? dto.role_label ?? "",
+    role: dto.role,
+    organization: dto.organization,
+    team: dto.team,
+    bank: dto.bank,
+    bankId: dto.bank_id,
+    isActive: dto.is_active,
+    avatar: computeAvatar(dto.name),
+    phone: undefined,
+    screenPermissions: dto.screen_permissions ?? [],
+    capabilities: dto.capabilities ?? [],
+    _version: dto.version,
+  };
 }
 
 // ---------- Read hook ----------
