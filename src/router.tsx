@@ -1,8 +1,10 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
+import { assertResourceEnv } from "@/lib/data/source";
 import { routeTree } from "./routeTree.gen";
 
 export const getRouter = () => {
+  assertResourceEnv();
   const queryClient = new QueryClient();
 
   const router = createRouter({
