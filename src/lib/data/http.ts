@@ -96,6 +96,11 @@ async function request(
 
   const body = await parse(res);
   if (!res.ok) {
+    if (res.status === 401) {
+      tokenStore.clear();
+      // Dynamic import to avoid circular dep (auth imports http, http can't import auth)
+      import("@/lib/mock").then((m) => m.auth.logout()).catch(() => {});
+    }
     throw mapHttpError(res.status, body, res.headers.get("content-type") ?? undefined);
   }
   return body;
