@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Edit, Power, Search, Trash2, KeyRound } from "lucide-react";
+import { Plus, Edit, Power, Search, Trash2, KeyRound, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,13 +24,10 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import {
-  roleCatalogCell,
-  orgsCell,
-  getOrgLabel,
-  logAudit,
-  type RoleCatalogEntry,
-} from "@/lib/governance";
+import { getOrgLabel, type RoleCatalogEntry } from "@/lib/governance";
+import { useRoles, useRoleMutations } from "@/lib/data/roles";
+import { useOrganizations } from "@/lib/data/organizations";
+import { isDomainError } from "@/lib/data/errors";
 import { DEMO_USERS, useAuth } from "@/lib/mock";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
 
@@ -46,19 +43,15 @@ type Payload = { name: string; orgCode: string };
 
 function RolesAdmin() {
   const { user } = useAuth();
-  const roles = roleCatalogCell.use();
-  const orgs = orgsCell.use();
+  const { data: roles, isLoading: rolesLoading } = useRoles();
+  const { data: orgs } = useOrganizations();
+  const mutations = useRoleMutations(
+    user ? { userId: String(user.id), userName: user.name, role: user.roleId } : undefined,
+  );
   const [q, setQ] = useState("");
   const [orgFilter, setOrgFilter] = useState<string>("all");
   const [openAdd, setOpenAdd] = useState(false);
   const [editing, setEditing] = useState<RoleCatalogEntry | null>(null);
-
-  const list = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    return roles
-      .filter((r) => orgFilter === "all" || r.orgCode === orgFilter)
-      .filter((r) => !s || r.name.toLowerCase().includes(s));
-  }, [roles, q, orgFilter]);
 
   const usersByRole = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -66,66 +59,67 @@ function RolesAdmin() {
     return counts;
   }, []);
 
-  function audit(action: string, ref: string, notes?: string) {
-    if (user)
-      logAudit({
-        userId: String(user.id),
-        userName: user.name,
-        role: user.roleId,
-        action,
-        ref,
-        notes,
-      });
+  if (rolesLoading || !roles || !orgs) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
-  function add(p: Payload) {
-    const code = `rc_${Date.now()}`;
-    const org = orgs.find((o) => o.code === p.orgCode);
-    const nextId = Math.max(0, ...roles.map((r) => r.id)) + 1;
-    roleCatalogCell.set((prev) => [
-      ...prev,
-      {
-        id: nextId,
-        code,
+  const list = roles
+    .filter((r) => orgFilter === "all" || r.orgCode === orgFilter)
+    .filter((r) => {
+      const s = q.trim().toLowerCase();
+      return !s || r.name.toLowerCase().includes(s);
+    });
+
+  async function add(p: Payload) {
+    try {
+      const org = orgs?.find((o) => o.code === p.orgCode);
+      await mutations.createRole.mutate({
         name: p.name,
-        orgId: org?.id ?? 0,
-        orgCode: p.orgCode,
-        active: true,
-        builtin: false,
-      },
-    ]);
-    audit("إضافة دور", code, p.name);
-    toast.success(`تمت إضافة الدور "${p.name}"`);
-    setOpenAdd(false);
+        organization_id: org?.id ?? 0,
+      });
+      toast.success(`تمت إضافة الدور "${p.name}"`);
+      setOpenAdd(false);
+    } catch (e) {
+      toast.error(isDomainError(e) ? e.message : "حدث خطأ أثناء الإضافة");
+    }
   }
 
-  function update(target: RoleCatalogEntry, p: Payload) {
-    const org = orgs.find((o) => o.code === p.orgCode);
-    roleCatalogCell.set((prev) =>
-      prev.map((r) =>
-        r.code === target.code
-          ? { ...r, name: p.name, orgCode: p.orgCode, orgId: org?.id ?? r.orgId }
-          : r,
-      ),
-    );
-    audit("تعديل دور", target.code, p.name);
-    toast.success("تم حفظ التعديلات");
-    setEditing(null);
+  async function update(target: RoleCatalogEntry, p: Payload) {
+    try {
+      const org = orgs?.find((o) => o.code === p.orgCode);
+      await mutations.updateRole.mutate({
+        id: target.id,
+        name: p.name,
+        organization_id: org?.id,
+      });
+      toast.success("تم حفظ التعديلات");
+      setEditing(null);
+    } catch (e) {
+      toast.error(isDomainError(e) ? e.message : "حدث خطأ أثناء التعديل");
+    }
   }
 
-  function toggle(r: RoleCatalogEntry) {
-    roleCatalogCell.set((prev) =>
-      prev.map((x) => (x.code === r.code ? { ...x, active: !x.active } : x)),
-    );
-    audit(r.active ? "إلغاء تفعيل دور" : "تفعيل دور", r.code, r.name);
-    toast.success(r.active ? `تم إلغاء تفعيل "${r.name}"` : `تم تفعيل "${r.name}"`);
+  async function toggle(r: RoleCatalogEntry) {
+    try {
+      await mutations.toggleRole.mutate({ id: r.id, is_active: !r.active });
+      toast.success(r.active ? `تم إلغاء تفعيل "${r.name}"` : `تم تفعيل "${r.name}"`);
+    } catch (e) {
+      toast.error(isDomainError(e) ? e.message : "حدث خطأ أثناء تغيير الحالة");
+    }
   }
 
-  function remove(r: RoleCatalogEntry) {
+  async function remove(r: RoleCatalogEntry) {
     if (r.builtin) return toast.error("لا يمكن حذف دور افتراضي. يمكنك إلغاء تفعيله.");
-    roleCatalogCell.set((prev) => prev.filter((x) => x.code !== r.code));
-    audit("حذف دور", r.code, r.name);
-    toast.success(`تم حذف "${r.name}"`);
+    try {
+      await mutations.deleteRole.mutate({ id: r.id });
+      toast.success(`تم حذف "${r.name}"`);
+    } catch (e) {
+      toast.error(isDomainError(e) ? e.message : "حدث خطأ أثناء الحذف");
+    }
   }
 
   return (
