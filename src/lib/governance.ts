@@ -107,6 +107,7 @@ export type ReferenceValue = {
   id: string;
   key: string;
   label: string;
+  _version?: number; // live optimistic-lock; ignored by mock + UI
 };
 
 export type ReferenceTable = {
@@ -115,6 +116,7 @@ export type ReferenceTable = {
   label: string;
   system?: boolean;
   values: ReferenceValue[];
+  _version?: number; // live optimistic-lock; ignored by mock + UI
 };
 
 const DEFAULT_REFERENCE_TABLES: ReferenceTable[] = [

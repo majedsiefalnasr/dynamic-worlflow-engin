@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, Trash2, Database } from "lucide-react";
+import { Plus, Trash2, Database, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
@@ -11,7 +11,9 @@ import { Label } from "@/components/ui/label";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { referenceTablesCell, type ReferenceTable } from "@/lib/governance";
+import type { ReferenceTable } from "@/lib/governance";
+import { useReferenceTables, useReferenceMutations } from "@/lib/data/reference-data";
+import { isDomainError } from "@/lib/data/errors";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/reference-data")({
@@ -23,32 +25,36 @@ export const Route = createFileRoute("/admin/reference-data")({
 });
 
 function ReferenceDataPage() {
-  const tables = referenceTablesCell.use();
+  const { data: tables = [], isLoading } = useReferenceTables();
+  const { createTable, createValue, removeTable, removeValue } = useReferenceMutations();
   const [tableKey, setTableKey] = useState("");
   const [tableLabel, setTableLabel] = useState("");
 
-  const addTable = () => {
+  const addTable = async () => {
     const key = tableKey.trim();
     const label = tableLabel.trim();
     if (!key || !label) return toast.error("المفتاح والاسم مطلوبان");
     if (!/^[a-z][a-z0-9_]*$/.test(key)) return toast.error("المفتاح يجب أن يكون بالإنجليزية مثل arrival_port");
     if (tables.some((t) => t.key === key)) return toast.error("هذا المفتاح مستخدم بالفعل");
-    referenceTablesCell.set((prev) => [...prev, {
-      id: `rt_${Date.now()}`,
-      key,
-      label,
-      values: [],
-    }]);
-    setTableKey("");
-    setTableLabel("");
-    toast.success("تمت إضافة جدول داخلي");
+    try {
+      await createTable.mutate({ key, label });
+      setTableKey("");
+      setTableLabel("");
+      toast.success("تمت إضافة جدول داخلي");
+    } catch (e) {
+      toast.error(isDomainError(e) ? e.message : "Could not add table");
+    }
   };
 
-  const removeTable = (id: string) => {
+  const onRemoveTable = async (id: string) => {
     const table = tables.find((t) => t.id === id);
     if (!table || table.system) return;
-    referenceTablesCell.set((prev) => prev.filter((t) => t.id !== id));
-    toast.success("تم حذف الجدول الداخلي");
+    try {
+      await removeTable.mutate({ id });
+      toast.success("تم حذف الجدول الداخلي");
+    } catch (e) {
+      toast.error(isDomainError(e) ? e.message : "Could not remove table");
+    }
   };
 
   return (
@@ -79,38 +85,59 @@ function ReferenceDataPage() {
         </div>
       </Card>
 
-      <div className="space-y-5">
-        {tables.map((table) => (
-          <ReferenceTableCard key={table.id} table={table} onRemove={() => removeTable(table.id)} />
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {tables.map((table) => (
+            <ReferenceTableCard
+              key={table.id}
+              table={table}
+              onRemove={() => onRemoveTable(table.id)}
+              onAddValue={async (k, l) => {
+                try {
+                  await createValue.mutate({ tableId: table.id, key: k, label: l });
+                } catch (e) {
+                  toast.error(isDomainError(e) ? e.message : "Could not add value");
+                }
+              }}
+              onRemoveValue={async (id) => {
+                try {
+                  await removeValue.mutate({ id });
+                } catch (e) {
+                  toast.error(isDomainError(e) ? e.message : "Could not remove value");
+                }
+              }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function ReferenceTableCard({ table, onRemove }: { table: ReferenceTable; onRemove: () => void }) {
+function ReferenceTableCard({
+  table, onRemove, onAddValue, onRemoveValue,
+}: {
+  table: ReferenceTable;
+  onRemove: () => void;
+  onAddValue: (key: string, label: string) => Promise<void>;
+  onRemoveValue: (valueId: string) => Promise<void>;
+}) {
   const [key, setKey] = useState("");
   const [label, setLabel] = useState("");
 
-  const addValue = () => {
+  const addValue = async () => {
     const nextKey = key.trim();
     const nextLabel = label.trim();
     if (!nextKey || !nextLabel) return toast.error("مفتاح وقيمة البيان مطلوبان");
     if (!/^[a-z][a-z0-9_]*$/.test(nextKey)) return toast.error("مفتاح القيمة يجب أن يكون بالإنجليزية");
     if (table.values.some((v) => v.key === nextKey)) return toast.error("هذا المفتاح مستخدم داخل الجدول");
-    referenceTablesCell.set((prev) => prev.map((t) => t.id === table.id ? {
-      ...t,
-      values: [...t.values, { id: `rv_${Date.now()}`, key: nextKey, label: nextLabel }],
-    } : t));
+    await onAddValue(nextKey, nextLabel);
     setKey("");
     setLabel("");
-  };
-
-  const removeValue = (id: string) => {
-    referenceTablesCell.set((prev) => prev.map((t) => t.id === table.id ? {
-      ...t,
-      values: t.values.filter((v) => v.id !== id),
-    } : t));
   };
 
   return (
@@ -150,7 +177,7 @@ function ReferenceTableCard({ table, onRemove }: { table: ReferenceTable; onRemo
               <TableCell className="font-mono text-xs">{value.key}</TableCell>
               <TableCell>{value.label}</TableCell>
               <TableCell>
-                <Button size="icon" variant="ghost" onClick={() => removeValue(value.id)}>
+                <Button size="icon" variant="ghost" onClick={() => onRemoveValue(value.id)}>
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </TableCell>
