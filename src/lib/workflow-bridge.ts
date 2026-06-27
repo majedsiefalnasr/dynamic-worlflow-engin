@@ -27,19 +27,19 @@ import type { RoleId, User } from "@/lib/mock";
 // Built-in demo identities keep their richly-seeded engine users (e.g. the
 // exec lead also carries the member role). Everyone else gets a synthesized
 // engine identity derived from their org/team/role selection.
-const BUILTIN_ACCOUNT_TO_WF_USER: Record<string, string> = {
-  u1: "wu_admin",
-  u2: "wu_support",
-  u4: "wu_reviewer",
-  u5: "wu_entry",
-  u6: "wu_reviewer",
-  u7: "wu_fx",
-  u9: "wu_exec_lead",
-  u10: "wu_exec_member",
-  u11: "wu_exec_member",
-  u12: "wu_exec_member",
-  u13: "wu_exec_member",
-  u14: "wu_exec_member",
+const BUILTIN_ACCOUNT_TO_WF_USER: Record<number, string> = {
+  1: "wu_admin",
+  2: "wu_support",
+  4: "wu_reviewer",
+  5: "wu_entry",
+  6: "wu_reviewer",
+  7: "wu_fx",
+  9: "wu_exec_lead",
+  10: "wu_exec_member",
+  11: "wu_exec_member",
+  12: "wu_exec_member",
+  13: "wu_exec_member",
+  14: "wu_exec_member",
 };
 
 /**
@@ -49,7 +49,7 @@ const BUILTIN_ACCOUNT_TO_WF_USER: Record<string, string> = {
  */
 export function wfUserFromAccount(user: User | null | undefined): WfUser | null {
   if (!user) return null;
-  const orgRaw = user.orgKind ?? "bank";
+  const orgRaw = user.organization?.code ?? "bank";
   const organizationId = ORG_ID_ALIASES[orgRaw] ?? orgRaw;
   const roleEngine = ROLE_ID_ALIASES[user.roleId] ?? user.roleId;
   return {
@@ -57,7 +57,7 @@ export function wfUserFromAccount(user: User | null | undefined): WfUser | null 
     fullName: user.name,
     email: user.email,
     organizationId,
-    teamIds: user.teamId ? [user.teamId] : [],
+    teamIds: user.team?.code ? [user.team.code] : [],
     roleIds: [roleEngine],
   };
 }
@@ -94,7 +94,10 @@ export function syncWorkflowUser(user: User | null | undefined) {
   wfAuth.setId(`wfu_${user.id}`);
 }
 
-export function visibleInstancesFor(user: User | null | undefined, instances = wfStore.instances.get()) {
+export function visibleInstancesFor(
+  user: User | null | undefined,
+  instances = wfStore.instances.get(),
+) {
   if (!user) return [];
   if (user.roleId === "rc_platform_admin") return instances;
 
@@ -160,7 +163,10 @@ function wfUserForRole(roleId: RoleId): WfUser | null {
     fullName: role.name,
     email: `${roleId}@role.local`,
     organizationId: ORG_ID_ALIASES[role.orgId] ?? role.orgId,
-    teamIds: teamsCell.get().filter((team) => team.roleCode === roleId).map((team) => team.id),
+    teamIds: teamsCell
+      .get()
+      .filter((team) => team.roleCode === roleId)
+      .map((team) => team.id),
     roleIds: [ROLE_ID_ALIASES[roleId] ?? roleId],
   };
 }
@@ -211,7 +217,11 @@ export function requestsAccessForUser(user: User | null | undefined): RequestsAc
 
 // Unified screen-permission gate. `requests` is derived from the designer
 // using the user's real identity; other screens fall back to the role matrix.
-export function canScreen(user: User | null | undefined, screen: ScreenKey, cap: ScreenCapability = "view"): boolean {
+export function canScreen(
+  user: User | null | undefined,
+  screen: ScreenKey,
+  cap: ScreenCapability = "view",
+): boolean {
   if (screen === "requests") return requestsAccessForUser(user)[cap];
   return user ? manualScreenCan(user.roleId, screen, cap) : false;
 }

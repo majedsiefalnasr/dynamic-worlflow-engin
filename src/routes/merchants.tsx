@@ -83,10 +83,10 @@ function Merchants() {
   // Bank admins see only their own bank's merchants
   const scoped = useMemo(
     () =>
-      isBankAdmin && user?.entityId
-        ? merchants.filter((m) => m.entityId === user.entityId)
+      isBankAdmin && user?.bankId
+        ? merchants.filter((m) => m.entityId === String(user.bankId))
         : merchants,
-    [merchants, isBankAdmin, user?.entityId],
+    [merchants, isBankAdmin, user?.bankId],
   );
 
   const filtered = useMemo(() => {
@@ -135,11 +135,11 @@ function Merchants() {
               </DialogTrigger>
               <MerchantDialog
                 title="تسجيل تاجر جديد"
-                defaultEntityId={user?.entityId ?? undefined}
+                defaultEntityId={user?.bankId != null ? String(user.bankId) : undefined}
                 onSave={(m) => {
                   merchantsCell.set((prev) => [m, ...prev]);
                   logAudit({
-                    userId: user!.id,
+                    userId: String(user!.id),
                     userName: user!.name,
                     role: user!.roleId,
                     action: "إضافة تاجر جديد",
@@ -358,7 +358,7 @@ function Merchants() {
                         if (!confirm(`حذف التاجر "${m.name}"؟`)) return;
                         merchantsCell.set((prev) => prev.filter((x) => x.id !== m.id));
                         logAudit({
-                          userId: user!.id,
+                          userId: String(user!.id),
                           userName: user!.name,
                           role: user!.roleId,
                           action: "حذف تاجر",
@@ -388,7 +388,7 @@ function Merchants() {
           <MerchantDialog
             title="تعديل بيانات التاجر"
             initial={editing}
-            defaultEntityId={user?.entityId ?? undefined}
+            defaultEntityId={user?.bankId != null ? String(user.bankId) : undefined}
             onSave={(m) => {
               merchantsCell.set((prev) =>
                 prev.map((x) =>
@@ -398,7 +398,7 @@ function Merchants() {
                 ),
               );
               logAudit({
-                userId: user!.id,
+                userId: String(user!.id),
                 userName: user!.name,
                 role: user!.roleId,
                 action: "تعديل بيانات تاجر",

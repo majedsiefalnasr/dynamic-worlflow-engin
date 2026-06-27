@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DEMO_USERS, saveUsers, useAuth, type User } from "@/lib/mock";
+import { DEMO_USERS, saveUsers, useAuth, computeAvatar, getRoleLabel, type User } from "@/lib/mock";
 import {
   entitiesCell,
   logAudit,
@@ -83,18 +83,18 @@ function SystemUsers() {
   const list = useMemo(() => {
     void version;
     const s = q.trim().toLowerCase();
-    return DEMO_USERS.filter((u) => orgFilter === "all" || u.orgKind === orgFilter).filter(
-      (u) => !s || u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s),
-    );
+    return DEMO_USERS.filter(
+      (u) => orgFilter === "all" || u.organization?.code === orgFilter,
+    ).filter((u) => !s || u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s));
   }, [version, q, orgFilter]);
 
   const stats = useMemo(() => {
     void version;
     return {
       total: DEMO_USERS.length,
-      bank: DEMO_USERS.filter((u) => u.orgKind === "bank").length,
-      committee: DEMO_USERS.filter((u) => u.orgKind === "committee").length,
-      inactive: DEMO_USERS.filter((u) => u.active === false).length,
+      bank: DEMO_USERS.filter((u) => u.organization?.code === "bank").length,
+      committee: DEMO_USERS.filter((u) => u.organization?.code === "committee").length,
+      inactive: DEMO_USERS.filter((u) => u.isActive === false).length,
     };
   }, [version]);
 
@@ -112,35 +112,46 @@ function SystemUsers() {
     return `${orgLabel}، ${teamLabel}`;
   }
 
+  function buildUserFields(p: Payload) {
+    const team = teams.find((t) => t.id === p.teamId);
+    const org = orgs.find((o) => o.id === p.orgId);
+    const bankIndex =
+      p.orgId === "bank" && p.entityId ? banks.findIndex((e) => e.id === p.entityId) : -1;
+    const bankEntity = bankIndex >= 0 ? banks[bankIndex] : undefined;
+    return {
+      organization: org ? { id: 0, code: org.id, name: org.label } : null,
+      team: team ? { id: 0, code: team.id, name: team.label } : null,
+      bank: bankEntity ? { id: bankIndex + 1, code: bankEntity.id, name: bankEntity.name } : null,
+      bankId: bankEntity ? bankIndex + 1 : null,
+    };
+  }
+
   function add(p: Payload) {
     const u: User = {
-      id: `u${Date.now()}`,
+      id: Date.now(),
       name: p.name,
       email: p.email,
       phone: p.phone,
       roleId: p.roleId,
-      orgKind: p.orgId,
-      teamId: p.teamId,
-      entityId: p.orgId === "bank" ? p.entityId : null,
-      org: orgLabelFor(p),
-      avatar: p.name
-        .split(" ")
-        .map((s) => s[0])
-        .join("")
-        .slice(0, 2),
-      active: true,
+      roleLabel: roles.find((r) => r.id === p.roleId)?.name ?? getRoleLabel(p.roleId),
+      role: null,
+      ...buildUserFields(p),
+      avatar: computeAvatar(p.name),
+      isActive: true,
+      screenPermissions: [],
+      capabilities: [],
     };
     DEMO_USERS.push(u);
     upsertWorkflowUser(u);
     saveUsers();
     if (user)
       logAudit({
-        userId: user.id,
+        userId: String(user.id),
         userName: user.name,
         role: user.roleId,
         action: "إضافة مستخدم نظام",
         ref: u.email,
-        notes: `${u.name}، ${u.org}`,
+        notes: `${u.name}، ${orgLabelFor(p)}`,
       });
     toast.success(`تمت إضافة ${u.name}`);
     refresh();
@@ -156,21 +167,15 @@ function SystemUsers() {
       email: p.email,
       phone: p.phone,
       roleId: p.roleId,
-      orgKind: p.orgId,
-      teamId: p.teamId,
-      entityId: p.orgId === "bank" ? p.entityId : null,
-      org: orgLabelFor(p),
-      avatar: p.name
-        .split(" ")
-        .map((s) => s[0])
-        .join("")
-        .slice(0, 2),
+      roleLabel: roles.find((r) => r.id === p.roleId)?.name ?? getRoleLabel(p.roleId),
+      ...buildUserFields(p),
+      avatar: computeAvatar(p.name),
     };
     upsertWorkflowUser(DEMO_USERS[idx]);
     saveUsers();
     if (user)
       logAudit({
-        userId: user.id,
+        userId: String(user.id),
         userName: user.name,
         role: user.roleId,
         action: "تعديل بيانات مستخدم",
@@ -185,12 +190,12 @@ function SystemUsers() {
   function toggleActive(u: User) {
     const idx = DEMO_USERS.findIndex((x) => x.id === u.id);
     if (idx < 0) return;
-    const next = u.active === false;
-    DEMO_USERS[idx] = { ...DEMO_USERS[idx], active: next };
+    const next = u.isActive === false;
+    DEMO_USERS[idx] = { ...DEMO_USERS[idx], isActive: next };
     saveUsers();
     if (user)
       logAudit({
-        userId: user.id,
+        userId: String(user.id),
         userName: user.name,
         role: user.roleId,
         action: next ? "تفعيل مستخدم" : "إلغاء تفعيل مستخدم",
@@ -329,21 +334,21 @@ function SystemUsers() {
                   <td className="px-4 py-3 text-xs">{u.email}</td>
                   <td className="px-4 py-3 text-xs">
                     <div className="flex items-center gap-1.5">
-                      {u.orgKind === "bank" ? (
+                      {u.organization?.code === "bank" ? (
                         <Building2 className="h-3.5 w-3.5 text-info" />
-                      ) : u.orgKind === "committee" ? (
+                      ) : u.organization?.code === "committee" ? (
                         <Landmark className="h-3.5 w-3.5 text-accent" />
                       ) : (
                         <ShieldCheck className="h-3.5 w-3.5 text-primary" />
                       )}
-                      <span>{u.org}</span>
+                      <span>{u.organization?.name ?? "—"}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant="secondary">{roleLabelFor(u)}</Badge>
                   </td>
                   <td className="px-4 py-3">
-                    {u.active === false ? (
+                    {u.isActive === false ? (
                       <Badge className="bg-destructive/15 text-destructive border-0">غير نشط</Badge>
                     ) : (
                       <Badge className="bg-success/15 text-success border-0">نشط</Badge>
@@ -362,13 +367,13 @@ function SystemUsers() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        className={u.active === false ? "text-success" : "text-destructive"}
+                        className={u.isActive === false ? "text-success" : "text-destructive"}
                         onClick={() => toggleActive(u)}
                         disabled={u.id === user?.id}
                         title={u.id === user?.id ? "لا يمكنك تعطيل حسابك" : ""}
                       >
                         <Power className="h-3.5 w-3.5 ml-1" />
-                        {u.active === false ? "تفعيل" : "إلغاء تفعيل"}
+                        {u.isActive === false ? "تفعيل" : "إلغاء تفعيل"}
                       </Button>
                     </div>
                   </td>
@@ -428,11 +433,11 @@ function SystemUsers() {
             </DialogHeader>
             <div className="space-y-3 py-2 text-sm">
               <Row label="البريد" value={viewing.email} />
-              <Row label="الجهة" value={viewing.org} />
-              <Row label="الفريق" value={getTeamLabel(viewing.teamId)} />
+              <Row label="الجهة" value={viewing.organization?.name ?? "—"} />
+              <Row label="الفريق" value={getTeamLabel(viewing.team?.code)} />
               <Row label="الدور" value={roleLabelFor(viewing)} />
               <Row label="الهاتف" value={viewing.phone ?? "—"} />
-              <Row label="الحالة" value={viewing.active === false ? "غير نشط" : "نشط"} />
+              <Row label="الحالة" value={viewing.isActive === false ? "غير نشط" : "نشط"} />
             </div>
           </DialogContent>
         )}
@@ -491,19 +496,20 @@ function UserDialog({
   roles: { id: string; name: string; orgId: string }[];
   onSave: (p: Payload) => void;
 }) {
-  const defaultOrg = initial?.orgKind ?? orgs[0]?.id ?? "bank";
+  const defaultOrg = initial?.organization?.code ?? orgs[0]?.id ?? "bank";
   const [name, setName] = useState(initial?.name ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
   const [orgId, setOrgId] = useState<string>(defaultOrg);
   const [entityId, setEntityId] = useState<string | null>(
-    initial?.entityId ?? (defaultOrg === "bank" ? (banks[0]?.id ?? null) : null),
+    banks.find((b) => b.name === initial?.bank?.name)?.id ??
+      (defaultOrg === "bank" ? (banks[0]?.id ?? null) : null),
   );
 
   const teamsForOrg = teams.filter((t) => t.orgKind === orgId);
   const rolesForOrg = roles.filter((r) => r.orgId === orgId);
 
-  const [teamId, setTeamId] = useState<string>(initial?.teamId ?? teamsForOrg[0]?.id ?? "");
+  const [teamId, setTeamId] = useState<string>(initial?.team?.code ?? teamsForOrg[0]?.id ?? "");
   const [roleId, setRoleId] = useState<string>(initialRoleId ?? rolesForOrg[0]?.id ?? "");
 
   function switchOrg(next: string) {

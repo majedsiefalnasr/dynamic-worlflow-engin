@@ -68,7 +68,14 @@ function RolesAdmin() {
 
   function audit(action: string, ref: string, notes?: string) {
     if (user)
-      logAudit({ userId: user.id, userName: user.name, role: user.roleId, action, ref, notes });
+      logAudit({
+        userId: String(user.id),
+        userName: user.name,
+        role: user.roleId,
+        action,
+        ref,
+        notes,
+      });
   }
 
   function add(p: Payload) {

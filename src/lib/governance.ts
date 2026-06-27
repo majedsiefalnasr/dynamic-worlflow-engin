@@ -3,10 +3,10 @@ import {
   AUDIT as SEED_AUDIT,
   DEMO_USERS,
   ENTITIES,
+  getRoleLabel,
   MERCHANTS as SEED_MERCHANTS,
   NOTIFICATIONS as SEED_NOTIFS,
   normalizeRoleId,
-  ROLE_LABELS,
   type RoleId,
 } from "./mock";
 
@@ -34,7 +34,7 @@ export const auditCell = cell<AuditEntry[]>(
   "audit",
   SEED_AUDIT.map((a) => ({
     id: a.id,
-    userId: DEMO_USERS[0].id,
+    userId: String(DEMO_USERS[0].id),
     userName: a.user,
     role: "rc_platform_admin",
     action: a.action,
@@ -52,7 +52,10 @@ export function logAudit(entry: Omit<AuditEntry, "id" | "ts" | "ip" | "device">)
       id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       ts: new Date().toISOString(),
       ip: "127.0.0.1",
-      device: typeof navigator !== "undefined" ? navigator.userAgent.split(") ")[0].slice(0, 40) : "server",
+      device:
+        typeof navigator !== "undefined"
+          ? navigator.userAgent.split(") ")[0].slice(0, 40)
+          : "server",
     },
     ...prev,
   ]);
@@ -75,7 +78,12 @@ export const notificationsCell = cell<Notif[]>(
 
 export function notify(n: Omit<Notif, "id" | "time" | "unread">) {
   notificationsCell.set((prev) => [
-    { ...n, id: `n_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, time: "الآن", unread: true },
+    {
+      ...n,
+      id: `n_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      time: "الآن",
+      unread: true,
+    },
     ...prev,
   ]);
 }
@@ -163,7 +171,10 @@ const DEFAULT_REFERENCE_TABLES: ReferenceTable[] = [
   },
 ];
 
-export const referenceTablesCell = cell<ReferenceTable[]>("referenceTables", DEFAULT_REFERENCE_TABLES);
+export const referenceTablesCell = cell<ReferenceTable[]>(
+  "referenceTables",
+  DEFAULT_REFERENCE_TABLES,
+);
 
 export function referenceValues(tableKey: string): ReferenceValue[] {
   return referenceTablesCell.get().find((t) => t.key === tableKey)?.values ?? [];
@@ -187,7 +198,13 @@ export type OrgRecord = {
 
 const DEFAULT_ORGS: OrgRecord[] = [
   { id: "bank", label: "البنوك التجارية", active: true, builtin: true, category: "bank" },
-  { id: "committee", label: "اللجنة الوطنية لتمويل الواردات", active: true, builtin: true, category: "committee" },
+  {
+    id: "committee",
+    label: "اللجنة الوطنية لتمويل الواردات",
+    active: true,
+    builtin: true,
+    category: "committee",
+  },
   { id: "platform", label: "إدارة النظام", active: true, builtin: true, category: "other" },
 ];
 
@@ -222,14 +239,70 @@ export type TeamRecord = {
 };
 
 const DEFAULT_TEAMS: TeamRecord[] = [
-  { id: "team_entry", label: "فريق الإدخال", orgKind: "bank", roleCode: "rc_bank_intake", active: true, builtin: true },
-  { id: "team_internal", label: "فريق المراجعة الداخلية", orgKind: "bank", roleCode: "rc_bank_reviewer", active: true, builtin: true },
-  { id: "team_fx", label: "فريق العمليات الخارجية", orgKind: "bank", roleCode: "rc_bank_swift", active: true, builtin: true },
-  { id: "team_admin_bank", label: "فريق الإدارة (البنك)", orgKind: "bank", roleCode: "rc_bank_admin", active: true, builtin: true },
-  { id: "team_support", label: "فريق اللجنة المساندة", orgKind: "committee", roleCode: "rc_support_member", active: true, builtin: true },
-  { id: "team_exec", label: "فريق اللجنة التنفيذية", orgKind: "committee", roleCode: "rc_executive_member", active: true, builtin: true },
-  { id: "team_fx_confirm", label: "فريق تأكيد العمليات", orgKind: "committee", roleCode: "rc_committee_manager", active: true, builtin: true },
-  { id: "team_platform_admin", label: "إدارة النظام", orgKind: "platform", roleCode: "rc_platform_admin", active: true, builtin: true },
+  {
+    id: "team_entry",
+    label: "فريق الإدخال",
+    orgKind: "bank",
+    roleCode: "rc_bank_intake",
+    active: true,
+    builtin: true,
+  },
+  {
+    id: "team_internal",
+    label: "فريق المراجعة الداخلية",
+    orgKind: "bank",
+    roleCode: "rc_bank_reviewer",
+    active: true,
+    builtin: true,
+  },
+  {
+    id: "team_fx",
+    label: "فريق العمليات الخارجية",
+    orgKind: "bank",
+    roleCode: "rc_bank_swift",
+    active: true,
+    builtin: true,
+  },
+  {
+    id: "team_admin_bank",
+    label: "فريق الإدارة (البنك)",
+    orgKind: "bank",
+    roleCode: "rc_bank_admin",
+    active: true,
+    builtin: true,
+  },
+  {
+    id: "team_support",
+    label: "فريق اللجنة المساندة",
+    orgKind: "committee",
+    roleCode: "rc_support_member",
+    active: true,
+    builtin: true,
+  },
+  {
+    id: "team_exec",
+    label: "فريق اللجنة التنفيذية",
+    orgKind: "committee",
+    roleCode: "rc_executive_member",
+    active: true,
+    builtin: true,
+  },
+  {
+    id: "team_fx_confirm",
+    label: "فريق تأكيد العمليات",
+    orgKind: "committee",
+    roleCode: "rc_committee_manager",
+    active: true,
+    builtin: true,
+  },
+  {
+    id: "team_platform_admin",
+    label: "إدارة النظام",
+    orgKind: "platform",
+    roleCode: "rc_platform_admin",
+    active: true,
+    builtin: true,
+  },
 ];
 
 export const teamsCell = cell<TeamRecord[]>("teams", DEFAULT_TEAMS);
@@ -260,20 +333,74 @@ export type RoleCatalogEntry = {
 };
 
 const DEFAULT_ROLE_CATALOG: RoleCatalogEntry[] = [
-  { id: "rc_platform_admin", name: ROLE_LABELS.rc_platform_admin, orgId: "platform", active: true, builtin: true },
-  { id: "rc_bank_admin", name: ROLE_LABELS.rc_bank_admin, orgId: "bank", active: true, builtin: true },
-  { id: "rc_bank_intake", name: ROLE_LABELS.rc_bank_intake, orgId: "bank", active: true, builtin: true },
-  { id: "rc_bank_reviewer", name: ROLE_LABELS.rc_bank_reviewer, orgId: "bank", active: true, builtin: true },
-  { id: "rc_bank_swift", name: ROLE_LABELS.rc_bank_swift, orgId: "bank", active: true, builtin: true },
-  { id: "rc_support_member", name: ROLE_LABELS.rc_support_member, orgId: "committee", active: true, builtin: true },
-  { id: "rc_executive_member", name: ROLE_LABELS.rc_executive_member, orgId: "committee", active: true, builtin: true },
-  { id: "rc_committee_manager", name: ROLE_LABELS.rc_committee_manager, orgId: "committee", active: true, builtin: true },
+  {
+    id: "rc_platform_admin",
+    name: getRoleLabel("rc_platform_admin"),
+    orgId: "platform",
+    active: true,
+    builtin: true,
+  },
+  {
+    id: "rc_bank_admin",
+    name: getRoleLabel("rc_bank_admin"),
+    orgId: "bank",
+    active: true,
+    builtin: true,
+  },
+  {
+    id: "rc_bank_intake",
+    name: getRoleLabel("rc_bank_intake"),
+    orgId: "bank",
+    active: true,
+    builtin: true,
+  },
+  {
+    id: "rc_bank_reviewer",
+    name: getRoleLabel("rc_bank_reviewer"),
+    orgId: "bank",
+    active: true,
+    builtin: true,
+  },
+  {
+    id: "rc_bank_swift",
+    name: getRoleLabel("rc_bank_swift"),
+    orgId: "bank",
+    active: true,
+    builtin: true,
+  },
+  {
+    id: "rc_support_member",
+    name: getRoleLabel("rc_support_member"),
+    orgId: "committee",
+    active: true,
+    builtin: true,
+  },
+  {
+    id: "rc_executive_member",
+    name: getRoleLabel("rc_executive_member"),
+    orgId: "committee",
+    active: true,
+    builtin: true,
+  },
+  {
+    id: "rc_committee_manager",
+    name: getRoleLabel("rc_committee_manager"),
+    orgId: "committee",
+    active: true,
+    builtin: true,
+  },
 ];
 
 export const roleCatalogCell = cell<RoleCatalogEntry[]>("roleCatalog", DEFAULT_ROLE_CATALOG);
 
 // Normalize previously persisted records to the current role schema.
-if (roleCatalogCell.get().some((role) => Object.keys(role).some((key) => !["id", "name", "orgId", "active", "builtin"].includes(key)))) {
+if (
+  roleCatalogCell
+    .get()
+    .some((role) =>
+      Object.keys(role).some((key) => !["id", "name", "orgId", "active", "builtin"].includes(key)),
+    )
+) {
   roleCatalogCell.set((roles) =>
     roles.map(({ id, name, orgId, active, builtin }) => ({ id, name, orgId, active, builtin })),
   );
@@ -289,9 +416,16 @@ export function getRoleCatalog(id: string | undefined | null): RoleCatalogEntry 
 }
 
 export type Permission =
-  | "request.create" | "request.review" | "request.approve" | "request.reject"
-  | "workflow.execute" | "reports.view" | "audit.view"
-  | "merchants.manage" | "users.manage" | "entities.manage"
+  | "request.create"
+  | "request.review"
+  | "request.approve"
+  | "request.reject"
+  | "workflow.execute"
+  | "reports.view"
+  | "audit.view"
+  | "merchants.manage"
+  | "users.manage"
+  | "entities.manage"
   | "roles.manage";
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
@@ -309,8 +443,23 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
 };
 
 const DEFAULT_ROLE_PERMS: Record<string, Permission[]> = {
-  rc_platform_admin: ["reports.view", "audit.view", "merchants.manage", "users.manage", "entities.manage", "roles.manage"],
-  rc_bank_admin: ["request.create", "workflow.execute", "reports.view", "audit.view", "merchants.manage", "users.manage", "roles.manage"],
+  rc_platform_admin: [
+    "reports.view",
+    "audit.view",
+    "merchants.manage",
+    "users.manage",
+    "entities.manage",
+    "roles.manage",
+  ],
+  rc_bank_admin: [
+    "request.create",
+    "workflow.execute",
+    "reports.view",
+    "audit.view",
+    "merchants.manage",
+    "users.manage",
+    "roles.manage",
+  ],
   rc_bank_intake: ["request.create", "merchants.manage"],
   rc_bank_reviewer: ["workflow.execute"],
   rc_bank_swift: ["workflow.execute"],
@@ -323,7 +472,9 @@ export const rolePermsCell = cell<Record<string, Permission[]>>("rolePerms", DEF
 
 if (Object.keys(rolePermsCell.get()).some((roleId) => !roleId.startsWith("rc_"))) {
   rolePermsCell.set((permissions) =>
-    Object.fromEntries(Object.entries(permissions).map(([roleId, values]) => [normalizeRoleId(roleId), values])),
+    Object.fromEntries(
+      Object.entries(permissions).map(([roleId, values]) => [normalizeRoleId(roleId), values]),
+    ),
   );
 }
 
@@ -416,25 +567,38 @@ if (
     Object.keys(permissions).some((roleId) => !roleId.startsWith("rc_")),
   )
 ) {
-  screenPermsCell.set((screens) =>
-    Object.fromEntries(
-      Object.entries(screens).map(([screen, permissions]) => [
-        screen,
-        Object.fromEntries(
-          Object.entries(permissions).map(([roleId, capabilities]) => [normalizeRoleId(roleId), capabilities]),
-        ),
-      ]),
-    ) as ScreenPerms,
+  screenPermsCell.set(
+    (screens) =>
+      Object.fromEntries(
+        Object.entries(screens).map(([screen, permissions]) => [
+          screen,
+          Object.fromEntries(
+            Object.entries(permissions).map(([roleId, capabilities]) => [
+              normalizeRoleId(roleId),
+              capabilities,
+            ]),
+          ),
+        ]),
+      ) as ScreenPerms,
   );
 }
 
 /** Permission check for manually-managed screens (reports/audit/merchants). */
-export function manualScreenCan(roleId: RoleId, screen: ManualScreenKey, cap: ScreenCapability = "view"): boolean {
+export function manualScreenCan(
+  roleId: RoleId,
+  screen: ManualScreenKey,
+  cap: ScreenCapability = "view",
+): boolean {
   if (roleId === "rc_platform_admin") return true;
   return screenPermsCell.get()[screen]?.[roleId]?.includes(cap) ?? false;
 }
 
-export function setScreenPermission(screen: ManualScreenKey, roleId: RoleId, cap: ScreenCapability, enabled: boolean) {
+export function setScreenPermission(
+  screen: ManualScreenKey,
+  roleId: RoleId,
+  cap: ScreenCapability,
+  enabled: boolean,
+) {
   screenPermsCell.set((prev) => {
     const current = prev[screen]?.[roleId] ?? [];
     let next: ScreenCapability[];

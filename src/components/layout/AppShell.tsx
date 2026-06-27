@@ -24,7 +24,7 @@ import {
   Database,
 } from "lucide-react";
 import { useState } from "react";
-import { useAuth, auth, ROLE_LABELS, type RoleId } from "@/lib/mock";
+import { useAuth, auth, type RoleId } from "@/lib/mock";
 import { notificationsCell, markAllRead, screenPermsCell, type ScreenKey } from "@/lib/governance";
 import { canScreen } from "@/lib/workflow-bridge";
 import { wfStore } from "@/lib/workflow-engine";
@@ -294,9 +294,7 @@ export function AppShell() {
                 >
                   <div className="text-right leading-tight hidden sm:block">
                     <div className="text-sm font-semibold">{user.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {ROLE_LABELS[user.roleId] ?? user.roleId}
-                    </div>
+                    <div className="text-xs text-muted-foreground">{user.roleLabel}</div>
                   </div>
                   <div className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
                     {user.avatar}
@@ -307,7 +305,9 @@ export function AppShell() {
                 <DropdownMenuLabel>
                   <div className="font-semibold">{user.name}</div>
                   <div className="text-xs font-normal text-muted-foreground">{user.email}</div>
-                  <div className="text-xs font-normal text-muted-foreground mt-0.5">{user.org}</div>
+                  <div className="text-xs font-normal text-muted-foreground mt-0.5">
+                    {user.organization?.name ?? "—"}
+                  </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => nav({ to: "/profile" })}>

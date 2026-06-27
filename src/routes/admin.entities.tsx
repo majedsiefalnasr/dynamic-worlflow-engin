@@ -62,7 +62,7 @@ function EntitiesAdmin() {
     entitiesCell.set((prev) => [...prev, e]);
     if (user)
       logAudit({
-        userId: user.id,
+        userId: String(user.id),
         userName: user.name,
         role: user.roleId,
         action: "إضافة بنك جديد",
@@ -77,7 +77,7 @@ function EntitiesAdmin() {
     entitiesCell.set((prev) => prev.map((x) => (x.id === id ? { ...x, ...p } : x)));
     if (user)
       logAudit({
-        userId: user.id,
+        userId: String(user.id),
         userName: user.name,
         role: user.roleId,
         action: "تعديل بيانات بنك",
@@ -93,7 +93,7 @@ function EntitiesAdmin() {
     entitiesCell.set((prev) => prev.map((x) => (x.id === e.id ? { ...x, status: next } : x)));
     if (user)
       logAudit({
-        userId: user.id,
+        userId: String(user.id),
         userName: user.name,
         role: user.roleId,
         action: next === "active" ? "تفعيل بنك" : "إيقاف بنك",

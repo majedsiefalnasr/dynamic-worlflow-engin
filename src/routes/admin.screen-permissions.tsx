@@ -92,7 +92,7 @@ function ScreenPermissionsAdmin() {
     setScreenPermission(screen, role.id, cap, enabled);
     if (user) {
       logAudit({
-        userId: user.id,
+        userId: String(user.id),
         userName: user.name,
         role: user.roleId,
         action: `${enabled ? "منح" : "إلغاء"} صلاحية ${SCREEN_CAP_LABELS[cap]}`,

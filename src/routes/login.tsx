@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { auth, DEMO_USERS, ROLE_LABELS } from "@/lib/mock";
+import { auth, DEMO_USERS } from "@/lib/mock";
 import { syncWorkflowUser } from "@/lib/workflow-bridge";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/login")({ component: Login });
 function Login() {
   const nav = useNavigate();
   const [step, setStep] = useState<"login" | "otp">("login");
-  const [selectedUserId, setSelectedUserId] = useState<string>(DEMO_USERS[0].id);
+  const [selectedUserId, setSelectedUserId] = useState<number>(DEMO_USERS[0].id);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,10 +114,12 @@ function Login() {
                     >
                       <div className="text-right min-w-0">
                         <div className="font-semibold truncate">{u.name}</div>
-                        <div className="text-xs text-muted-foreground truncate">{u.org}</div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {u.organization?.name ?? "—"}
+                        </div>
                       </div>
                       <span className="shrink-0 px-2 py-0.5 rounded-full bg-muted text-xs">
-                        {ROLE_LABELS[u.roleId] ?? u.roleId}
+                        {u.roleLabel}
                       </span>
                     </button>
                   ))}
@@ -159,9 +161,7 @@ function Login() {
                   <Lock className="h-4 w-4 mt-0.5 text-accent" />
                   <div className="text-xs text-muted-foreground leading-relaxed">
                     سيتم تسجيل دخولك بصلاحيات:{" "}
-                    <span className="font-semibold text-foreground">
-                      {ROLE_LABELS[selected.roleId] ?? selected.roleId}
-                    </span>
+                    <span className="font-semibold text-foreground">{selected.roleLabel}</span>
                   </div>
                 </div>
               </Card>

@@ -88,7 +88,14 @@ function TeamsAdmin() {
 
   function audit(action: string, ref: string, notes?: string) {
     if (user)
-      logAudit({ userId: user.id, userName: user.name, role: user.roleId, action, ref, notes });
+      logAudit({
+        userId: String(user.id),
+        userName: user.name,
+        role: user.roleId,
+        action,
+        ref,
+        notes,
+      });
   }
 
   function add(p: Payload) {
@@ -116,7 +123,7 @@ function TeamsAdmin() {
   }
 
   function toggleActive(t: TeamRecord) {
-    const usersInTeam = DEMO_USERS.filter((u) => u.teamId === t.id).length;
+    const usersInTeam = DEMO_USERS.filter((u) => u.team?.code === t.id).length;
     if (t.active && usersInTeam > 0) {
       toast.info(`تنبيه: ${usersInTeam} مستخدماً مرتبطاً بهذا الفريق`);
     }
@@ -127,7 +134,7 @@ function TeamsAdmin() {
 
   function remove(t: TeamRecord) {
     if (t.builtin) return toast.error("لا يمكن حذف فريق افتراضي. يمكنك إلغاء تفعيله بدلاً من ذلك.");
-    const usersInTeam = DEMO_USERS.filter((u) => u.teamId === t.id).length;
+    const usersInTeam = DEMO_USERS.filter((u) => u.team?.code === t.id).length;
     if (usersInTeam > 0)
       return toast.error(`لا يمكن حذف الفريق، يوجد ${usersInTeam} مستخدماً مرتبطاً به.`);
     teamsCell.set((prev) => prev.filter((x) => x.id !== t.id));
@@ -239,7 +246,7 @@ function TeamsAdmin() {
             </thead>
             <tbody>
               {list.map((t) => {
-                const count = DEMO_USERS.filter((u) => u.teamId === t.id).length;
+                const count = DEMO_USERS.filter((u) => u.team?.code === t.id).length;
                 return (
                   <tr key={t.id} className="border-t hover:bg-muted/30">
                     <td className="px-4 py-3">

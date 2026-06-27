@@ -79,7 +79,14 @@ function OrgsAdmin() {
 
   function audit(action: string, ref: string, notes?: string) {
     if (user)
-      logAudit({ userId: user.id, userName: user.name, role: user.roleId, action, ref, notes });
+      logAudit({
+        userId: String(user.id),
+        userName: user.name,
+        role: user.roleId,
+        action,
+        ref,
+        notes,
+      });
   }
 
   function slug(s: string) {
@@ -195,7 +202,7 @@ function OrgsAdmin() {
               {list.map((o) => {
                 const teamCount = teams.filter((t) => t.orgKind === o.id).length;
                 const roleCount = roles.filter((r) => r.orgId === o.id).length;
-                const userCount = DEMO_USERS.filter((u) => u.orgKind === o.id).length;
+                const userCount = DEMO_USERS.filter((u) => u.organization?.code === o.id).length;
                 return (
                   <tr key={o.id} className="border-t hover:bg-muted/30">
                     <td className="px-4 py-3">

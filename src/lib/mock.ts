@@ -16,16 +16,21 @@ export type RoleId =
   | "rc_committee_manager"
   | (string & {});
 
-export const ROLE_LABELS: Record<string, string> = {
-  rc_platform_admin: "مسؤول نظام اللجنة",
-  rc_bank_admin: "مسؤول البنك التجاري",
-  rc_bank_intake: "موظف إدخال البنك التجاري",
-  rc_bank_reviewer: "مراجع داخلي بالبنك التجاري",
-  rc_bank_swift: "موظف العمليات الخارجية بالبنك التجاري",
-  rc_support_member: "عضو اللجنة المساندة",
-  rc_executive_member: "عضو اللجنة التنفيذية",
-  rc_committee_manager: "مدير اللجنة التنفيذية",
-};
+export function getRoleLabel(roleId: string): string {
+  // Lazy import avoided: governance.ts already imports from mock.ts.
+  // Use a simple local map for mock mode; live mode uses user.roleLabel.
+  const MOCK_ROLE_LABELS: Record<string, string> = {
+    rc_platform_admin: "مسؤول نظام اللجنة",
+    rc_bank_admin: "مسؤول البنك التجاري",
+    rc_bank_intake: "موظف إدخال البنك التجاري",
+    rc_bank_reviewer: "مراجع داخلي بالبنك التجاري",
+    rc_bank_swift: "موظف العمليات الخارجية بالبنك التجاري",
+    rc_support_member: "عضو اللجنة المساندة",
+    rc_executive_member: "عضو اللجنة التنفيذية",
+    rc_committee_manager: "مدير اللجنة التنفيذية",
+  };
+  return MOCK_ROLE_LABELS[roleId] ?? roleId;
+}
 
 export const BANK_ROLE_IDS: RoleId[] = [
   "rc_bank_admin",
@@ -62,16 +67,42 @@ export type Entity = {
 };
 
 export const ENTITIES: Entity[] = [
-  { id: "e1", type: "bank", name: "البنك اليمني للإنشاء والتعمير", swiftCode: "YBRDYESA", licenseNo: "BNK-001", status: "active" },
-  { id: "e2", type: "bank", name: "بنك التضامن الإسلامي", swiftCode: "TSIBYESA", licenseNo: "BNK-002", status: "active" },
-  { id: "e3", type: "bank", name: "بنك سبأ الإسلامي", swiftCode: "SBAIYESA", licenseNo: "BNK-003", status: "active" },
+  {
+    id: "e1",
+    type: "bank",
+    name: "البنك اليمني للإنشاء والتعمير",
+    swiftCode: "YBRDYESA",
+    licenseNo: "BNK-001",
+    status: "active",
+  },
+  {
+    id: "e2",
+    type: "bank",
+    name: "بنك التضامن الإسلامي",
+    swiftCode: "TSIBYESA",
+    licenseNo: "BNK-002",
+    status: "active",
+  },
+  {
+    id: "e3",
+    type: "bank",
+    name: "بنك سبأ الإسلامي",
+    swiftCode: "SBAIYESA",
+    licenseNo: "BNK-003",
+    status: "active",
+  },
 ];
 
 export type OrgKind = string;
 export type TeamId = string;
 export type BuiltinTeamId =
-  | "team_entry" | "team_internal" | "team_fx" | "team_admin_bank"
-  | "team_support" | "team_exec" | "team_fx_confirm"
+  | "team_entry"
+  | "team_internal"
+  | "team_fx"
+  | "team_admin_bank"
+  | "team_support"
+  | "team_exec"
+  | "team_fx_confirm"
   | "team_platform_admin";
 
 export const TEAM_LABELS: Record<TeamId, string> = {
@@ -99,33 +130,241 @@ export const TEAM_ROLE: Record<TeamId, RoleId> = {
   team_platform_admin: "rc_platform_admin",
 };
 
+export type ScreenPermission = {
+  screen: string;
+  capabilities: string[];
+};
+
 export type User = {
-  id: string;
+  id: number;
   name: string;
   email: string;
   roleId: RoleId;
-  entityId: string | null;
-  org: string;
+  roleLabel: string;
+  role: { id: number; code: string; name: string } | null;
+  organization: { id: number; code: string; name: string } | null;
+  team: { id: number; code: string; name: string } | null;
+  bank: { id: number; code: string; name: string } | null;
+  bankId: number | null;
+  isActive: boolean;
   avatar: string;
-  active?: boolean;
   phone?: string;
-  orgKind?: OrgKind;
-  teamId?: TeamId;
+  screenPermissions: ScreenPermission[];
+  capabilities: string[];
+  _version?: number;
 };
 
+export function computeAvatar(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length < 2) return parts[0]?.[0] ?? "";
+  return (parts[0][0] ?? "") + (parts[parts.length - 1][0] ?? "");
+}
+
 export const DEMO_USERS: User[] = [
-  { id: "u1", name: "ياسر الحضرمي", email: "admin@cby.gov.ye", roleId: "rc_platform_admin", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — إدارة الأنظمة", avatar: "يح", orgKind: "platform", teamId: "team_platform_admin" },
-  { id: "u4", name: "أحمد المقطري", email: "admin@ybank.ye", roleId: "rc_bank_admin", entityId: "e1", org: "البنك اليمني للإنشاء والتعمير — فريق الإدارة (البنك)", avatar: "أم", orgKind: "bank", teamId: "team_admin_bank" },
-  { id: "u5", name: "علي القاضي", email: "intake@ybank.ye", roleId: "rc_bank_intake", entityId: "e1", org: "البنك اليمني للإنشاء والتعمير — فريق الإدخال", avatar: "عق", orgKind: "bank", teamId: "team_entry" },
-  { id: "u6", name: "نوال الحاج", email: "reviewer@ybank.ye", roleId: "rc_bank_reviewer", entityId: "e1", org: "البنك اليمني للإنشاء والتعمير — فريق المراجعة الداخلية", avatar: "نح", orgKind: "bank", teamId: "team_internal" },
-  { id: "u2", name: "محمد الشامي", email: "m.shami@cby.gov.ye", roleId: "rc_support_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة المساندة", avatar: "مش", orgKind: "committee", teamId: "team_support" },
-  { id: "u7", name: "سامي العتمي", email: "swift@ybank.ye", roleId: "rc_bank_swift", entityId: "e1", org: "البنك اليمني للإنشاء والتعمير — فريق العمليات الخارجية", avatar: "سع", orgKind: "bank", teamId: "team_fx" },
-  { id: "u9", name: "د. هدى الإرياني", email: "huda@cby.gov.ye", roleId: "rc_committee_manager", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق تأكيد العمليات", avatar: "هإ", orgKind: "committee", teamId: "team_fx_confirm" },
-  { id: "u10", name: "م. سامي الذماري", email: "sami@cby.gov.ye", roleId: "rc_executive_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة التنفيذية", avatar: "سذ", orgKind: "committee", teamId: "team_exec" },
-  { id: "u11", name: "د. ندى الكبسي", email: "nada@cby.gov.ye", roleId: "rc_executive_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة التنفيذية", avatar: "نك", orgKind: "committee", teamId: "team_exec" },
-  { id: "u12", name: "أ. فهد الشرعبي", email: "fahd@cby.gov.ye", roleId: "rc_executive_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة التنفيذية", avatar: "فش", orgKind: "committee", teamId: "team_exec" },
-  { id: "u13", name: "د. أمينة العزب", email: "amina@cby.gov.ye", roleId: "rc_executive_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة التنفيذية", avatar: "أع", orgKind: "committee", teamId: "team_exec" },
-  { id: "u14", name: "م. خالد الأنسي", email: "khaled@cby.gov.ye", roleId: "rc_executive_member", entityId: null, org: "اللجنة الوطنية لتمويل الواردات — فريق اللجنة التنفيذية", avatar: "خأ", orgKind: "committee", teamId: "team_exec" },
+  {
+    id: 1,
+    name: "ياسر الحضرمي",
+    email: "admin@cby.gov.ye",
+    roleId: "rc_platform_admin",
+    roleLabel: "مدير النظام",
+    role: { id: 1, code: "rc_platform_admin", name: "مدير النظام" },
+    organization: { id: 3, code: "platform", name: "إدارة النظام" },
+    team: { id: 8, code: "team_platform_admin", name: "إدارة النظام" },
+    bank: null,
+    bankId: null,
+    isActive: true,
+    avatar: "يح",
+    phone: undefined,
+    screenPermissions: [],
+    capabilities: [],
+  },
+  {
+    id: 4,
+    name: "أحمد المقطري",
+    email: "admin@ybank.ye",
+    roleId: "rc_bank_admin",
+    roleLabel: "مدير البنك",
+    role: { id: 2, code: "rc_bank_admin", name: "مدير البنك" },
+    organization: { id: 1, code: "bank", name: "البنوك التجارية" },
+    team: { id: 4, code: "team_admin_bank", name: "فريق الإدارة (البنك)" },
+    bank: { id: 1, code: "ybank", name: "البنك اليمني للإنشاء والتعمير" },
+    bankId: 1,
+    isActive: true,
+    avatar: "أم",
+    phone: undefined,
+    screenPermissions: [],
+    capabilities: [],
+  },
+  {
+    id: 5,
+    name: "علي القاضي",
+    email: "intake@ybank.ye",
+    roleId: "rc_bank_intake",
+    roleLabel: "موظف الإدخال",
+    role: { id: 3, code: "rc_bank_intake", name: "موظف الإدخال" },
+    organization: { id: 1, code: "bank", name: "البنوك التجارية" },
+    team: { id: 1, code: "team_entry", name: "فريق الإدخال" },
+    bank: { id: 1, code: "ybank", name: "البنك اليمني للإنشاء والتعمير" },
+    bankId: 1,
+    isActive: true,
+    avatar: "عق",
+    phone: undefined,
+    screenPermissions: [],
+    capabilities: [],
+  },
+  {
+    id: 6,
+    name: "نوال الحاج",
+    email: "reviewer@ybank.ye",
+    roleId: "rc_bank_reviewer",
+    roleLabel: "مراجع داخلي",
+    role: { id: 4, code: "rc_bank_reviewer", name: "مراجع داخلي" },
+    organization: { id: 1, code: "bank", name: "البنوك التجارية" },
+    team: { id: 2, code: "team_internal", name: "فريق المراجعة الداخلية" },
+    bank: { id: 1, code: "ybank", name: "البنك اليمني للإنشاء والتعمير" },
+    bankId: 1,
+    isActive: true,
+    avatar: "نح",
+    phone: undefined,
+    screenPermissions: [],
+    capabilities: [],
+  },
+  {
+    id: 2,
+    name: "محمد الشامي",
+    email: "m.shami@cby.gov.ye",
+    roleId: "rc_support_member",
+    roleLabel: "عضو لجنة مساندة",
+    role: { id: 6, code: "rc_support_member", name: "عضو لجنة مساندة" },
+    organization: { id: 2, code: "committee", name: "اللجنة الوطنية لتمويل الواردات" },
+    team: { id: 5, code: "team_support", name: "فريق اللجنة المساندة" },
+    bank: null,
+    bankId: null,
+    isActive: true,
+    avatar: "مش",
+    phone: undefined,
+    screenPermissions: [],
+    capabilities: [],
+  },
+  {
+    id: 7,
+    name: "سامي العتمي",
+    email: "swift@ybank.ye",
+    roleId: "rc_bank_swift",
+    roleLabel: "عمليات خارجية",
+    role: { id: 5, code: "rc_bank_swift", name: "عمليات خارجية" },
+    organization: { id: 1, code: "bank", name: "البنوك التجارية" },
+    team: { id: 3, code: "team_fx", name: "فريق العمليات الخارجية" },
+    bank: { id: 1, code: "ybank", name: "البنك اليمني للإنشاء والتعمير" },
+    bankId: 1,
+    isActive: true,
+    avatar: "سع",
+    phone: undefined,
+    screenPermissions: [],
+    capabilities: [],
+  },
+  {
+    id: 9,
+    name: "د. هدى الإرياني",
+    email: "huda@cby.gov.ye",
+    roleId: "rc_committee_manager",
+    roleLabel: "مدير عمليات اللجنة",
+    role: { id: 8, code: "rc_committee_manager", name: "مدير عمليات اللجنة" },
+    organization: { id: 2, code: "committee", name: "اللجنة الوطنية لتمويل الواردات" },
+    team: { id: 7, code: "team_fx_confirm", name: "فريق تأكيد العمليات" },
+    bank: null,
+    bankId: null,
+    isActive: true,
+    avatar: "هإ",
+    phone: undefined,
+    screenPermissions: [],
+    capabilities: [],
+  },
+  {
+    id: 10,
+    name: "م. سامي الذماري",
+    email: "sami@cby.gov.ye",
+    roleId: "rc_executive_member",
+    roleLabel: "عضو لجنة تنفيذية",
+    role: { id: 7, code: "rc_executive_member", name: "عضو لجنة تنفيذية" },
+    organization: { id: 2, code: "committee", name: "اللجنة الوطنية لتمويل الواردات" },
+    team: { id: 6, code: "team_exec", name: "فريق اللجنة التنفيذية" },
+    bank: null,
+    bankId: null,
+    isActive: true,
+    avatar: "سذ",
+    phone: undefined,
+    screenPermissions: [],
+    capabilities: [],
+  },
+  {
+    id: 11,
+    name: "د. ندى الكبسي",
+    email: "nada@cby.gov.ye",
+    roleId: "rc_executive_member",
+    roleLabel: "عضو لجنة تنفيذية",
+    role: { id: 7, code: "rc_executive_member", name: "عضو لجنة تنفيذية" },
+    organization: { id: 2, code: "committee", name: "اللجنة الوطنية لتمويل الواردات" },
+    team: { id: 6, code: "team_exec", name: "فريق اللجنة التنفيذية" },
+    bank: null,
+    bankId: null,
+    isActive: true,
+    avatar: "نك",
+    phone: undefined,
+    screenPermissions: [],
+    capabilities: [],
+  },
+  {
+    id: 12,
+    name: "أ. فهد الشرعبي",
+    email: "fahd@cby.gov.ye",
+    roleId: "rc_executive_member",
+    roleLabel: "عضو لجنة تنفيذية",
+    role: { id: 7, code: "rc_executive_member", name: "عضو لجنة تنفيذية" },
+    organization: { id: 2, code: "committee", name: "اللجنة الوطنية لتمويل الواردات" },
+    team: { id: 6, code: "team_exec", name: "فريق اللجنة التنفيذية" },
+    bank: null,
+    bankId: null,
+    isActive: true,
+    avatar: "فش",
+    phone: undefined,
+    screenPermissions: [],
+    capabilities: [],
+  },
+  {
+    id: 13,
+    name: "د. أمينة العزب",
+    email: "amina@cby.gov.ye",
+    roleId: "rc_executive_member",
+    roleLabel: "عضو لجنة تنفيذية",
+    role: { id: 7, code: "rc_executive_member", name: "عضو لجنة تنفيذية" },
+    organization: { id: 2, code: "committee", name: "اللجنة الوطنية لتمويل الواردات" },
+    team: { id: 6, code: "team_exec", name: "فريق اللجنة التنفيذية" },
+    bank: null,
+    bankId: null,
+    isActive: true,
+    avatar: "أع",
+    phone: undefined,
+    screenPermissions: [],
+    capabilities: [],
+  },
+  {
+    id: 14,
+    name: "م. خالد الأنسي",
+    email: "khaled@cby.gov.ye",
+    roleId: "rc_executive_member",
+    roleLabel: "عضو لجنة تنفيذية",
+    role: { id: 7, code: "rc_executive_member", name: "عضو لجنة تنفيذية" },
+    organization: { id: 2, code: "committee", name: "اللجنة الوطنية لتمويل الواردات" },
+    team: { id: 6, code: "team_exec", name: "فريق اللجنة التنفيذية" },
+    bank: null,
+    bankId: null,
+    isActive: true,
+    avatar: "خأ",
+    phone: undefined,
+    screenPermissions: [],
+    capabilities: [],
+  },
 ];
 
 // Persist system users so additions/edits survive a page reload. The stored
@@ -137,10 +376,12 @@ function loadStoredUsers(): User[] | null {
   try {
     const raw = window.localStorage.getItem(USERS_KEY);
     if (!raw) return null;
-    return (JSON.parse(raw) as Array<User & { role?: string }>).map(({ role, ...user }) => ({
-      ...user,
-      roleId: normalizeRoleId(user.roleId ?? role),
-    }));
+    const parsed = JSON.parse(raw) as unknown[];
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    const first = parsed[0] as Record<string, unknown>;
+    // Detect old shape: string id or missing role object → discard
+    if (typeof first.id === "string" || !("role" in first)) return null;
+    return parsed as User[];
   } catch {
     return null;
   }
@@ -175,12 +416,27 @@ const emit = () => {
 };
 
 export const auth = {
-  get user() { return currentUser; },
-  get lang() { return lang; },
-  get theme() { return theme; },
-  login(u: User) { currentUser = u; emit(); },
-  logout() { currentUser = null; emit(); },
-  setLang(l: "ar" | "en") { lang = l; emit(); },
+  get user() {
+    return currentUser;
+  },
+  get lang() {
+    return lang;
+  },
+  get theme() {
+    return theme;
+  },
+  login(u: User) {
+    currentUser = u;
+    emit();
+  },
+  logout() {
+    currentUser = null;
+    emit();
+  },
+  setLang(l: "ar" | "en") {
+    lang = l;
+    emit();
+  },
   toggleTheme() {
     theme = theme === "light" ? "dark" : "light";
     if (typeof document !== "undefined") {
@@ -188,7 +444,10 @@ export const auth = {
     }
     emit();
   },
-  subscribe(l: () => void) { listeners.add(l); return () => listeners.delete(l); },
+  subscribe(l: () => void) {
+    listeners.add(l);
+    return () => listeners.delete(l);
+  },
 };
 
 export function useAuth() {
@@ -199,12 +458,32 @@ export function useAuth() {
   );
 }
 
-const types = ["مواد غذائية", "أدوية ومستلزمات طبية", "مشتقات نفطية", "قطع غيار", "مواد بناء", "إلكترونيات"];
-const importers = ["شركة هائل سعيد أنعم", "مجموعة الشيباني", "شركة ثابت إخوان", "شركة الكميم للأدوية", "مجموعة الأهدل"];
+const types = [
+  "مواد غذائية",
+  "أدوية ومستلزمات طبية",
+  "مشتقات نفطية",
+  "قطع غيار",
+  "مواد بناء",
+  "إلكترونيات",
+];
+const importers = [
+  "شركة هائل سعيد أنعم",
+  "مجموعة الشيباني",
+  "شركة ثابت إخوان",
+  "شركة الكميم للأدوية",
+  "مجموعة الأهدل",
+];
 
 export type Merchant = {
-  id: string; name: string; tax: string; cr: string; address: string;
-  contact: string; category: string; status: "active" | "suspended"; transactions: number;
+  id: string;
+  name: string;
+  tax: string;
+  cr: string;
+  address: string;
+  contact: string;
+  category: string;
+  status: "active" | "suspended";
+  transactions: number;
   entityId?: string;
   taxCardExpiry?: string;
   commercialRegistrationExpiry?: string;
@@ -220,13 +499,15 @@ export const MERCHANTS: Merchant[] = importers.map((n, i) => ({
   taxCardExpiry: "2026-06-16",
   commercialRegistrationExpiry: "2026-06-16",
   owners: [{ id: `own${i + 1}`, name: `${n} - المالك الرئيسي`, share: 25 }],
-  linkedCompanies: [{
-    id: `mc${i + 1}`,
-    name: n,
-    category: types[i % types.length],
-    cr: `CR-${String(50000 + i * 13)}`,
-    crExpiry: "2026-06-16",
-  }],
+  linkedCompanies: [
+    {
+      id: `mc${i + 1}`,
+      name: n,
+      category: types[i % types.length],
+      cr: `CR-${String(50000 + i * 13)}`,
+      crExpiry: "2026-06-16",
+    },
+  ],
   address: ["صنعاء – شارع الزبيري", "عدن – كريتر", "الحديدة – شارع صنعاء", "المكلا", "تعز"][i % 5],
   contact: `+9677${String(11000000 + i * 9999)}`,
   category: types[i % types.length],
@@ -236,7 +517,13 @@ export const MERCHANTS: Merchant[] = importers.map((n, i) => ({
 }));
 
 export type AuditLog = {
-  id: string; user: string; action: string; ts: string; ip: string; device: string; ref: string;
+  id: string;
+  user: string;
+  action: string;
+  ts: string;
+  ip: string;
+  device: string;
+  ref: string;
 };
 
 export const AUDIT: AuditLog[] = Array.from({ length: 25 }, (_, i) => ({
@@ -265,9 +552,39 @@ export const MONTHLY = [
 export const CATEGORY_DIST = types.map((name, i) => ({ name, value: [32, 22, 18, 12, 9, 7][i] }));
 
 export const NOTIFICATIONS = [
-  { id: "n1", title: "طلب جديد بحاجة لمراجعتك", body: "طلب من محرّك سير العمل في مرحلتك الحالية", time: "منذ 5 دقائق", unread: true },
-  { id: "n2", title: "تم تنفيذ إجراء سير عمل", body: "انتقل الطلب إلى المرحلة التالية", time: "منذ 32 دقيقة", unread: true },
-  { id: "n3", title: "تنبيه: فاتورة مكررة", body: "رقم فاتورة مستخدم في أكثر من طلب", time: "منذ ساعة", unread: true },
-  { id: "n4", title: "تم إغلاق طلب", body: "اكتمل مسار سير العمل", time: "اليوم 09:14", unread: false },
-  { id: "n5", title: "تحديث في مصمم سير العمل", body: "تم نشر نسخة جديدة من سير العمل", time: "أمس", unread: false },
+  {
+    id: "n1",
+    title: "طلب جديد بحاجة لمراجعتك",
+    body: "طلب من محرّك سير العمل في مرحلتك الحالية",
+    time: "منذ 5 دقائق",
+    unread: true,
+  },
+  {
+    id: "n2",
+    title: "تم تنفيذ إجراء سير عمل",
+    body: "انتقل الطلب إلى المرحلة التالية",
+    time: "منذ 32 دقيقة",
+    unread: true,
+  },
+  {
+    id: "n3",
+    title: "تنبيه: فاتورة مكررة",
+    body: "رقم فاتورة مستخدم في أكثر من طلب",
+    time: "منذ ساعة",
+    unread: true,
+  },
+  {
+    id: "n4",
+    title: "تم إغلاق طلب",
+    body: "اكتمل مسار سير العمل",
+    time: "اليوم 09:14",
+    unread: false,
+  },
+  {
+    id: "n5",
+    title: "تحديث في مصمم سير العمل",
+    body: "تم نشر نسخة جديدة من سير العمل",
+    time: "أمس",
+    unread: false,
+  },
 ];

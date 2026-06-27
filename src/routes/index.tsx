@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { useAuth, ROLE_LABELS } from "@/lib/mock";
+import { useAuth } from "@/lib/mock";
 import { wfStore } from "@/lib/workflow-engine";
 import {
   dashboardBuckets,
@@ -35,7 +35,7 @@ function Dashboard() {
     <div className="space-y-6">
       <PageHeader
         title={`أهلاً، ${user.name.split(" ")[0]}`}
-        subtitle={`الطلبات والمهام المتاحة لك بصلاحيات ${ROLE_LABELS[user.roleId] ?? user.roleId}.`}
+        subtitle={`الطلبات والمهام المتاحة لك بصلاحيات ${user.roleLabel}.`}
         actions={
           roleCanCreateRequest(user) ? (
             <Button asChild>

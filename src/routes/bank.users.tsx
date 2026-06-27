@@ -22,7 +22,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DEMO_USERS, saveUsers, useAuth, ENTITIES, type User, type RoleId } from "@/lib/mock";
+import {
+  DEMO_USERS,
+  saveUsers,
+  useAuth,
+  computeAvatar,
+  getRoleLabel,
+  type User,
+  type RoleId,
+} from "@/lib/mock";
 import {
   Dialog,
   DialogContent,
@@ -47,26 +55,26 @@ function BankUsers() {
   const roles = roleCatalogCell.use().filter((role) => role.active && role.orgId === "bank");
   const teams = teamsCell.use();
   const [roleFilter, setRoleFilter] = useState<"all" | RoleId>("all");
-  const entityId = user?.entityId;
-  const entity = ENTITIES.find((candidate) => candidate.id === entityId);
+  const bankId = user?.bankId ?? null;
+  const bankName = user?.bank?.name;
 
   const list = useMemo(() => {
     void version;
     const s = q.trim().toLowerCase();
-    return DEMO_USERS.filter((u) => u.entityId === entityId)
+    return DEMO_USERS.filter((u) => u.bankId === bankId)
       .filter((u) => roleFilter === "all" || u.roleId === roleFilter)
       .filter((u) => !s || u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s));
-  }, [version, q, roleFilter, entityId]);
+  }, [version, q, roleFilter, bankId]);
 
   const stats = useMemo(() => {
     void version;
-    const all = DEMO_USERS.filter((u) => u.entityId === entityId);
+    const all = DEMO_USERS.filter((u) => u.bankId === bankId);
     return {
       total: all.length,
-      active: all.filter((u) => u.active !== false).length,
-      inactive: all.filter((u) => u.active === false).length,
+      active: all.filter((u) => u.isActive !== false).length,
+      inactive: all.filter((u) => u.isActive === false).length,
     };
-  }, [version, entityId]);
+  }, [version, bankId]);
 
   if (!user) return null;
   if (user.roleId !== "rc_bank_admin") {
@@ -82,10 +90,10 @@ function BankUsers() {
   function toggleActive(u: User) {
     const idx = DEMO_USERS.findIndex((x) => x.id === u.id);
     if (idx < 0) return;
-    const next = u.active === false;
-    DEMO_USERS[idx] = { ...DEMO_USERS[idx], active: next };
+    const next = u.isActive === false;
+    DEMO_USERS[idx] = { ...DEMO_USERS[idx], isActive: next };
     logAudit({
-      userId: user!.id,
+      userId: String(user!.id),
       userName: user!.name,
       role: user!.roleId,
       action: next ? "تفعيل موظف" : "إلغاء تفعيل موظف",
@@ -101,7 +109,7 @@ function BankUsers() {
     <div>
       <PageHeader
         title="موظفو الجهة"
-        subtitle={`إدارة موظفي ${entity?.name ?? ""} وتعيين الأدوار الفرعية`}
+        subtitle={`إدارة موظفي ${bankName ?? ""} وتعيين الأدوار الفرعية`}
         breadcrumbs={[{ label: "الرئيسية", to: "/" }, { label: "موظفو الجهة" }]}
         actions={
           <Dialog open={openAdd} onOpenChange={setOpenAdd}>
@@ -114,25 +122,29 @@ function BankUsers() {
               title="إضافة موظف للجهة"
               roles={roles}
               onSave={(payload) => {
+                const team = teams.find((t) => t.roleCode === payload.roleId);
                 const u: User = {
-                  id: `u${Date.now()}`,
-                  ...payload,
-                  entityId: user!.entityId,
-                  orgKind: "bank",
-                  teamId: teams.find((team) => team.roleCode === payload.roleId)?.id,
-                  org: entity?.name ?? "",
-                  avatar: payload.name
-                    .split(" ")
-                    .map((s) => s[0])
-                    .join("")
-                    .slice(0, 2),
-                  active: true,
+                  id: Date.now(),
+                  name: payload.name,
+                  email: payload.email,
+                  phone: payload.phone,
+                  roleId: payload.roleId,
+                  roleLabel: getRoleLabel(payload.roleId),
+                  role: null,
+                  organization: user!.organization,
+                  team: team ? { id: 0, code: team.id, name: team.label } : null,
+                  bank: user!.bank,
+                  bankId: user!.bankId,
+                  isActive: true,
+                  avatar: computeAvatar(payload.name),
+                  screenPermissions: [],
+                  capabilities: [],
                 };
                 DEMO_USERS.push(u);
                 upsertWorkflowUser(u);
                 saveUsers();
                 logAudit({
-                  userId: user!.id,
+                  userId: String(user!.id),
                   userName: user!.name,
                   role: user!.roleId,
                   action: "إضافة موظف للجهة",
@@ -238,7 +250,7 @@ function BankUsers() {
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    {u.active === false ? (
+                    {u.isActive === false ? (
                       <Badge className="bg-destructive/15 text-destructive border-0">غير نشط</Badge>
                     ) : (
                       <Badge className="bg-success/15 text-success border-0">نشط</Badge>
@@ -252,13 +264,13 @@ function BankUsers() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        className={u.active === false ? "text-success" : "text-destructive"}
+                        className={u.isActive === false ? "text-success" : "text-destructive"}
                         onClick={() => toggleActive(u)}
                         disabled={u.id === user.id}
                         title={u.id === user.id ? "لا يمكنك تعطيل حسابك" : ""}
                       >
                         <Power className="h-3.5 w-3.5 ml-1" />
-                        {u.active === false ? "تفعيل" : "إلغاء تفعيل"}
+                        {u.isActive === false ? "تفعيل" : "إلغاء تفعيل"}
                       </Button>
                     </div>
                   </td>
@@ -301,21 +313,19 @@ function BankUsers() {
             onSave={(payload) => {
               const idx = DEMO_USERS.findIndex((x) => x.id === editing.id);
               if (idx >= 0) {
+                const team = teams.find((t) => t.roleCode === payload.roleId);
                 DEMO_USERS[idx] = {
                   ...DEMO_USERS[idx],
                   ...payload,
-                  teamId: teams.find((team) => team.roleCode === payload.roleId)?.id,
-                  avatar: payload.name
-                    .split(" ")
-                    .map((s) => s[0])
-                    .join("")
-                    .slice(0, 2),
+                  roleLabel: getRoleLabel(payload.roleId),
+                  team: team ? { id: 0, code: team.id, name: team.label } : null,
+                  avatar: computeAvatar(payload.name),
                 };
                 upsertWorkflowUser(DEMO_USERS[idx]);
                 saveUsers();
               }
               logAudit({
-                userId: user!.id,
+                userId: String(user!.id),
                 userName: user!.name,
                 role: user!.roleId,
                 action: "تعديل بيانات موظف",
