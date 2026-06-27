@@ -13,6 +13,7 @@ import {
   screenPermsCell,
   roleCatalogCell,
   MANAGED_SCREENS,
+  SCREEN_CAP_LABELS,
   manualScreenCan,
   setScreenPermission,
   logAudit,
@@ -206,7 +207,7 @@ export function usePermissionMutations(auditCtx?: AuditInput) {
       mutate: async (i: ToggleInput) => {
         setScreenPermission(i.screen, i.roleCode, i.cap, i.enabled);
         audit(
-          `${i.enabled ? "منح" : "إلغاء"} صلاحية ${i.cap}`,
+          `${i.enabled ? "منح" : "إلغاء"} صلاحية ${SCREEN_CAP_LABELS[i.cap] ?? i.cap}`,
           `${i.screen}:${i.roleCode}`,
           `${i.screenLabel}، ${i.roleName}`,
         );

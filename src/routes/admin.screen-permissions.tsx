@@ -11,7 +11,6 @@ import {
   MANAGED_SCREENS,
   SCREEN_CAP_LABELS,
   getOrgLabel,
-  manualScreenCan,
   type ManualScreenKey,
   type RoleCatalogEntry,
   type ScreenCapability,
@@ -237,10 +236,9 @@ function ScreenPermissionsAdmin() {
                               </>
                             ) : (
                               (() => {
-                                const checked = manualScreenCan(role.code as RoleId, g.key, c.cap);
-                                const viewLockedByAdd =
-                                  c.cap === "view" &&
-                                  manualScreenCan(role.code as RoleId, g.key, "add");
+                                const perms = matrix.data?.permissions[role.code]?.[g.key] ?? [];
+                                const checked = perms.includes(c.cap);
+                                const viewLockedByAdd = c.cap === "view" && perms.includes("add");
                                 return (
                                   <Switch
                                     checked={checked}
