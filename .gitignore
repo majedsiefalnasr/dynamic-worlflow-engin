@@ -37,3 +37,9 @@ dist-ssr
 # Playwright session snapshots
 .playwright-cli/
 .playwright-mcp/
+
+# Backend clone (read-only inspection copy, not part of this repo)
+backend/
+
+# Graphify knowledge graph output
+graphify-out/
