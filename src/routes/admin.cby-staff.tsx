@@ -26,17 +26,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DEMO_USERS, saveUsers, useAuth, computeAvatar, getRoleLabel, type User } from "@/lib/mock";
-import {
-  entitiesCell,
-  logAudit,
-  teamsCell,
-  orgsCell,
-  roleCatalogCell,
-  getTeamLabel,
-  getOrgLabel,
-} from "@/lib/governance";
-import { upsertWorkflowUser } from "@/lib/workflow-bridge";
+import { useAuth, type User } from "@/lib/mock";
+import { getTeamLabel, getOrgLabel } from "@/lib/governance";
+import { useUsers, useUserMutations, type CreateUserInput } from "@/lib/data/users";
+import { useOrganizations } from "@/lib/data/organizations";
+import { useTeams } from "@/lib/data/teams";
+import { useRoles } from "@/lib/data/roles";
+import { useBanks } from "@/lib/data/banks";
 import {
   Dialog,
   DialogContent,
@@ -69,11 +65,15 @@ type Payload = {
 
 function SystemUsers() {
   const { user } = useAuth();
-  const banks = entitiesCell.use();
-  const teams = teamsCell.use();
-  const orgs = orgsCell.use();
-  const roles = roleCatalogCell.use();
-  const [version, setVersion] = useState(0);
+  const { data: banks = [] } = useBanks();
+  const { data: teams = [] } = useTeams();
+  const { data: orgs = [] } = useOrganizations();
+  const { data: roles = [] } = useRoles();
+  const { data: allUsers, isLoading } = useUsers();
+  const auditCtx = user
+    ? { userId: String(user.id), userName: user.name, role: user.roleId }
+    : undefined;
+  const mutations = useUserMutations(auditCtx);
   const [openAdd, setOpenAdd] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [viewing, setViewing] = useState<User | null>(null);
@@ -81,38 +81,32 @@ function SystemUsers() {
   const [orgFilter, setOrgFilter] = useState<string>("all");
 
   const list = useMemo(() => {
-    void version;
+    if (!allUsers) return [];
     const s = q.trim().toLowerCase();
-    return DEMO_USERS.filter(
-      (u) => orgFilter === "all" || u.organization?.code === orgFilter,
-    ).filter((u) => !s || u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s));
-  }, [version, q, orgFilter]);
+    return allUsers
+      .filter((u) => orgFilter === "all" || u.organization?.code === orgFilter)
+      .filter((u) => !s || u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s));
+  }, [allUsers, q, orgFilter]);
 
   const stats = useMemo(() => {
-    void version;
+    if (!allUsers) return { total: 0, bank: 0, committee: 0, inactive: 0 };
     return {
-      total: DEMO_USERS.length,
-      bank: DEMO_USERS.filter((u) => u.organization?.code === "bank").length,
-      committee: DEMO_USERS.filter((u) => u.organization?.code === "committee").length,
-      inactive: DEMO_USERS.filter((u) => u.isActive === false).length,
+      total: allUsers.length,
+      bank: allUsers.filter((u) => u.organization?.code === "bank").length,
+      committee: allUsers.filter((u) => u.organization?.code === "committee").length,
+      inactive: allUsers.filter((u) => u.isActive === false).length,
     };
-  }, [version]);
+  }, [allUsers]);
 
-  function refresh() {
-    setVersion((v) => v + 1);
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <span className="text-muted-foreground text-sm">جاري التحميل...</span>
+      </div>
+    );
   }
 
-  function orgLabelFor(p: Payload): string {
-    const teamLabel = getTeamLabel(p.teamId);
-    const orgLabel = getOrgLabel(p.orgId);
-    if (p.orgId === "bank" && p.entityId) {
-      const b = banks.find((e) => String(e.id) === p.entityId);
-      if (b) return `${b.name}، ${teamLabel}`;
-    }
-    return `${orgLabel}، ${teamLabel}`;
-  }
-
-  function buildUserFields(p: Payload) {
+  function buildMockObjects(p: Payload) {
     const team = teams.find((t) => t.code === p.teamId);
     const org = orgs.find((o) => o.code === p.orgId);
     const bankEntity =
@@ -121,88 +115,59 @@ function SystemUsers() {
       organization: org ? { id: org.id, code: org.code, name: org.label } : null,
       team: team ? { id: team.id, code: team.code, name: team.label } : null,
       bank: bankEntity ? { id: bankEntity.id, code: bankEntity.code, name: bankEntity.name } : null,
-      bankId: bankEntity?.id ?? null,
+      roleLabel: roles.find((r) => r.code === p.roleId)?.name,
     };
   }
 
   function add(p: Payload) {
-    const u: User = {
-      id: Date.now(),
+    const mock = buildMockObjects(p);
+    const input: CreateUserInput = {
       name: p.name,
       email: p.email,
       phone: p.phone,
       roleId: p.roleId,
-      roleLabel: roles.find((r) => r.code === p.roleId)?.name ?? getRoleLabel(p.roleId),
-      role: null,
-      ...buildUserFields(p),
-      avatar: computeAvatar(p.name),
-      isActive: true,
-      screenPermissions: [],
-      capabilities: [],
+      organizationCode: p.orgId,
+      teamCode: p.teamId,
+      bankId: p.entityId ? Number(p.entityId) : null,
+      _mock: {
+        organization: mock.organization,
+        team: mock.team,
+        bank: mock.bank,
+        roleLabel: mock.roleLabel,
+      },
     };
-    DEMO_USERS.push(u);
-    upsertWorkflowUser(u);
-    saveUsers();
-    if (user)
-      logAudit({
-        userId: String(user.id),
-        userName: user.name,
-        role: user.roleId,
-        action: "إضافة مستخدم نظام",
-        ref: u.email,
-        notes: `${u.name}، ${orgLabelFor(p)}`,
-      });
-    toast.success(`تمت إضافة ${u.name}`);
-    refresh();
-    setOpenAdd(false);
+    mutations.createUser.mutate(input).then(() => {
+      toast.success(`تمت إضافة ${p.name}`);
+      setOpenAdd(false);
+    });
   }
 
   function update(target: User, p: Payload) {
-    const idx = DEMO_USERS.findIndex((x) => x.id === target.id);
-    if (idx < 0) return;
-    DEMO_USERS[idx] = {
-      ...DEMO_USERS[idx],
-      name: p.name,
-      email: p.email,
-      phone: p.phone,
-      roleId: p.roleId,
-      roleLabel: roles.find((r) => r.code === p.roleId)?.name ?? getRoleLabel(p.roleId),
-      ...buildUserFields(p),
-      avatar: computeAvatar(p.name),
-    };
-    upsertWorkflowUser(DEMO_USERS[idx]);
-    saveUsers();
-    if (user)
-      logAudit({
-        userId: String(user.id),
-        userName: user.name,
-        role: user.roleId,
-        action: "تعديل بيانات مستخدم",
-        ref: target.email,
-        notes: p.name,
+    const mock = buildMockObjects(p);
+    mutations.updateUser
+      .mutate({
+        id: target.id,
+        name: p.name,
+        email: p.email,
+        phone: p.phone,
+        roleId: p.roleId,
+        teamCode: p.teamId,
+        _mock: {
+          team: mock.team,
+          roleLabel: mock.roleLabel,
+        },
+      })
+      .then(() => {
+        toast.success("تم حفظ التعديلات");
+        setEditing(null);
       });
-    toast.success("تم حفظ التعديلات");
-    refresh();
-    setEditing(null);
   }
 
   function toggleActive(u: User) {
-    const idx = DEMO_USERS.findIndex((x) => x.id === u.id);
-    if (idx < 0) return;
     const next = u.isActive === false;
-    DEMO_USERS[idx] = { ...DEMO_USERS[idx], isActive: next };
-    saveUsers();
-    if (user)
-      logAudit({
-        userId: String(user.id),
-        userName: user.name,
-        role: user.roleId,
-        action: next ? "تفعيل مستخدم" : "إلغاء تفعيل مستخدم",
-        ref: u.email,
-        notes: u.name,
-      });
-    toast.success(next ? `تم تفعيل ${u.name}` : `تم إلغاء تفعيل ${u.name}`);
-    refresh();
+    mutations.toggleUser.mutate({ id: u.id, isActive: next }).then(() => {
+      toast.success(next ? `تم تفعيل ${u.name}` : `تم إلغاء تفعيل ${u.name}`);
+    });
   }
 
   function deriveInitialRoleId(u: User): string {
@@ -381,7 +346,7 @@ function SystemUsers() {
               {list.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-12 text-center">
-                    {DEMO_USERS.length === 0 ? (
+                    {stats.total === 0 ? (
                       <div className="flex flex-col items-center gap-3">
                         <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary grid place-items-center">
                           <UserCog className="h-5 w-5" />

@@ -22,15 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DEMO_USERS,
-  saveUsers,
-  useAuth,
-  computeAvatar,
-  getRoleLabel,
-  type User,
-  type RoleId,
-} from "@/lib/mock";
+import { useAuth, type User, type RoleId } from "@/lib/mock";
 import {
   Dialog,
   DialogContent,
@@ -41,40 +33,45 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { logAudit, roleCatalogCell, teamsCell } from "@/lib/governance";
-import { upsertWorkflowUser } from "@/lib/workflow-bridge";
+import { useUsers, useUserMutations } from "@/lib/data/users";
+import { useRoles } from "@/lib/data/roles";
+import { useTeams } from "@/lib/data/teams";
 
 export const Route = createFileRoute("/bank/users")({ component: BankUsers });
 
 function BankUsers() {
   const { user } = useAuth();
-  const [version, setVersion] = useState(0);
   const [openAdd, setOpenAdd] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [q, setQ] = useState("");
-  const roles = roleCatalogCell.use().filter((role) => role.active && role.orgCode === "bank");
-  const teams = teamsCell.use();
+  const { data: allRoles = [] } = useRoles();
+  const roles = useMemo(() => allRoles.filter((r) => r.active && r.orgCode === "bank"), [allRoles]);
+  const { data: teams = [] } = useTeams();
   const [roleFilter, setRoleFilter] = useState<"all" | RoleId>("all");
   const bankId = user?.bankId ?? null;
   const bankName = user?.bank?.name;
+  const { data: bankUsers, isLoading } = useUsers(bankId !== null ? { bankId } : undefined);
+  const auditCtx = user
+    ? { userId: String(user.id), userName: user.name, role: user.roleId }
+    : undefined;
+  const mutations = useUserMutations(auditCtx);
 
   const list = useMemo(() => {
-    void version;
+    if (!bankUsers) return [];
     const s = q.trim().toLowerCase();
-    return DEMO_USERS.filter((u) => u.bankId === bankId)
+    return bankUsers
       .filter((u) => roleFilter === "all" || u.roleId === roleFilter)
       .filter((u) => !s || u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s));
-  }, [version, q, roleFilter, bankId]);
+  }, [bankUsers, q, roleFilter]);
 
   const stats = useMemo(() => {
-    void version;
-    const all = DEMO_USERS.filter((u) => u.bankId === bankId);
+    if (!bankUsers) return { total: 0, active: 0, inactive: 0 };
     return {
-      total: all.length,
-      active: all.filter((u) => u.isActive !== false).length,
-      inactive: all.filter((u) => u.isActive === false).length,
+      total: bankUsers.length,
+      active: bankUsers.filter((u) => u.isActive !== false).length,
+      inactive: bankUsers.filter((u) => u.isActive === false).length,
     };
-  }, [version, bankId]);
+  }, [bankUsers]);
 
   if (!user) return null;
   if (user.roleId !== "rc_bank_admin") {
@@ -83,26 +80,19 @@ function BankUsers() {
     );
   }
 
-  function refresh() {
-    setVersion((v) => v + 1);
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <span className="text-muted-foreground text-sm">جاري التحميل...</span>
+      </div>
+    );
   }
 
   function toggleActive(u: User) {
-    const idx = DEMO_USERS.findIndex((x) => x.id === u.id);
-    if (idx < 0) return;
     const next = u.isActive === false;
-    DEMO_USERS[idx] = { ...DEMO_USERS[idx], isActive: next };
-    logAudit({
-      userId: String(user!.id),
-      userName: user!.name,
-      role: user!.roleId,
-      action: next ? "تفعيل موظف" : "إلغاء تفعيل موظف",
-      ref: u.email,
-      notes: u.name,
+    mutations.toggleUser.mutate({ id: u.id, isActive: next }).then(() => {
+      toast.success(next ? `تم تفعيل ${u.name}` : `تم إلغاء تفعيل ${u.name}`);
     });
-    saveUsers();
-    toast.success(next ? `تم تفعيل ${u.name}` : `تم إلغاء تفعيل ${u.name}`);
-    refresh();
   }
 
   return (
@@ -123,37 +113,26 @@ function BankUsers() {
               roles={roles}
               onSave={(payload) => {
                 const team = teams.find((t) => t.roleCode === payload.roleId);
-                const u: User = {
-                  id: Date.now(),
-                  name: payload.name,
-                  email: payload.email,
-                  phone: payload.phone,
-                  roleId: payload.roleId,
-                  roleLabel: getRoleLabel(payload.roleId),
-                  role: null,
-                  organization: user!.organization,
-                  team: team ? { id: team.id, code: team.code, name: team.label } : null,
-                  bank: user!.bank,
-                  bankId: user!.bankId,
-                  isActive: true,
-                  avatar: computeAvatar(payload.name),
-                  screenPermissions: [],
-                  capabilities: [],
-                };
-                DEMO_USERS.push(u);
-                upsertWorkflowUser(u);
-                saveUsers();
-                logAudit({
-                  userId: String(user!.id),
-                  userName: user!.name,
-                  role: user!.roleId,
-                  action: "إضافة موظف للجهة",
-                  ref: u.email,
-                  notes: `${u.name}، ${roles.find((role) => role.code === u.roleId)?.name ?? u.roleId}`,
-                });
-                toast.success(`تمت إضافة ${u.name}`);
-                refresh();
-                setOpenAdd(false);
+                mutations.createUser
+                  .mutate({
+                    name: payload.name,
+                    email: payload.email,
+                    phone: payload.phone,
+                    roleId: payload.roleId,
+                    organizationCode: user!.organization?.code ?? "bank",
+                    teamCode: team?.code,
+                    bankId: user!.bankId,
+                    _mock: {
+                      organization: user!.organization,
+                      team: team ? { id: team.id, code: team.code, name: team.label } : null,
+                      bank: user!.bank,
+                      roleLabel: roles.find((r) => r.code === payload.roleId)?.name,
+                    },
+                  })
+                  .then(() => {
+                    toast.success(`تمت إضافة ${payload.name}`);
+                    setOpenAdd(false);
+                  });
               }}
             />
           </Dialog>
@@ -311,30 +290,24 @@ function BankUsers() {
             initial={editing}
             roles={roles}
             onSave={(payload) => {
-              const idx = DEMO_USERS.findIndex((x) => x.id === editing.id);
-              if (idx >= 0) {
-                const team = teams.find((t) => t.roleCode === payload.roleId);
-                DEMO_USERS[idx] = {
-                  ...DEMO_USERS[idx],
-                  ...payload,
-                  roleLabel: getRoleLabel(payload.roleId),
-                  team: team ? { id: team.id, code: team.code, name: team.label } : null,
-                  avatar: computeAvatar(payload.name),
-                };
-                upsertWorkflowUser(DEMO_USERS[idx]);
-                saveUsers();
-              }
-              logAudit({
-                userId: String(user!.id),
-                userName: user!.name,
-                role: user!.roleId,
-                action: "تعديل بيانات موظف",
-                ref: editing.email,
-                notes: payload.name,
-              });
-              toast.success("تم حفظ التعديلات");
-              refresh();
-              setEditing(null);
+              const team = teams.find((t) => t.roleCode === payload.roleId);
+              mutations.updateUser
+                .mutate({
+                  id: editing.id,
+                  name: payload.name,
+                  email: payload.email,
+                  phone: payload.phone,
+                  roleId: payload.roleId,
+                  teamCode: team?.code,
+                  _mock: {
+                    team: team ? { id: team.id, code: team.code, name: team.label } : null,
+                    roleLabel: roles.find((r) => r.code === payload.roleId)?.name,
+                  },
+                })
+                .then(() => {
+                  toast.success("تم حفظ التعديلات");
+                  setEditing(null);
+                });
             }}
           />
         )}
