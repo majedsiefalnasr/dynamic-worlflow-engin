@@ -129,7 +129,7 @@ function Login() {
                         key={u.id}
                         onClick={() => {
                           setEmail(u.email);
-                          setPassword("password");
+                          setPassword("Password@123");
                         }}
                         className={cn(
                           "flex min-h-11 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-right text-xs transition-colors",
