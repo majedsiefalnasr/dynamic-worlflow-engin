@@ -53,22 +53,79 @@ export type ToggleInput = {
 export type { ManualScreenKey, ScreenCapability, RoleCatalogEntry } from "@/lib/governance";
 
 // ---------- DTO ----------
+// Backend capability enum (App\Http\Controllers\Api\RolePermissionController::CAPABILITIES)
+// vs. the 3 caps this screen manages. MANAGE implies all of them.
+const CAP_TO_BACKEND: Record<ScreenCapability, string> = {
+  view: "VIEW",
+  add: "CREATE",
+  edit: "UPDATE",
+};
+const BACKEND_TO_CAP: Record<string, ScreenCapability | undefined> = {
+  VIEW: "view",
+  CREATE: "add",
+  UPDATE: "edit",
+};
+
 interface PermissionMatrixDto {
-  roles: { id: number; code: string; name: string; org_code: string }[];
-  screens: { key: string; label: string; caps: string[] }[];
+  roles: { id: number; code: string; name: string; organization_id: number }[];
+  screens: { id: number; code: string; name: string }[];
   permissions: Record<string, Record<string, string[]>>;
 }
 
-function toPermissionMatrix(dto: PermissionMatrixDto): PermissionMatrixData {
+// Role catalog cell is hydrated here too (not just by the roles adapter) so
+// this screen works as a direct-navigation entry point in live mode — the
+// shared cell is fine to touch, but roles.ts itself stays off-limits (§3.5).
+interface RoleDto {
+  id: number;
+  code: string;
+  name: string;
+  organization: { id: number; code: string; name: string };
+  organization_id: number;
+  is_active: boolean;
+  is_system: boolean;
+  version?: number;
+}
+
+function toRoleCatalogEntry(dto: RoleDto): RoleCatalogEntry {
   return {
-    roles: dto.roles.map((r) => ({ id: r.id, code: r.code, name: r.name, orgCode: r.org_code })),
-    screens: dto.screens.map((s) => ({
-      key: s.key,
-      label: s.label,
-      caps: s.caps as ScreenCapability[],
-    })),
-    permissions: dto.permissions as Record<string, Record<string, ScreenCapability[]>>,
+    id: dto.id,
+    code: dto.code,
+    name: dto.name,
+    orgId: dto.organization_id,
+    orgCode: dto.organization.code,
+    active: dto.is_active,
+    builtin: dto.is_system,
+    _version: dto.version,
   };
+}
+
+function toPermissions(
+  dto: PermissionMatrixDto,
+): Record<string, Record<string, ScreenCapability[]>> {
+  const roleById = new Map(dto.roles.map((r) => [r.id, r]));
+  const permissions: Record<string, Record<string, ScreenCapability[]>> = {};
+
+  for (const [roleId, screenCaps] of Object.entries(dto.permissions)) {
+    const role = roleById.get(Number(roleId));
+    if (!role) continue;
+    permissions[role.code] = {};
+    for (const [screenCode, caps] of Object.entries(screenCaps)) {
+      const mapped = new Set<ScreenCapability>();
+      for (const cap of caps) {
+        if (cap === "MANAGE") {
+          mapped.add("view");
+          mapped.add("add");
+          mapped.add("edit");
+        } else {
+          const c = BACKEND_TO_CAP[cap];
+          if (c) mapped.add(c);
+        }
+      }
+      if (mapped.size > 0) permissions[role.code][screenCode] = [...mapped];
+    }
+  }
+
+  return permissions;
 }
 
 // ---------- Read hook ----------
@@ -85,21 +142,39 @@ export function usePermissionMatrix(): ReadResult<PermissionMatrixData> {
     queryFn: ({ signal }) =>
       api
         .get<PermissionMatrixDto>("/admin/role-permissions", undefined, signal)
-        .then(toPermissionMatrix),
+        .then(toPermissions),
   });
 
+  // Same queryKey as roles.ts's useRoles(), so this shares its cache entry
+  // instead of double-fetching when both screens are mounted. Needed because
+  // this screen may be opened directly without the roles screen hydrating
+  // roleCatalogCell first (mutation below needs real numeric role ids).
+  useQuery({
+    queryKey: ["roles", "list", {}],
+    enabled: live,
+    queryFn: ({ signal }) =>
+      api.getList<RoleDto>("/roles", { per_page: 100 }, signal).then((r) => {
+        const mapped = r.data.map(toRoleCatalogEntry);
+        roleCatalogCell.set(mapped);
+        return mapped;
+      }),
+  });
+
+  // Roles always come from the role catalog cell (hydrated by the query
+  // above in live mode, seeded by mock data otherwise) so display fields
+  // like orgCode are correct either way — the matrix endpoint's own
+  // roles/screens shape doesn't match what this screen needs (see toggle).
+  const activeRoles = roles
+    .filter((r) => r.active && r.code !== "rc_platform_admin")
+    .sort((a, b) => `${a.orgCode}-${a.name}`.localeCompare(`${b.orgCode}-${b.name}`));
+
+  const screens = MANAGED_SCREENS.map((s) => ({
+    key: s.key,
+    label: s.label,
+    caps: s.caps,
+  }));
+
   if (!live) {
-    // Build the matrix from cells
-    const activeRoles = roles
-      .filter((r) => r.active && r.code !== "rc_platform_admin")
-      .sort((a, b) => `${a.orgCode}-${a.name}`.localeCompare(`${b.orgCode}-${b.name}`));
-
-    const screens = MANAGED_SCREENS.map((s) => ({
-      key: s.key,
-      label: s.label,
-      caps: s.caps,
-    }));
-
     const permissions: Record<string, Record<string, ScreenCapability[]>> = {};
     for (const role of activeRoles) {
       permissions[role.code] = {};
@@ -129,7 +204,16 @@ export function usePermissionMatrix(): ReadResult<PermissionMatrixData> {
   }
 
   return {
-    data: query.data,
+    data: query.data && {
+      roles: activeRoles.map((r) => ({
+        id: r.id,
+        code: r.code,
+        name: r.name,
+        orgCode: r.orgCode,
+      })),
+      screens,
+      permissions: query.data,
+    },
     isLoading: query.isLoading,
     error: (query.error as ReadResult<unknown>["error"]) ?? null,
     refetch: () => void query.refetch(),
@@ -142,15 +226,20 @@ function useLiveMutations() {
   const invalidate = () => qc.invalidateQueries({ queryKey: screenPermKeys.matrix() });
 
   const toggle = useMutation({
-    mutationFn: (i: ToggleInput) =>
-      api
+    mutationFn: (i: ToggleInput) => {
+      const roleId = roleCatalogCell.get().find((r) => r.code === i.roleCode)?.id;
+      if (roleId === undefined) {
+        return Promise.reject(new Error(`Unknown role code: ${i.roleCode}`));
+      }
+      return api
         .post("/admin/role-permissions/toggle", {
-          role_code: i.roleCode,
+          role_id: roleId,
           screen_code: i.screen,
-          capability: i.cap,
+          capability: CAP_TO_BACKEND[i.cap],
           enabled: i.enabled,
         })
-        .then(() => undefined),
+        .then(() => undefined);
+    },
     onSuccess: invalidate,
   });
 

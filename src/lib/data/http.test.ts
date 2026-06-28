@@ -43,6 +43,24 @@ describe("api.getList returns data + meta", () => {
     expect(r.data).toEqual([{ id: 1 }]);
     expect(r.meta?.total).toBe(1);
   });
+
+  test("{success,message,data:{data,stats}} → data.data", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(200, {
+          success: true,
+          message: "Teams retrieved.",
+          data: {
+            data: [{ id: 13, code: "team_alaamlyat-albnky" }],
+            stats: { total_teams: 1 },
+          },
+        }),
+      ),
+    );
+    const r = await api.getList("/teams");
+    expect(r.data).toEqual([{ id: 13, code: "team_alaamlyat-albnky" }]);
+  });
 });
 
 describe("errors map to DomainError", () => {

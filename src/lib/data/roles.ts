@@ -85,13 +85,13 @@ function useLiveMutations() {
     onSuccess: invalidate,
   });
   const updateRole = useMutation({
-    mutationFn: (i: { id: number; name?: string; organization_id?: number }) =>
-      api.patch<RoleDto>(`/roles/${i.id}`, { name: i.name, organization_id: i.organization_id }),
+    mutationFn: (i: { id: number; name?: string; organization_id?: number; version?: number }) =>
+      api.patch<RoleDto>(`/roles/${i.id}`, { name: i.name, organization_id: i.organization_id, version: i.version }),
     onSuccess: invalidate,
   });
   const toggleRole = useMutation({
-    mutationFn: (i: { id: number; is_active: boolean }) =>
-      api.patch(`/roles/${i.id}`, { is_active: i.is_active }).then(() => undefined),
+    mutationFn: (i: { id: number; activate: boolean }) =>
+      api.post(`/roles/${i.id}/${i.activate ? "activate" : "deactivate"}`).then(() => undefined),
     onSuccess: invalidate,
   });
   const deleteRole = useMutation({
@@ -199,18 +199,18 @@ export function useRoleMutations(auditCtx?: AuditInput) {
     } as MutationHandle<{ id: number; name?: string; organization_id?: number }>,
     toggleRole: {
       ...idle,
-      mutate: async (i: { id: number; is_active: boolean }) => {
+      mutate: async (i: { id: number; activate: boolean }) => {
         roleCatalogCell.set((prev) =>
-          prev.map((r) => (r.id === i.id ? { ...r, active: i.is_active } : r)),
+          prev.map((r) => (r.id === i.id ? { ...r, active: i.activate } : r)),
         );
         const role = roleCatalogCell.get().find((r) => r.id === i.id);
         audit(
-          i.is_active ? "تفعيل دور" : "إلغاء تفعيل دور",
+          i.activate ? "تفعيل دور" : "إلغاء تفعيل دور",
           role?.code ?? String(i.id),
           role?.name,
         );
       },
-    } as MutationHandle<{ id: number; is_active: boolean }>,
+    } as MutationHandle<{ id: number; activate: boolean }>,
     deleteRole: {
       ...idle,
       mutate: async (i: { id: number }) => {

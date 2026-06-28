@@ -86,13 +86,13 @@ function useLiveMutations() {
     onSuccess: invalidate,
   });
   const updateTeam = useMutation({
-    mutationFn: (i: { id: number; name?: string; organization_id?: number }) =>
-      api.patch<TeamDto>(`/teams/${i.id}`, { name: i.name, organization_id: i.organization_id }),
+    mutationFn: (i: { id: number; name?: string; organization_id?: number; version?: number }) =>
+      api.patch<TeamDto>(`/teams/${i.id}`, { name: i.name, organization_id: i.organization_id, version: i.version }),
     onSuccess: invalidate,
   });
   const toggleTeam = useMutation({
-    mutationFn: (i: { id: number; is_active: boolean }) =>
-      api.patch(`/teams/${i.id}`, { is_active: i.is_active }).then(() => undefined),
+    mutationFn: (i: { id: number; activate: boolean }) =>
+      api.post(`/teams/${i.id}/${i.activate ? "activate" : "deactivate"}`).then(() => undefined),
     onSuccess: invalidate,
   });
   const deleteTeam = useMutation({
@@ -207,18 +207,18 @@ export function useTeamMutations(auditCtx?: AuditInput) {
     } as MutationHandle<{ id: number; name?: string; organization_id?: number }>,
     toggleTeam: {
       ...idle,
-      mutate: async (i: { id: number; is_active: boolean }) => {
+      mutate: async (i: { id: number; activate: boolean }) => {
         teamsCell.set((prev) =>
-          prev.map((t) => (t.id === i.id ? { ...t, active: i.is_active } : t)),
+          prev.map((t) => (t.id === i.id ? { ...t, active: i.activate } : t)),
         );
         const team = teamsCell.get().find((t) => t.id === i.id);
         audit(
-          i.is_active ? "تفعيل فريق" : "إلغاء تفعيل فريق",
+          i.activate ? "تفعيل فريق" : "إلغاء تفعيل فريق",
           team?.code ?? String(i.id),
           team?.label,
         );
       },
-    } as MutationHandle<{ id: number; is_active: boolean }>,
+    } as MutationHandle<{ id: number; activate: boolean }>,
     deleteTeam: {
       ...idle,
       mutate: async (i: { id: number }) => {

@@ -27,26 +27,72 @@ export const organizationKeys = {
 };
 
 // ---------- DTO -> domain ----------
+type ApiOrgCategory = "banks" | "national_committee" | "other";
+
 interface OrgDto {
   id: number;
-  slug: string; // → code
+  code: string;
   name: string; // → label
+  category: ApiOrgCategory;
   is_active: boolean; // → active
   is_system: boolean; // → builtin
   version?: number; // → _version
-  metadata?: { category?: OrgCategory };
 }
+
+type OrgDetailDto = OrgDto | { organization?: OrgDto };
+
+const API_CATEGORY_TO_DOMAIN: Record<ApiOrgCategory, OrgCategory> = {
+  banks: "bank",
+  national_committee: "committee",
+  other: "other",
+};
+
+const DOMAIN_CATEGORY_TO_API: Record<OrgCategory, ApiOrgCategory> = {
+  bank: "banks",
+  committee: "national_committee",
+  other: "other",
+};
+
+const FALLBACK_INITIAL_VERSION = 1;
 
 export function toOrgRecord(dto: OrgDto): OrgRecord {
   return {
     id: dto.id,
-    code: dto.slug,
+    code: dto.code,
     label: dto.name,
-    category: dto.metadata?.category ?? "other",
+    category: API_CATEGORY_TO_DOMAIN[dto.category] ?? "other",
     active: dto.is_active,
     builtin: dto.is_system,
     _version: dto.version,
   };
+}
+
+function orgFromDetail(dto: OrgDetailDto): OrgDto | undefined {
+  if ("organization" in dto) return dto.organization;
+  return dto as OrgDto;
+}
+
+type UpdateOrganizationInput = {
+  id: number;
+  name?: string;
+  metadata?: { category?: OrgCategory };
+  version?: number;
+};
+
+export async function updateOrganization(i: UpdateOrganizationInput): Promise<OrgRecord> {
+  const detail =
+    i.version === undefined
+      ? orgFromDetail(await api.get<OrgDetailDto>(`/organizations/${i.id}`))
+      : undefined;
+  const version = i.version ?? detail?.version;
+
+  return api
+    .patch<OrgDto>(`/organizations/${i.id}`, {
+      name: i.name,
+      category: i.metadata?.category ? DOMAIN_CATEGORY_TO_API[i.metadata.category] : undefined,
+      version: version ?? FALLBACK_INITIAL_VERSION,
+    })
+    .then(toOrgRecord);
 }
 
 // ---------- Read hook ----------
@@ -80,17 +126,23 @@ function useLiveMutations() {
 
   const createOrg = useMutation({
     mutationFn: (i: { name: string; metadata: { category: OrgCategory } }) =>
-      api.post<OrgDto>("/organizations", i).then(toOrgRecord),
+      api
+        .post<OrgDto>("/organizations", {
+          name: i.name,
+          category: DOMAIN_CATEGORY_TO_API[i.metadata.category],
+        })
+        .then(toOrgRecord),
     onSuccess: invalidate,
   });
   const updateOrg = useMutation({
-    mutationFn: (i: { id: number; name?: string; metadata?: { category?: OrgCategory } }) =>
-      api.patch<OrgDto>(`/organizations/${i.id}`, { name: i.name, metadata: i.metadata }),
+    mutationFn: updateOrganization,
     onSuccess: invalidate,
   });
   const toggleOrg = useMutation({
-    mutationFn: (i: { id: number; is_active: boolean }) =>
-      api.patch(`/organizations/${i.id}`, { is_active: i.is_active }).then(() => undefined),
+    mutationFn: (i: { id: number; activate: boolean }) =>
+      api
+        .post(`/organizations/${i.id}/${i.activate ? "activate" : "deactivate"}`)
+        .then(() => undefined),
     onSuccess: invalidate,
   });
   const deleteOrg = useMutation({
@@ -195,14 +247,12 @@ export function useOrgMutations(auditCtx?: AuditInput) {
     } as MutationHandle<{ id: number; name?: string; metadata?: { category?: OrgCategory } }>,
     toggleOrg: {
       ...idle,
-      mutate: async (i: { id: number; is_active: boolean }) => {
-        orgsCell.set((prev) =>
-          prev.map((o) => (o.id === i.id ? { ...o, active: i.is_active } : o)),
-        );
+      mutate: async (i: { id: number; activate: boolean }) => {
+        orgsCell.set((prev) => prev.map((o) => (o.id === i.id ? { ...o, active: i.activate } : o)));
         const org = orgsCell.get().find((o) => o.id === i.id);
-        audit(i.is_active ? "تفعيل جهة" : "إلغاء تفعيل جهة", org?.code ?? String(i.id), org?.label);
+        audit(i.activate ? "تفعيل جهة" : "إلغاء تفعيل جهة", org?.code ?? String(i.id), org?.label);
       },
-    } as MutationHandle<{ id: number; is_active: boolean }>,
+    } as MutationHandle<{ id: number; activate: boolean }>,
     deleteOrg: {
       ...idle,
       mutate: async (i: { id: number }) => {

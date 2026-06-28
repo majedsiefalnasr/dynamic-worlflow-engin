@@ -40,7 +40,8 @@ import { getOrgLabel, type TeamRecord } from "@/lib/governance";
 import { useTeams, useTeamMutations } from "@/lib/data/teams";
 import { useOrganizations } from "@/lib/data/organizations";
 import { isDomainError } from "@/lib/data/errors";
-import { DEMO_USERS, useAuth } from "@/lib/mock";
+import { useAuth } from "@/lib/mock";
+import { useUsers } from "@/lib/data/users";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +62,7 @@ function TeamsAdmin() {
   const { user } = useAuth();
   const { data: teams, isLoading: teamsLoading } = useTeams();
   const { data: orgs } = useOrganizations();
+  const { data: userList } = useUsers();
   const mutations = useTeamMutations(
     user ? { userId: String(user.id), userName: user.name, role: user.roleId } : undefined,
   );
@@ -112,6 +114,7 @@ function TeamsAdmin() {
         id: target.id,
         name: p.label,
         organization_id: org?.id,
+        version: target._version,
       });
       toast.success("تم حفظ التعديلات");
       setEditing(null);
@@ -121,12 +124,12 @@ function TeamsAdmin() {
   }
 
   async function toggleActive(t: TeamRecord) {
-    const usersInTeam = DEMO_USERS.filter((u) => u.team?.code === t.code).length;
+    const usersInTeam = (userList ?? []).filter((u) => u.team?.code === t.code).length;
     if (t.active && usersInTeam > 0) {
       toast.info(`تنبيه: ${usersInTeam} مستخدماً مرتبطاً بهذا الفريق`);
     }
     try {
-      await mutations.toggleTeam.mutate({ id: t.id, is_active: !t.active });
+      await mutations.toggleTeam.mutate({ id: t.id, activate: !t.active });
       toast.success(t.active ? `تم إلغاء تفعيل "${t.label}"` : `تم تفعيل "${t.label}"`);
     } catch (e) {
       toast.error(isDomainError(e) ? e.message : "حدث خطأ أثناء تغيير الحالة");
@@ -135,7 +138,7 @@ function TeamsAdmin() {
 
   async function remove(t: TeamRecord) {
     if (t.builtin) return toast.error("لا يمكن حذف فريق افتراضي. يمكنك إلغاء تفعيله بدلاً من ذلك.");
-    const usersInTeam = DEMO_USERS.filter((u) => u.team?.code === t.code).length;
+    const usersInTeam = (userList ?? []).filter((u) => u.team?.code === t.code).length;
     if (usersInTeam > 0)
       return toast.error(`لا يمكن حذف الفريق، يوجد ${usersInTeam} مستخدماً مرتبطاً به.`);
     try {
@@ -250,7 +253,7 @@ function TeamsAdmin() {
             </thead>
             <tbody>
               {list.map((t) => {
-                const count = DEMO_USERS.filter((u) => u.team?.code === t.code).length;
+                const count = (userList ?? []).filter((u) => u.team?.code === t.code).length;
                 return (
                   <tr key={t.id} className="border-t hover:bg-muted/30">
                     <td className="px-4 py-3">

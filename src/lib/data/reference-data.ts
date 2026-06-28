@@ -107,15 +107,14 @@ function useLiveMutations() {
         ),
     onSuccess: invalidate,
   });
-  // No hard delete — deactivate via PATCH is_active (POST /deactivate is WAF-blocked, spec §7).
   const removeTable = useMutation({
     mutationFn: (i: { id: string }) =>
-      api.patch(`/reference-tables/${i.id}`, { is_active: false }).then(() => undefined),
+      api.post(`/reference-tables/${i.id}/deactivate`).then(() => undefined),
     onSuccess: invalidate,
   });
   const removeValue = useMutation({
     mutationFn: (i: { id: string }) =>
-      api.patch(`/reference-values/${i.id}`, { is_active: false }).then(() => undefined),
+      api.post(`/reference-values/${i.id}/deactivate`).then(() => undefined),
     onSuccess: invalidate,
   });
   return { createTable, createValue, removeTable, removeValue };

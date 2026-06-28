@@ -34,7 +34,7 @@ type EntityPayload = {
   name: string;
   licenseNumber?: string;
   swiftCode?: string;
-  status: "active" | "inactive" | "suspended";
+  status: "active" | "inactive";
 };
 
 function EntitiesAdmin() {
@@ -77,11 +77,13 @@ function EntitiesAdmin() {
 
   async function update(id: number, p: EntityPayload) {
     try {
+      const bank = banks.find((b) => b.id === id);
       await mutations.updateBank.mutate({
         id,
         name: p.name,
         license_number: p.licenseNumber,
         swift_code: p.swiftCode,
+        version: bank?._version,
       });
       toast.success("تم حفظ التعديلات");
       setEditing(null);
@@ -93,7 +95,7 @@ function EntitiesAdmin() {
   async function toggleStatus(e: BankEntity) {
     const activate = e.status !== "active";
     try {
-      await mutations.toggleBank.mutate({ id: e.id, is_active: activate });
+      await mutations.toggleBank.mutate({ id: e.id, activate });
       toast.success(activate ? `تم تفعيل ${e.name}` : `تم إيقاف ${e.name}`);
     } catch (err) {
       toast.error(isDomainError(err) ? err.message : "فشل تغيير حالة البنك");
@@ -182,11 +184,7 @@ function EntitiesAdmin() {
                           : "bg-destructive/15 text-destructive border-0"
                       }
                     >
-                      {e.status === "active"
-                        ? "نشط"
-                        : e.status === "suspended"
-                          ? "موقوف"
-                          : "غير نشط"}
+                      {e.status === "active" ? "نشط" : "غير نشط"}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
@@ -266,11 +264,7 @@ function EntitiesAdmin() {
               <Row
                 label="الحالة"
                 value={
-                  viewing.status === "active"
-                    ? "نشط"
-                    : viewing.status === "suspended"
-                      ? "موقوف"
-                      : "غير نشط"
+                  viewing.status === "active" ? "نشط" : "غير نشط"
                 }
               />
               <Row label="المعرّف" value={String(viewing.id)} />
@@ -349,14 +343,6 @@ function EntityDialog({
               onClick={() => setStatus("inactive")}
             >
               غير نشط
-            </Button>
-            <Button
-              type="button"
-              variant={status === "suspended" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setStatus("suspended")}
-            >
-              موقوف
             </Button>
           </div>
         </div>

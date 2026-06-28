@@ -28,7 +28,8 @@ import { getOrgLabel, type RoleCatalogEntry } from "@/lib/governance";
 import { useRoles, useRoleMutations } from "@/lib/data/roles";
 import { useOrganizations } from "@/lib/data/organizations";
 import { isDomainError } from "@/lib/data/errors";
-import { DEMO_USERS, useAuth } from "@/lib/mock";
+import { useAuth } from "@/lib/mock";
+import { useUsers } from "@/lib/data/users";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
 
 export const Route = createFileRoute("/admin/roles")({
@@ -45,6 +46,7 @@ function RolesAdmin() {
   const { user } = useAuth();
   const { data: roles, isLoading: rolesLoading } = useRoles();
   const { data: orgs } = useOrganizations();
+  const { data: users } = useUsers();
   const mutations = useRoleMutations(
     user ? { userId: String(user.id), userName: user.name, role: user.roleId } : undefined,
   );
@@ -55,9 +57,9 @@ function RolesAdmin() {
 
   const usersByRole = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const u of DEMO_USERS) counts[u.roleId] = (counts[u.roleId] ?? 0) + 1;
+    for (const u of users ?? []) counts[u.roleId] = (counts[u.roleId] ?? 0) + 1;
     return counts;
-  }, []);
+  }, [users]);
 
   if (rolesLoading || !roles || !orgs) {
     return (
@@ -95,6 +97,7 @@ function RolesAdmin() {
         id: target.id,
         name: p.name,
         organization_id: org?.id,
+        version: target._version,
       });
       toast.success("تم حفظ التعديلات");
       setEditing(null);
@@ -105,7 +108,7 @@ function RolesAdmin() {
 
   async function toggle(r: RoleCatalogEntry) {
     try {
-      await mutations.toggleRole.mutate({ id: r.id, is_active: !r.active });
+      await mutations.toggleRole.mutate({ id: r.id, activate: !r.active });
       toast.success(r.active ? `تم إلغاء تفعيل "${r.name}"` : `تم تفعيل "${r.name}"`);
     } catch (e) {
       toast.error(isDomainError(e) ? e.message : "حدث خطأ أثناء تغيير الحالة");

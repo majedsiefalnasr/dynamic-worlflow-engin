@@ -37,7 +37,8 @@ import {
 } from "@/lib/governance";
 import { useOrganizations, useOrgMutations } from "@/lib/data/organizations";
 import { isDomainError } from "@/lib/data/errors";
-import { DEMO_USERS, useAuth } from "@/lib/mock";
+import { useAuth } from "@/lib/mock";
+import { useUsers } from "@/lib/data/users";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
 
 export const Route = createFileRoute("/admin/orgs")({
@@ -49,6 +50,12 @@ export const Route = createFileRoute("/admin/orgs")({
 });
 
 type Payload = { label: string; category: OrgCategory };
+
+function operationErrorMessage(e: unknown): string {
+  if (isDomainError(e)) return e.message;
+  if (e instanceof Error) return e.message;
+  return "فشلت العملية.";
+}
 
 const ORG_CATEGORIES: {
   value: OrgCategory;
@@ -74,6 +81,7 @@ const ORG_CATEGORIES: {
 function OrgsAdmin() {
   const { user } = useAuth();
   const { data: orgs, isLoading } = useOrganizations();
+  const { data: userList } = useUsers();
   const teams = teamsCell.use();
   const roles = roleCatalogCell.use();
   const mutations = useOrgMutations(
@@ -105,7 +113,7 @@ function OrgsAdmin() {
       toast.success(`تمت إضافة الجهة "${p.label}"`);
       setOpenAdd(false);
     } catch (e) {
-      toast.error(isDomainError(e) ? e.message : "فشلت العملية.");
+      toast.error(operationErrorMessage(e));
     }
   }
 
@@ -115,20 +123,21 @@ function OrgsAdmin() {
         id: target.id,
         name: p.label,
         metadata: { category: p.category },
+        version: target._version,
       });
       toast.success("تم حفظ التعديلات");
       setEditing(null);
     } catch (e) {
-      toast.error(isDomainError(e) ? e.message : "فشلت العملية.");
+      toast.error(operationErrorMessage(e));
     }
   }
 
   async function toggle(o: OrgRecord) {
     try {
-      await mutations.toggleOrg.mutate({ id: o.id, is_active: !o.active });
+      await mutations.toggleOrg.mutate({ id: o.id, activate: !o.active });
       toast.success(o.active ? `تم إلغاء تفعيل "${o.label}"` : `تم تفعيل "${o.label}"`);
     } catch (e) {
-      toast.error(isDomainError(e) ? e.message : "فشلت العملية.");
+      toast.error(operationErrorMessage(e));
     }
   }
 
@@ -143,7 +152,7 @@ function OrgsAdmin() {
       await mutations.deleteOrg.mutate({ id: o.id });
       toast.success(`تم حذف "${o.label}"`);
     } catch (e) {
-      toast.error(isDomainError(e) ? e.message : "فشلت العملية.");
+      toast.error(operationErrorMessage(e));
     }
   }
 
@@ -213,7 +222,9 @@ function OrgsAdmin() {
               {list.map((o) => {
                 const teamCount = teams.filter((t) => t.orgCode === o.code).length;
                 const roleCount = roles.filter((r) => r.orgCode === o.code).length;
-                const userCount = DEMO_USERS.filter((u) => u.organization?.code === o.code).length;
+                const userCount = (userList ?? []).filter(
+                  (u) => u.organization?.code === o.code,
+                ).length;
                 return (
                   <tr key={o.id} className="border-t hover:bg-muted/30">
                     <td className="px-4 py-3">

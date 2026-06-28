@@ -26,9 +26,14 @@ export function ScreenGuard({
   if (!user) return null;
   wfStore.users.use();
 
-  const allowed = live
-    ? (user.screenPermissions?.some((sp) => sp.screen === screen) ?? false)
-    : canScreen(user, screen, "view");
+  // TODO(deferred): remove rc_platform_admin bypass once backend populates
+  // screen_permissions for admin users (currently returns empty array).
+  // See docs/deferred/screen-permissions-bypass.md
+  const allowed =
+    user.roleId === "rc_platform_admin" ||
+    (live
+      ? (user.screenPermissions?.some((sp) => sp.screen === screen) ?? false)
+      : canScreen(user, screen, "view"));
 
   if (!allowed) {
     return (

@@ -61,7 +61,7 @@ export type BankEntity = {
   name: string;
   licenseNumber?: string;
   swiftCode?: string;
-  status: "active" | "inactive" | "suspended";
+  status: "active" | "inactive";
   _version?: number;
 };
 
@@ -488,6 +488,7 @@ export type Merchant = {
   commercialRegistrationExpiry?: string;
   owners?: { id: string; name: string; share: number }[];
   linkedCompanies?: { id: string; name: string; category: string; cr: string; crExpiry: string }[];
+  _version?: number;
 };
 
 export const MERCHANTS: Merchant[] = importers.map((n, i) => ({

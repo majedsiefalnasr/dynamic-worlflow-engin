@@ -642,6 +642,28 @@ export function manualScreenCan(
   return screenPermsCell.get()[screen]?.[roleId]?.includes(cap) ?? false;
 }
 
+// Backend capability enum (App\Http\Controllers\Api\RolePermissionController::CAPABILITIES)
+// vs. the 3 caps screens manage here. MANAGE implies all of them.
+const BACKEND_CAP_TO_SCREEN: Record<string, ScreenCapability | undefined> = {
+  VIEW: "view",
+  CREATE: "add",
+  UPDATE: "edit",
+};
+
+/**
+ * Live permission check using the screen permissions the backend put on the
+ * authenticated user (User.screenPermissions, fetched on login/me — reflects
+ * whatever the platform admin set, unlike the local screenPermsCell which is
+ * mock-only seed data and never changes at runtime).
+ */
+export function liveScreenCan(user: User, screen: ScreenKey, cap: ScreenCapability): boolean {
+  if (user.roleId === "rc_platform_admin") return true;
+  const entry = user.screenPermissions.find((p) => p.screen === screen);
+  if (!entry) return false;
+  if (entry.capabilities.includes("MANAGE")) return true;
+  return entry.capabilities.some((c) => BACKEND_CAP_TO_SCREEN[c] === cap);
+}
+
 export function setScreenPermission(
   screen: ManualScreenKey,
   roleId: RoleId,

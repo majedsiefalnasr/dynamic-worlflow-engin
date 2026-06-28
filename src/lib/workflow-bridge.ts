@@ -16,12 +16,14 @@ import {
 } from "@/lib/workflow-engine";
 import { wfAuth } from "@/lib/workflow-engine/wfAuth";
 import {
+  liveScreenCan,
   manualScreenCan,
   roleCatalogCell,
   teamsCell,
   type ScreenCapability,
   type ScreenKey,
 } from "@/lib/governance";
+import { isLive } from "@/lib/data/auth";
 import type { RoleId, User } from "@/lib/mock";
 
 // Built-in demo identities keep their richly-seeded engine users (e.g. the
@@ -223,7 +225,12 @@ export function canScreen(
   cap: ScreenCapability = "view",
 ): boolean {
   if (screen === "requests") return requestsAccessForUser(user)[cap];
-  return user ? manualScreenCan(user.roleId, screen, cap) : false;
+  if (!user) return false;
+  // Live mode: permissions come from the backend (reflects whatever the
+  // platform admin set on /admin/screen-permissions). Mock mode keeps the
+  // local role × screen matrix since mock users carry no screenPermissions.
+  if (isLive()) return liveScreenCan(user, screen, cap);
+  return manualScreenCan(user.roleId, screen, cap);
 }
 
 export function roleCanCreateRequest(user: User | null | undefined): boolean {

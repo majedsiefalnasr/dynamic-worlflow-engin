@@ -124,8 +124,15 @@ export const api = {
     signal?: AbortSignal,
   ): Promise<{ data: T[]; meta?: PageMeta }> => {
     const body = await request("GET", path, { query, signal });
-    const data = (unwrap(body) ?? []) as T[];
-    const meta = (body as { meta?: PageMeta } | null)?.meta;
+    const unwrapped = unwrap(body);
+    const data = Array.isArray(unwrapped)
+      ? unwrapped
+      : unwrapped && typeof unwrapped === "object" && Array.isArray((unwrapped as { data?: unknown }).data)
+        ? (unwrapped as { data: T[] }).data
+        : [];
+    const meta =
+      (body as { meta?: PageMeta } | null)?.meta ??
+      (unwrapped as { meta?: PageMeta } | null)?.meta;
     return { data: Array.isArray(data) ? data : [], meta };
   },
 

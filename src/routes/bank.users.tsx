@@ -7,6 +7,7 @@ import {
   Search,
   Power,
   ShieldCheck,
+  Wand2,
   type LucideIcon,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -36,6 +37,7 @@ import { toast } from "sonner";
 import { useUsers, useUserMutations } from "@/lib/data/users";
 import { useRoles } from "@/lib/data/roles";
 import { useTeams } from "@/lib/data/teams";
+import { generatePassword } from "@/lib/utils";
 
 export const Route = createFileRoute("/bank/users")({ component: BankUsers });
 
@@ -91,7 +93,7 @@ function BankUsers() {
   function toggleActive(u: User) {
     const next = u.isActive === false;
     mutations.toggleUser
-      .mutate({ id: u.id, isActive: next })
+      .mutate({ id: u.id, activate: next })
       .then(() => {
         toast.success(next ? `تم تفعيل ${u.name}` : `تم إلغاء تفعيل ${u.name}`);
       })
@@ -121,6 +123,7 @@ function BankUsers() {
                     name: payload.name,
                     email: payload.email,
                     phone: payload.phone,
+                    password: payload.password,
                     roleId: payload.roleId,
                     organizationCode: user!.organization?.code ?? "bank",
                     teamCode: team?.code,
@@ -301,8 +304,10 @@ function BankUsers() {
                   name: payload.name,
                   email: payload.email,
                   phone: payload.phone,
+                  password: payload.password,
                   roleId: payload.roleId,
                   teamCode: team?.code,
+                  version: editing._version,
                   _mock: {
                     team: team ? { id: team.id, code: team.code, name: team.label } : null,
                     roleLabel: roles.find((r) => r.code === payload.roleId)?.name,
@@ -343,7 +348,13 @@ function StatCard({
   );
 }
 
-type UserPayload = { name: string; email: string; roleId: RoleId; phone?: string };
+type UserPayload = {
+  name: string;
+  email: string;
+  roleId: RoleId;
+  phone?: string;
+  password?: string;
+};
 
 function UserDialog({
   title,
@@ -359,10 +370,12 @@ function UserDialog({
   const [name, setName] = useState(initial?.name ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
+  const [password, setPassword] = useState("");
   const [roleId, setRoleId] = useState<RoleId>(
     initial?.roleId ?? (roles[0]?.code as RoleId) ?? "rc_bank_intake",
   );
-  const valid = name.trim() && /\S+@\S+\.\S+/.test(email);
+  const valid =
+    name.trim() && /\S+@\S+\.\S+/.test(email) && (!!initial || password.trim().length >= 8);
 
   return (
     <DialogContent dir="rtl" className="sm:max-w-md">
@@ -384,6 +397,27 @@ function UserDialog({
         <div className="space-y-1.5">
           <Label>الهاتف</Label>
           <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+9677…" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>{initial ? "كلمة المرور (اختياري)" : "كلمة المرور *"}</Label>
+          <div className="flex gap-2">
+            <Input
+              type="text"
+              dir="ltr"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={initial ? "اتركه فارغاً لعدم التغيير" : "8 أحرف على الأقل"}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              title="توليد كلمة مرور"
+              onClick={() => setPassword(generatePassword())}
+            >
+              <Wand2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <div className="space-y-1.5">
           <Label>الدور الفرعي *</Label>
@@ -409,6 +443,7 @@ function UserDialog({
               name: name.trim(),
               email: email.trim(),
               phone: phone.trim() || undefined,
+              password: password.trim() || undefined,
               roleId,
             })
           }

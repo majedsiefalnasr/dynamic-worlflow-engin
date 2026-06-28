@@ -9,7 +9,7 @@ import { api } from "./http";
 import { source } from "./source";
 import { mockRead, type MutationHandle, type ReadResult } from "./query";
 import { computeAvatar, getRoleLabel, type User, type RoleId } from "@/lib/mock";
-import { logAudit, usersCell } from "@/lib/governance";
+import { getRoleCatalog, logAudit, usersCell } from "@/lib/governance";
 import { upsertWorkflowUser } from "@/lib/workflow-bridge";
 
 export type { User } from "@/lib/mock";
@@ -120,6 +120,7 @@ export type CreateUserInput = {
   name: string;
   email: string;
   phone?: string;
+  password?: string;
   roleId: RoleId;
   organizationCode: string;
   teamCode?: string;
@@ -138,8 +139,11 @@ export type UpdateUserInput = {
   name: string;
   email: string;
   phone?: string;
+  password?: string;
   roleId: RoleId;
   teamCode?: string;
+  bankId?: number | null;
+  version?: number;
   /** Resolved objects for mock mode */
   _mock?: {
     team: { id: number; code: string; name: string } | null;
@@ -149,7 +153,7 @@ export type UpdateUserInput = {
 
 export type ToggleUserInput = {
   id: number;
-  isActive: boolean;
+  activate: boolean;
 };
 
 // ---------- Mutations ----------
@@ -164,7 +168,8 @@ function useLiveMutations() {
           name: i.name,
           email: i.email,
           phone: i.phone,
-          role_id: i.roleId,
+          password: i.password,
+          role_id: getRoleCatalog(i.roleId)?.id,
           organization_code: i.organizationCode,
           team_code: i.teamCode,
           bank_id: i.bankId,
@@ -179,15 +184,18 @@ function useLiveMutations() {
           name: i.name,
           email: i.email,
           phone: i.phone,
-          role_id: i.roleId,
+          ...(i.password ? { password: i.password } : {}),
+          role_id: getRoleCatalog(i.roleId)?.id,
           team_code: i.teamCode,
+          bank_id: i.bankId,
+          version: i.version,
         })
         .then(toUser),
     onSuccess: invalidate,
   });
   const toggleUser = useMutation({
     mutationFn: (i: ToggleUserInput) =>
-      api.patch(`/users/${i.id}`, { is_active: i.isActive }).then(() => undefined),
+      api.post(`/users/${i.id}/${i.activate ? "activate" : "deactivate"}`).then(() => undefined),
     onSuccess: invalidate,
   });
   return { createUser, updateUser, toggleUser };
@@ -299,12 +307,12 @@ export function useUserMutations(auditCtx?: AuditInput) {
         usersCell.set((prev) =>
           prev.map((u) => {
             if (u.id !== i.id) return u;
-            toggled = { ...u, isActive: i.isActive };
+            toggled = { ...u, isActive: i.activate };
             return toggled;
           }),
         );
         if (toggled) {
-          audit(i.isActive ? "تفعيل مستخدم" : "إلغاء تفعيل مستخدم", toggled.email, toggled.name);
+          audit(i.activate ? "تفعيل مستخدم" : "إلغاء تفعيل مستخدم", toggled.email, toggled.name);
         }
       },
     } as MutationHandle<ToggleUserInput>,

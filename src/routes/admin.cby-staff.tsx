@@ -11,6 +11,7 @@ import {
   Building2,
   Landmark,
   KeyRound,
+  Wand2,
   type LucideIcon,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -29,7 +30,7 @@ import {
 import { useAuth, type User } from "@/lib/mock";
 import { getTeamLabel, getOrgLabel } from "@/lib/governance";
 import { useUsers, useUserMutations, type CreateUserInput } from "@/lib/data/users";
-import { useOrganizations } from "@/lib/data/organizations";
+import { useOrganizations, type OrgRecord } from "@/lib/data/organizations";
 import { useTeams } from "@/lib/data/teams";
 import { useRoles } from "@/lib/data/roles";
 import { useBanks } from "@/lib/data/banks";
@@ -44,6 +45,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { RoleGuard } from "@/components/workflow/RoleGuard";
+import { generatePassword } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/cby-staff")({
   component: () => (
@@ -57,6 +59,7 @@ type Payload = {
   name: string;
   email: string;
   phone?: string;
+  password?: string;
   orgId: string;
   teamId: string;
   roleId: string; // role catalog id
@@ -80,6 +83,8 @@ function SystemUsers() {
   const [q, setQ] = useState("");
   const [orgFilter, setOrgFilter] = useState<string>("all");
 
+  const categoryOf = (code?: string | null) => orgs.find((o) => o.code === code)?.category;
+
   const list = useMemo(() => {
     if (!allUsers) return [];
     const s = q.trim().toLowerCase();
@@ -92,11 +97,11 @@ function SystemUsers() {
     if (!allUsers) return { total: 0, bank: 0, committee: 0, inactive: 0 };
     return {
       total: allUsers.length,
-      bank: allUsers.filter((u) => u.organization?.code === "bank").length,
-      committee: allUsers.filter((u) => u.organization?.code === "committee").length,
+      bank: allUsers.filter((u) => categoryOf(u.organization?.code) === "bank").length,
+      committee: allUsers.filter((u) => categoryOf(u.organization?.code) === "committee").length,
       inactive: allUsers.filter((u) => u.isActive === false).length,
     };
-  }, [allUsers]);
+  }, [allUsers, orgs]);
 
   if (isLoading) {
     return (
@@ -110,7 +115,9 @@ function SystemUsers() {
     const team = teams.find((t) => t.code === p.teamId);
     const org = orgs.find((o) => o.code === p.orgId);
     const bankEntity =
-      p.orgId === "bank" && p.entityId ? banks.find((e) => String(e.id) === p.entityId) : undefined;
+      org?.category === "bank" && p.entityId
+        ? banks.find((e) => String(e.id) === p.entityId)
+        : undefined;
     return {
       organization: org ? { id: org.id, code: org.code, name: org.label } : null,
       team: team ? { id: team.id, code: team.code, name: team.label } : null,
@@ -125,6 +132,7 @@ function SystemUsers() {
       name: p.name,
       email: p.email,
       phone: p.phone,
+      password: p.password,
       roleId: p.roleId,
       organizationCode: p.orgId,
       teamCode: p.teamId,
@@ -153,8 +161,11 @@ function SystemUsers() {
         name: p.name,
         email: p.email,
         phone: p.phone,
+        password: p.password,
         roleId: p.roleId,
         teamCode: p.teamId,
+        bankId: target.bankId,
+        version: target._version,
         _mock: {
           team: mock.team,
           roleLabel: mock.roleLabel,
@@ -170,7 +181,7 @@ function SystemUsers() {
   function toggleActive(u: User) {
     const next = u.isActive === false;
     mutations.toggleUser
-      .mutate({ id: u.id, isActive: next })
+      .mutate({ id: u.id, activate: next })
       .then(() => {
         toast.success(next ? `تم تفعيل ${u.name}` : `تم إلغاء تفعيل ${u.name}`);
       })
@@ -305,9 +316,9 @@ function SystemUsers() {
                   <td className="px-4 py-3 text-xs">{u.email}</td>
                   <td className="px-4 py-3 text-xs">
                     <div className="flex items-center gap-1.5">
-                      {u.organization?.code === "bank" ? (
+                      {categoryOf(u.organization?.code) === "bank" ? (
                         <Building2 className="h-3.5 w-3.5 text-info" />
-                      ) : u.organization?.code === "committee" ? (
+                      ) : categoryOf(u.organization?.code) === "committee" ? (
                         <Landmark className="h-3.5 w-3.5 text-accent" />
                       ) : (
                         <ShieldCheck className="h-3.5 w-3.5 text-primary" />
@@ -462,20 +473,22 @@ function UserDialog({
   initial?: User;
   initialRoleId?: string;
   banks: { id: number; code: string; name: string }[];
-  orgs: { id: number; code: string; label: string }[];
+  orgs: OrgRecord[];
   teams: { id: number; code: string; label: string; orgCode: string }[];
   roles: { id: number; code: string; name: string; orgCode: string }[];
   onSave: (p: Payload) => void;
 }) {
-  const defaultOrg = initial?.organization?.code ?? orgs[0]?.code ?? "bank";
+  const defaultOrg = initial?.organization?.code ?? orgs[0]?.code ?? "";
+  const isBankOrg = (code: string) => orgs.find((o) => o.code === code)?.category === "bank";
   const [name, setName] = useState(initial?.name ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
+  const [password, setPassword] = useState("");
   const [orgId, setOrgId] = useState<string>(defaultOrg);
   const [entityId, setEntityId] = useState<string | null>(() => {
     const found = banks.find((b) => b.name === initial?.bank?.name);
     if (found) return String(found.id);
-    return defaultOrg === "bank" ? (banks[0] ? String(banks[0].id) : null) : null;
+    return isBankOrg(defaultOrg) ? (banks[0] ? String(banks[0].id) : null) : null;
   });
 
   const teamsForOrg = teams.filter((t) => t.orgCode === orgId);
@@ -490,7 +503,7 @@ function UserDialog({
     const nr = roles.filter((r) => r.orgCode === next);
     setTeamId(nt[0]?.code ?? "");
     setRoleId(nr[0]?.code ?? "");
-    if (next === "bank") {
+    if (isBankOrg(next)) {
       if (!entityId) setEntityId(banks[0] ? String(banks[0].id) : null);
     } else {
       setEntityId(null);
@@ -498,9 +511,16 @@ function UserDialog({
   }
 
   const emailOk = /\S+@\S+\.\S+/.test(email);
-  const needsBank = orgId === "bank";
+  const needsBank = isBankOrg(orgId);
+  const passwordOk = !!initial || password.trim().length >= 8;
   const valid =
-    name.trim() && emailOk && !!orgId && !!teamId && !!roleId && (!needsBank || !!entityId);
+    name.trim() &&
+    emailOk &&
+    passwordOk &&
+    !!orgId &&
+    !!teamId &&
+    !!roleId &&
+    (!needsBank || !!entityId);
 
   return (
     <DialogContent dir="rtl" className="sm:max-w-lg">
@@ -533,8 +553,30 @@ function UserDialog({
         </div>
 
         <div className="space-y-1.5">
+          <Label>{initial ? "كلمة المرور (اختياري)" : "كلمة المرور *"}</Label>
+          <div className="flex gap-2">
+            <Input
+              type="text"
+              dir="ltr"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={initial ? "اتركه فارغاً لعدم التغيير" : "8 أحرف على الأقل"}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              title="توليد كلمة مرور"
+              onClick={() => setPassword(generatePassword())}
+            >
+              <Wand2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
           <Label>الجهة *</Label>
-          <Select value={orgId} onValueChange={switchOrg}>
+          <Select value={orgId} onValueChange={switchOrg} disabled={!!initial}>
             <SelectTrigger>
               <SelectValue placeholder="اختر الجهة..." />
             </SelectTrigger>
@@ -546,12 +588,17 @@ function UserDialog({
               ))}
             </SelectContent>
           </Select>
+          {!!initial && (
+            <p className="text-xs text-muted-foreground">
+              لا يمكن تغيير جهة المستخدم بعد إنشائه.
+            </p>
+          )}
         </div>
 
         {needsBank && (
           <div className="space-y-1.5">
             <Label>البنك التجاري *</Label>
-            <Select value={entityId ?? ""} onValueChange={(v) => setEntityId(v)}>
+            <Select value={entityId ?? ""} onValueChange={(v) => setEntityId(v)} disabled={!!initial}>
               <SelectTrigger>
                 <SelectValue placeholder="اختر البنك..." />
               </SelectTrigger>
@@ -623,6 +670,7 @@ function UserDialog({
               name: name.trim(),
               email: email.trim(),
               phone: phone.trim() || undefined,
+              password: password.trim() || undefined,
               orgId,
               teamId,
               roleId,

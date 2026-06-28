@@ -46,7 +46,7 @@ export function toBankEntity(dto: BankDto): BankEntity {
     licenseNumber: dto.license_number,
     swiftCode: dto.swift_code,
     status:
-      (dto.status as BankEntity["status"]) ?? (dto.is_active === false ? "inactive" : "active"),
+      ((dto.status?.toLowerCase() as BankEntity["status"]) ?? (dto.is_active === false ? "inactive" : "active")),
     _version: dto.version,
   };
 }
@@ -90,13 +90,13 @@ function useLiveMutations() {
     onSuccess: invalidate,
   });
   const updateBank = useMutation({
-    mutationFn: (i: { id: number; name?: string; license_number?: string; swift_code?: string }) =>
+    mutationFn: (i: { id: number; name?: string; license_number?: string; swift_code?: string; version?: number }) =>
       api.patch<BankDto>(`/banks/${i.id}`, i),
     onSuccess: invalidate,
   });
   const toggleBank = useMutation({
-    mutationFn: (i: { id: number; is_active: boolean }) =>
-      api.patch(`/banks/${i.id}`, { is_active: i.is_active }).then(() => undefined),
+    mutationFn: (i: { id: number; activate: boolean }) =>
+      api.post(`/banks/${i.id}/${i.activate ? "activate" : "deactivate"}`).then(() => undefined),
     onSuccess: invalidate,
   });
   const deleteBank = useMutation({
@@ -222,20 +222,20 @@ export function useBankMutations(auditCtx?: AuditInput) {
     }>,
     toggleBank: {
       ...idle,
-      mutate: async (i: { id: number; is_active: boolean }) => {
+      mutate: async (i: { id: number; activate: boolean }) => {
         entitiesCell.set((prev) =>
           prev.map((b) =>
-            b.id === i.id ? { ...b, status: i.is_active ? "active" : "inactive" } : b,
+            b.id === i.id ? { ...b, status: i.activate ? "active" : "inactive" } : b,
           ),
         );
         const bank = entitiesCell.get().find((b) => b.id === i.id);
         audit(
-          i.is_active ? "تفعيل بنك" : "إلغاء تفعيل بنك",
+          i.activate ? "تفعيل بنك" : "إلغاء تفعيل بنك",
           bank?.code ?? String(i.id),
           bank?.name,
         );
       },
-    } as MutationHandle<{ id: number; is_active: boolean }>,
+    } as MutationHandle<{ id: number; activate: boolean }>,
     deleteBank: {
       ...idle,
       mutate: async (i: { id: number }) => {

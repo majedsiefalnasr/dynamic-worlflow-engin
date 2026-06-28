@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, Search, Edit, Trash2, Building2, Eye } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Building2, Eye, Loader2 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/card";
@@ -23,11 +23,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAuth, BANK_ENTITIES, type Merchant } from "@/lib/mock";
+import { useAuth } from "@/lib/mock";
+import type { Merchant } from "@/lib/data/merchants";
+import { useMerchants, useMerchantDetail, useMerchantMutations } from "@/lib/data/merchants";
+import { useBanks } from "@/lib/data/banks";
+import { isDomainError } from "@/lib/data/errors";
 import {
-  merchantsCell,
-  logAudit,
   referenceLabels,
+  referenceValues,
   referenceTablesCell,
   screenPermsCell,
 } from "@/lib/governance";
@@ -43,8 +46,8 @@ export const Route = createFileRoute("/merchants")({
   ),
 });
 
-function entityName(id?: string) {
-  return BANK_ENTITIES.find((e) => String(e.id) === id)?.name ?? "—";
+function entityName(banks: { id: number; name: string }[], id?: string) {
+  return banks.find((e) => String(e.id) === id)?.name ?? "—";
 }
 
 function linkedCompanies(m: Merchant) {
@@ -70,14 +73,59 @@ function bankIdToEntityId(bankId?: number | null): string | undefined {
   return bankId != null ? String(bankId) : undefined;
 }
 
+function sectorIdByLabel(label: string): number | undefined {
+  const v = referenceValues("sector_activity").find((r) => r.label === label);
+  return v ? Number(v.id) : undefined;
+}
+
+function toMerchantPayload(m: Merchant) {
+  return {
+    name: m.name,
+    bank_id: m.entityId ? Number(m.entityId) : undefined,
+    tax_number: m.tax || undefined,
+    tax_card_expiry: m.taxCardExpiry || undefined,
+    phone: m.contact === "—" ? undefined : m.contact || undefined,
+    address: m.address === "—" ? undefined : m.address || undefined,
+    status: m.status === "suspended" ? "SUSPENDED" : "ACTIVE",
+    owners: m.owners
+      ?.filter((o) => o.name.trim())
+      .map((o) => ({ name: o.name, ownership_percentage: o.share })),
+    companies: m.linkedCompanies
+      ?.filter((c) => c.name.trim() && c.cr.trim())
+      .map((c) => ({
+        name: c.name,
+        commercial_registration_number: c.cr,
+        commercial_registration_expiry: c.crExpiry === "—" ? undefined : c.crExpiry,
+        sector_reference_value_id: c.category ? sectorIdByLabel(c.category) : undefined,
+      })),
+  };
+}
+
 function Merchants() {
   const { user } = useAuth();
-  const merchants = merchantsCell.use();
+  const { data: merchantList, isLoading } = useMerchants();
+  const { data: bankList } = useBanks();
+  // Bank list may 403 when the user's role lacks banks:VIEW. Fall back to the
+  // user's own bank from the auth payload — enough for the locked dropdown and
+  // display when the full list is unavailable.
+  const banks = useMemo(() => {
+    if (bankList?.length) return bankList;
+    if (user?.bank)
+      return [
+        { id: user.bank.id, name: user.bank.name, code: user.bank.code, status: "active" as const },
+      ];
+    return [];
+  }, [bankList, user?.bank]);
+  const mutations = useMerchantMutations(
+    user ? { userId: String(user.id), userName: user.name, role: user.roleId } : undefined,
+  );
+  const merchants = useMemo(() => merchantList ?? [], [merchantList]);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended">("all");
   const [bankFilter, setBankFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Merchant | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const { data: editingDetail, isLoading: editingLoading } = useMerchantDetail(editingId);
   const [viewing, setViewing] = useState<Merchant | null>(null);
 
   screenPermsCell.use();
@@ -108,10 +156,10 @@ function Merchants() {
         linkedCompanies(m).some((c) =>
           [c.name, c.cr, c.category].join(" ").toLowerCase().includes(s),
         ) ||
-        entityName(m.entityId).toLowerCase().includes(s)
+        entityName(banks, m.entityId).toLowerCase().includes(s)
       );
     });
-  }, [scoped, q, statusFilter, bankFilter, isPlatform]);
+  }, [scoped, q, statusFilter, bankFilter, isPlatform, banks]);
 
   const stats = useMemo(
     () => ({
@@ -121,6 +169,14 @@ function Merchants() {
     }),
     [scoped],
   );
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -143,18 +199,16 @@ function Merchants() {
               <MerchantDialog
                 title="تسجيل تاجر جديد"
                 defaultEntityId={userEntityId}
-                onSave={(m) => {
-                  merchantsCell.set((prev) => [m, ...prev]);
-                  logAudit({
-                    userId: String(user!.id),
-                    userName: user!.name,
-                    role: user!.roleId,
-                    action: "إضافة تاجر جديد",
-                    ref: m.cr,
-                    notes: m.name,
-                  });
-                  toast.success(`تم تسجيل التاجر "${m.name}"`);
-                  setOpen(false);
+                lockEntity={!isPlatform}
+                banks={banks}
+                onSave={async (m) => {
+                  try {
+                    await mutations.createMerchant.mutate(toMerchantPayload(m));
+                    toast.success(`تم تسجيل التاجر "${m.name}"`);
+                    setOpen(false);
+                  } catch (err) {
+                    toast.error(isDomainError(err) ? err.message : "فشل إضافة التاجر");
+                  }
                 }}
               />
             </Dialog>
@@ -190,7 +244,7 @@ function Merchants() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">كل البنوك</SelectItem>
-              {BANK_ENTITIES.map((e) => (
+              {banks.map((e) => (
                 <SelectItem key={e.id} value={String(e.id)}>
                   {e.name}
                 </SelectItem>
@@ -255,7 +309,7 @@ function Merchants() {
                     <td className="p-3">
                       <Badge variant="outline" className="font-normal">
                         <Building2 className="h-3 w-3 ml-1" />
-                        {entityName(m.entityId)}
+                        {entityName(banks, m.entityId)}
                       </Badge>
                     </td>
                     <td className="p-3">
@@ -322,7 +376,7 @@ function Merchants() {
                 <Row k="الرقم الضريبي" v={m.tax} />
                 <Row k="انتهاء البطاقة الضريبية" v={m.taxCardExpiry ?? "—"} />
                 <Row k="أول سجل تجاري" v={primaryCompany(m).cr} />
-                <Row k="البنك" v={entityName(m.entityId)} />
+                <Row k="البنك" v={entityName(banks, m.entityId)} />
                 <Row k="العنوان" v={m.address} />
                 <Row k="هاتف" v={m.contact} />
               </div>
@@ -336,22 +390,22 @@ function Merchants() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() =>
-                        merchantsCell.set((prev) =>
-                          prev.map((x) =>
-                            x.id === m.id
-                              ? { ...x, status: x.status === "active" ? "suspended" : "active" }
-                              : x,
-                          ),
-                        )
-                      }
+                      onClick={async () => {
+                        const activate = m.status !== "active";
+                        try {
+                          await mutations.toggleMerchant.mutate({ id: Number(m.id), activate });
+                          toast.success(activate ? `تم تفعيل ${m.name}` : `تم إيقاف ${m.name}`);
+                        } catch (err) {
+                          toast.error(isDomainError(err) ? err.message : "فشل تغيير حالة التاجر");
+                        }
+                      }}
                     >
                       {m.status === "active" ? "إيقاف" : "تفعيل"}
                     </Button>
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() => setEditing(m)}
+                      onClick={() => setEditingId(Number(m.id))}
                       aria-label="تعديل التاجر"
                     >
                       <Edit className="h-3.5 w-3.5" />
@@ -361,18 +415,14 @@ function Merchants() {
                       variant="ghost"
                       className="text-destructive"
                       aria-label="حذف التاجر"
-                      onClick={() => {
+                      onClick={async () => {
                         if (!confirm(`حذف التاجر "${m.name}"؟`)) return;
-                        merchantsCell.set((prev) => prev.filter((x) => x.id !== m.id));
-                        logAudit({
-                          userId: String(user!.id),
-                          userName: user!.name,
-                          role: user!.roleId,
-                          action: "حذف تاجر",
-                          ref: m.cr,
-                          notes: m.name,
-                        });
-                        toast.success("تم حذف التاجر");
+                        try {
+                          await mutations.deleteMerchant.mutate({ id: Number(m.id) });
+                          toast.success("تم حذف التاجر");
+                        } catch (err) {
+                          toast.error(isDomainError(err) ? err.message : "فشل حذف التاجر");
+                        }
                       }}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -390,30 +440,33 @@ function Merchants() {
         </div>
       )}
 
-      <Dialog open={!!editing} onOpenChange={(v) => !v && setEditing(null)}>
-        {editing && (
+      <Dialog open={!!editingId} onOpenChange={(v) => !v && setEditingId(null)}>
+        {editingId && editingLoading && (
+          <DialogContent dir="rtl" className="sm:max-w-lg">
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          </DialogContent>
+        )}
+        {editingDetail && (
           <MerchantDialog
             title="تعديل بيانات التاجر"
-            initial={editing}
+            initial={editingDetail}
             defaultEntityId={userEntityId}
-            onSave={(m) => {
-              merchantsCell.set((prev) =>
-                prev.map((x) =>
-                  x.id === editing.id
-                    ? { ...m, id: editing.id, transactions: editing.transactions }
-                    : x,
-                ),
-              );
-              logAudit({
-                userId: String(user!.id),
-                userName: user!.name,
-                role: user!.roleId,
-                action: "تعديل بيانات تاجر",
-                ref: m.cr,
-                notes: m.name,
-              });
-              toast.success("تم تحديث بيانات التاجر");
-              setEditing(null);
+            lockEntity={!isPlatform}
+            banks={banks}
+            onSave={async (m) => {
+              try {
+                await mutations.updateMerchant.mutate({
+                  id: Number(editingDetail.id),
+                  ...toMerchantPayload(m),
+                  version: editingDetail._version,
+                });
+                toast.success("تم تحديث بيانات التاجر");
+                setEditingId(null);
+              } catch (err) {
+                toast.error(isDomainError(err) ? err.message : "فشل تعديل التاجر");
+              }
             }}
           />
         )}
@@ -432,7 +485,7 @@ function Merchants() {
               <DetailRow k="الرقم الضريبي" v={viewing.tax} />
               <DetailRow k="انتهاء البطاقة الضريبية" v={viewing.taxCardExpiry ?? "—"} />
               <DetailRow k="الحالة" v={viewing.status === "active" ? "نشط" : "موقوف"} />
-              <DetailRow k="البنك التابع له" v={entityName(viewing.entityId)} />
+              <DetailRow k="البنك التابع له" v={entityName(banks, viewing.entityId)} />
               <DetailRow k="عدد المعاملات" v={String(viewing.transactions)} />
               <div className="sm:col-span-2">
                 <DetailRow k="العنوان" v={viewing.address} />
@@ -493,11 +546,15 @@ function MerchantDialog({
   title,
   initial,
   defaultEntityId,
+  lockEntity,
+  banks,
   onSave,
 }: {
   title: string;
   initial?: Merchant;
   defaultEntityId?: string;
+  lockEntity?: boolean;
+  banks: { id: number; name: string }[];
   onSave: (m: Merchant) => void;
 }) {
   referenceTablesCell.use();
@@ -511,7 +568,7 @@ function MerchantDialog({
   const [contact, setContact] = useState(initial?.contact === "—" ? "" : (initial?.contact ?? ""));
   const [status, setStatus] = useState<"active" | "suspended">(initial?.status ?? "active");
   const [entityId, setEntityId] = useState<string>(
-    initial?.entityId ?? defaultEntityId ?? String(BANK_ENTITIES[0].id),
+    initial?.entityId ?? defaultEntityId ?? (banks[0] ? String(banks[0].id) : ""),
   );
   const [owners, setOwners] = useState(
     initial?.owners?.length ? initial.owners : [{ id: `own_${Date.now()}`, name: "", share: 25 }],
@@ -607,16 +664,12 @@ function MerchantDialog({
         </Field>
         <div className="sm:col-span-2">
           <Field label="البنك التابع له *">
-            <Select
-              value={entityId}
-              onValueChange={setEntityId}
-              disabled={!!defaultEntityId && !initial}
-            >
+            <Select value={entityId} onValueChange={setEntityId} disabled={lockEntity}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {BANK_ENTITIES.map((e) => (
+                {banks.map((e) => (
                   <SelectItem key={e.id} value={String(e.id)}>
                     {e.name}
                   </SelectItem>
